@@ -2,7 +2,7 @@ import axios from "axios";
 import qs from "qs"; // npm install qs
 
 const api = axios.create({
-    baseURL: import.meta.env.VITE_API_BASE_URL || "https://843a182d52ad.ngrok-free.app/api",
+    baseURL: import.meta.env.VITE_API_BASE_URL || "http://localhost:8080/api",
     withCredentials: true,
     paramsSerializer: (params) => {
         // 👉 bikin array jadi certIds=1&certIds=2

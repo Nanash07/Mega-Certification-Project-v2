@@ -1,8 +1,10 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
+// Auth
 import Login from "./pages/auth/Login";
 import ForgotPassword from "./pages/auth/ForgotPassword";
 
+// Layouts & Guards
 import ProtectedRoute from "./routes/ProtectedRoute";
 import MainLayout from "./layouts/MainLayout";
 
@@ -46,6 +48,9 @@ import DetailBatchPage from "./pages/batch/DetailBatchPage";
 
 // ================= USERS =================
 import UserPage from "./pages/users/UserPage";
+
+// ================= SETTINGS =================
+import EmailConfigPage from "./pages/Settings/EmailConfigPage";
 
 export default function App() {
     return (
@@ -319,6 +324,18 @@ export default function App() {
                         <ProtectedRoute roles={["SUPERADMIN"]}>
                             <MainLayout>
                                 <UserPage />
+                            </MainLayout>
+                        </ProtectedRoute>
+                    }
+                />
+
+                {/* ===== SETTINGS (EMAIL CONFIG) ===== */}
+                <Route
+                    path="/settings/email-config"
+                    element={
+                        <ProtectedRoute roles={["SUPERADMIN"]}>
+                            <MainLayout>
+                                <EmailConfigPage />
                             </MainLayout>
                         </ProtectedRoute>
                     }

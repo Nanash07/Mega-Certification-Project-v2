@@ -102,6 +102,12 @@ export const MENU = [
         href: "/user",
         key: "user",
     },
+    {
+        label: "Settings",
+        icon: <Settings size={18} />,
+        key: "settings",
+        subMenu: [{ label: "Konfigurasi Email (SMTP)", href: "/settings/email-config" }],
+    },
 ];
 
 // ======== ROLE-BASED FILTERING ========
