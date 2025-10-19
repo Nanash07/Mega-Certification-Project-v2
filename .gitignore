@@ -1,0 +1,79 @@
+### === Global === ###
+.DS_Store
+Thumbs.db
+*.log
+*.out
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+*.tmp
+*.bak
+*~
+
+### === Environment & Secrets === ###
+.env
+.env.*
+*.key
+*.pem
+*.crt
+*.csr
+*.p12
+*.jks
+.gitconfig
+.git-credentials
+
+### === Build & Distribution === ###
+dist/
+dist-ssr/
+build/
+target/
+out/
+coverage/
+test-output/
+surefire-reports/
+jacoco.exec
+
+### === Frontend (Node.js) === ###
+node_modules/
+.vscode/
+*.local
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+### === Backend (Spring Boot / Maven) === ###
+.mvn/
+!.mvn/wrapper/maven-wrapper.jar
+!.mvn/wrapper/maven-wrapper.properties
+!.mvn/wrapper/maven-wrapperDownloader.java
+HELP.md
+
+### === IDE Files === ###
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.iml
+*.ipr
+*.iws
+.classpath
+.project
+.settings/
+.sts4-cache/
+.springBeans/
+.factorypath/
+.apt_generated/
+
+### === OS Specific === ###
+.DS_Store
+Thumbs.db
+
+### === Docker === ###
+docker-compose.override.yml
+Dockerfile.local
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
