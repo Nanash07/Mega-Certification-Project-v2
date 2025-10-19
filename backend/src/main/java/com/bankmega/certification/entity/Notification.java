@@ -5,7 +5,10 @@ import lombok.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "notifications")
+@Table(name = "notifications", indexes = {
+        @Index(name = "idx_notifications_user", columnList = "user_id"),
+        @Index(name = "idx_notifications_is_read", columnList = "is_read")
+})
 @Getter
 @Setter
 @Builder
@@ -17,29 +20,56 @@ public class Notification {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // penerima notifikasi (biasanya FK ke users.id)
-    @Column(nullable = false)
-    private Long recipientId;
+    @Column(name = "user_id", nullable = false)
+    private Long userId;
 
-    // judul singkat notifikasi
     @Column(length = 255, nullable = false)
     private String title;
 
-    // isi notifikasi lengkap
     @Column(columnDefinition = "TEXT", nullable = false)
     private String message;
 
     @Builder.Default
-    @Column(nullable = false)
-    private Boolean readStatus = false;
+    @Column(name = "is_read", nullable = false)
+    private boolean isRead = false;
 
+    @Column(name = "read_at")
     private LocalDateTime readAt;
 
-    @Builder.Default
-    @Column(nullable = false)
-    private LocalDateTime createdAt = LocalDateTime.now();
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
 
-    // optional: buat arahkan ke entity tertentu (misal batch atau sertifikat)
+    @Column(name = "sent_at")
+    private LocalDateTime sentAt;
+
+    @Builder.Default
+    @Column(name = "success")
+    private Boolean success = true;
+
+    @Column(name = "error_message")
+    private String errorMessage;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "type", length = 50)
+    private Type type;
+
+    @Column(name = "related_entity")
     private String relatedEntity;
+
+    @Column(name = "related_entity_id")
     private Long relatedEntityId;
+
+    @PrePersist
+    protected void onCreate() {
+        if (createdAt == null) {
+            createdAt = LocalDateTime.now();
+        }
+    }
+
+    // 🔹 ENUM notifikasi
+    public enum Type {
+        CERT_REMINDER,
+        BATCH_NOTIFICATION,
+        EXPIRED_NOTICE
+    }
 }

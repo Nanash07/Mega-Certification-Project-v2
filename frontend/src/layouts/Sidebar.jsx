@@ -9,35 +9,21 @@ import {
     ChevronUp,
     BadgeCheck,
     Bell,
-    FileText,
-    Layers,
     ClipboardList,
     Settings,
 } from "lucide-react";
 
 // ================== MENU MASTER ==================
 export const MENU = [
-    // 1. Dashboard & Monitoring
+    // 1. Dashboard
     {
         label: "Dashboard",
         icon: <LayoutDashboard size={18} />,
         href: "/dashboard",
         key: "dashboard",
     },
-    /*{
-    label: "Reminder / Notifikasi",
-    icon: <Bell size={18} />,
-    href: "/reminder",
-    key: "reminder",
-  },
-  {
-    label: "Reports",
-    icon: <FileText size={18} />,
-    href: "/reports",
-    key: "reports",
-  },*/
 
-    // 2. Data Pegawai & Organization
+    // 2. Employee
     {
         label: "Employee",
         icon: <User size={18} />,
@@ -50,7 +36,7 @@ export const MENU = [
         ],
     },
 
-    // 5. Batch Sertifikasi
+    // 3. Batch Sertifikasi
     {
         label: "Batch Sertifikasi",
         icon: <ClipboardList size={18} />,
@@ -69,7 +55,7 @@ export const MENU = [
         ],
     },
 
-    // 3. Master Sertifikasi
+    // 5. Master Sertifikasi
     {
         label: "Sertifikasi",
         icon: <BadgeCheck size={18} />,
@@ -83,6 +69,7 @@ export const MENU = [
         ],
     },
 
+    // 6. Organization
     {
         label: "Organization",
         icon: <Users size={18} />,
@@ -95,18 +82,23 @@ export const MENU = [
         ],
     },
 
-    // 6. User & Role Management
+    // 7. User Management
     {
         label: "Manajemen User",
         icon: <Settings size={18} />,
         href: "/user",
         key: "user",
     },
+
+    // 8. Settings / Notification
     {
-        label: "Settings",
-        icon: <Settings size={18} />,
+        label: "Notifikasi",
+        icon: <Bell size={18} />,
         key: "settings",
-        subMenu: [{ label: "Konfigurasi Email (SMTP)", href: "/settings/email-config" }],
+        subMenu: [
+            { label: "Template & Jadwal", href: "/settings/notification-settings" },
+            { label: "Konfigurasi Email (SMTP)", href: "/settings/email-config" },
+        ],
     },
 ];
 
@@ -130,21 +122,21 @@ const filterMenuByRole = (menu, roleRaw) => {
     }
 
     // Default (PEGAWAI / unknown): cuma menu personal
-    return menu.filter((item) => item.key === "dashboard" || item.key === "employee" || item.key === "reminder");
+    return menu.filter((item) => item.key === "dashboard" || item.key === "employee");
 };
 
 export default function Sidebar({ open, setOpen }) {
     const location = useLocation();
     const [openMenu, setOpenMenu] = useState("");
 
-    // Ambil role dari storage (fleksibel)
+    // Ambil role dari storage
     const role = (JSON.parse(localStorage.getItem("user") || "{}").role || localStorage.getItem("role") || "")
         .toString()
         .toUpperCase();
 
     const visibleMenu = filterMenuByRole(MENU, role);
 
-    // Auto expand parent submenu kalau route ada di salah satu anaknya
+    // Auto expand submenu yang aktif
     useEffect(() => {
         const parent = visibleMenu.find(
             (m) => m.subMenu && m.subMenu.some((s) => location.pathname.startsWith(s.href))
@@ -153,11 +145,11 @@ export default function Sidebar({ open, setOpen }) {
     }, [location.pathname, visibleMenu]);
 
     const handleMenuClick = (key) => setOpenMenu((prev) => (prev === key ? "" : key));
+
     const handleLinkClick = () => {
         if (window.innerWidth < 1024) setOpen(false);
     };
 
-    // Active states
     const isActive = (href) => location.pathname === href || location.pathname.startsWith(href + "/");
     const isParentActive = (submenu) => submenu.some((sub) => isActive(sub.href));
     const isMenuActive = (item) =>

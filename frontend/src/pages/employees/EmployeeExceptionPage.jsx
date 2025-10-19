@@ -159,10 +159,126 @@ export default function EmployeeExceptionPage() {
 
     return (
         <div>
-            {/* Toolbar */}
-            <div className="mb-4 space-y-3">
-                {/* buttons + filters */}
-                {/* ... (kode toolbar tetap sama bro) */}
+            <div className="space-y-3 mb-4">
+                {/* 🔸 Button Row */}
+                <div className="grid grid-cols-6 gap-3">
+                    <div className="lg:col-span-2"></div>
+                    <div>
+                        <button className="btn btn-primary btn-sm w-full" onClick={() => setShowCreateModal(true)}>
+                            + Tambah
+                        </button>
+                    </div>
+
+                    <div>
+                        <button className="btn btn-success btn-sm w-full" onClick={() => setShowImportModal(true)}>
+                            Import Excel
+                        </button>
+                    </div>
+
+                    <div>
+                        <button className="btn btn-secondary btn-sm w-full" onClick={handleDownloadTemplate}>
+                            Download Template
+                        </button>
+                    </div>
+
+                    <div>
+                        <button
+                            className="btn btn-accent btn-soft border-accent btn-sm w-full"
+                            onClick={() => {
+                                setFilterEmployee(null);
+                                setFilterJob([]);
+                                setFilterCert([]);
+                                setFilterLevel([]);
+                                setFilterSub([]);
+                                setFilterStatus([]);
+                                setPage(1);
+                                load();
+                                toast.success("Filter dibersihkan");
+                            }}
+                        >
+                            Clear Filter
+                        </button>
+                    </div>
+                </div>
+
+                {/* 🔸 Filter Row */}
+                <div className="grid grid-cols-6 gap-3 items-end">
+                    {/* Pegawai */}
+                    <div className="col-span-1">
+                        <AsyncSelect
+                            cacheOptions
+                            defaultOptions
+                            loadOptions={loadEmployees}
+                            value={filterEmployee}
+                            onChange={setFilterEmployee}
+                            placeholder="Cari pegawai..."
+                            className="text-xs"
+                        />
+                    </div>
+
+                    {/* Jabatan */}
+                    <div className="col-span-1">
+                        <Select
+                            isMulti
+                            options={jobOptions}
+                            value={filterJob}
+                            onChange={setFilterJob}
+                            placeholder="Pilih jabatan..."
+                            className="text-xs"
+                        />
+                    </div>
+
+                    {/* Sertifikasi */}
+                    <div className="col-span-1">
+                        <Select
+                            isMulti
+                            options={certOptions}
+                            value={filterCert}
+                            onChange={setFilterCert}
+                            placeholder="Pilih sertifikasi..."
+                            className="text-xs"
+                        />
+                    </div>
+
+                    {/* Level */}
+                    <div className="col-span-1">
+                        <Select
+                            isMulti
+                            options={levelOptions}
+                            value={filterLevel}
+                            onChange={setFilterLevel}
+                            placeholder="Pilih level..."
+                            className="text-xs"
+                        />
+                    </div>
+
+                    {/* Sub Bidang */}
+                    <div className="col-span-1">
+                        <Select
+                            isMulti
+                            options={subOptions}
+                            value={filterSub}
+                            onChange={setFilterSub}
+                            placeholder="Pilih sub bidang..."
+                            className="text-xs"
+                        />
+                    </div>
+
+                    {/* Status */}
+                    <div className="col-span-1">
+                        <Select
+                            isMulti
+                            options={[
+                                { value: true, label: "ACTIVE" },
+                                { value: false, label: "NONACTIVE" },
+                            ]}
+                            value={filterStatus}
+                            onChange={setFilterStatus}
+                            placeholder="Pilih status..."
+                            className="text-xs"
+                        />
+                    </div>
+                </div>
             </div>
 
             {/* Table */}

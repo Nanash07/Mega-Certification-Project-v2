@@ -14,6 +14,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
 
@@ -204,7 +205,7 @@ public class EmployeeCertificationService {
         EmployeeCertification ec = repo.findByIdAndDeletedAtIsNull(id)
                 .orElseThrow(() -> new RuntimeException("Certification not found"));
 
-        ec.setDeletedAt(Instant.now());
+        ec.setDeletedAt(LocalDateTime.now());
         ec.setStatus(EmployeeCertification.Status.INVALID);
         ec.setUpdatedAt(Instant.now());
 

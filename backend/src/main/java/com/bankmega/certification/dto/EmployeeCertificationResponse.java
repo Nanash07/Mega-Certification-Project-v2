@@ -5,6 +5,7 @@ import lombok.*;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Getter
 @Setter
@@ -36,13 +37,13 @@ public class EmployeeCertificationResponse {
 
     // 🔹 Info Sertifikat
     private String certNumber;
-    private LocalDate certDate;      // Tanggal sertifikat diterbitkan
-    private LocalDate validFrom;     // Berlaku dari
-    private LocalDate validUntil;    // Berlaku sampai
-    private LocalDate reminderDate;  // Tanggal mulai reminder
-    
+    private LocalDate certDate; // Tanggal sertifikat diterbitkan
+    private LocalDate validFrom; // Berlaku dari
+    private LocalDate validUntil; // Berlaku sampai
+    private LocalDate reminderDate; // Tanggal mulai reminder
+
     private String fileUrl;
-    private String fileName;   // Nama asli file
+    private String fileName; // Nama asli file
     private String fileType;
 
     private EmployeeCertification.Status status;
@@ -51,5 +52,5 @@ public class EmployeeCertificationResponse {
     // 🔹 Audit
     private Instant createdAt;
     private Instant updatedAt;
-    private Instant deletedAt;
+    private LocalDateTime deletedAt;
 }

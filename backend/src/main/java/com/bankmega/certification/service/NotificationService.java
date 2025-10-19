@@ -1,134 +1,255 @@
 package com.bankmega.certification.service;
 
-import com.bankmega.certification.entity.EmailConfig;
-import com.bankmega.certification.entity.Notification;
+import com.bankmega.certification.entity.*;
+import com.bankmega.certification.repository.EmployeeBatchRepository;
+import com.bankmega.certification.repository.EmployeeCertificationRepository;
 import com.bankmega.certification.repository.NotificationRepository;
-import com.bankmega.certification.security.AESUtil;
 import lombok.RequiredArgsConstructor;
-import org.springframework.mail.SimpleMailMessage;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.mail.javamail.JavaMailSenderImpl;
+import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
+import jakarta.mail.internet.MimeMessage;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Properties;
+import java.util.*;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class NotificationService {
 
     private final NotificationRepository notificationRepository;
+    private final EmployeeCertificationRepository employeeCertificationRepository;
+    private final EmployeeBatchRepository employeeBatchRepository;
     private final EmailConfigService emailConfigService;
+    private final NotificationTemplateService templateService;
+    private final JavaMailSenderImpl reusableMailSender; // ✅ pake bean dari MailSenderConfig
 
-    /**
-     * Kirim notifikasi (in-app + email)
-     */
-    public Notification sendNotification(Long recipientId, String recipientEmail, String title, String message) {
-        // 📨 1️⃣ Simpan notifikasi in-app
+    // ================== GENERIC NOTIFICATION ==================
+    public Notification sendNotification(Long userId, String email, String title, String message,
+            Notification.Type type, String relatedEntity, Long relatedEntityId) {
+
         Notification notification = Notification.builder()
-                .recipientId(recipientId)
+                .userId(userId)
                 .title(title)
                 .message(message)
-                .readStatus(false)
+                .type(type)
+                .isRead(false)
+                .relatedEntity(relatedEntity)
+                .relatedEntityId(relatedEntityId)
                 .createdAt(LocalDateTime.now())
+                .sentAt(LocalDateTime.now())
                 .build();
 
         notificationRepository.save(notification);
+        log.info("📨 Notifikasi disimpan ke DB untuk userId={} | {}", userId, title);
 
-        // 💌 2️⃣ Kirim email jika tersedia
-        if (recipientEmail != null && !recipientEmail.isBlank()) {
-            sendEmail(recipientEmail, title, message);
+        if (email != null && !email.isBlank()) {
+            sendEmailAsync(email, title, message);
         }
 
         return notification;
     }
 
-    /**
-     * Kirim email berdasarkan konfigurasi aktif dari EmailConfig
-     */
-    private void sendEmail(String to, String subject, String text) {
+    // ================== REMINDER SERTIFIKASI ==================
+    public void sendCertificationReminder(Employee employee, EmployeeCertification cert) {
         try {
-            // 🔹 Ambil konfigurasi aktif
-            EmailConfig config = emailConfigService.getActiveConfigEntity();
+            if (employee == null || employee.getEmail() == null || employee.getEmail().isBlank())
+                return;
+            if (cert == null || cert.getCertificationRule() == null)
+                return;
 
-            if (config.getPassword() == null || config.getPassword().isBlank()) {
-                throw new RuntimeException("Password SMTP kosong di konfigurasi aktif");
-            }
+            NotificationTemplate.Code code = NotificationTemplate.Code.CERT_REMINDER;
+            var rule = cert.getCertificationRule();
+            var certEntity = rule.getCertification();
 
-            // 🔐 Dekripsi password
-            String realPassword = AESUtil.decrypt(config.getPassword());
+            // 🔹 Lengkapi nama sertifikasi
+            String fullName = certEntity != null ? certEntity.getName() : "-";
+            if (rule.getCertificationLevel() != null)
+                fullName += " - " + rule.getCertificationLevel().getName();
+            if (rule.getSubField() != null)
+                fullName += " (" + rule.getSubField().getName() + ")";
 
-            // 🔧 Setup JavaMailSender dinamis
-            JavaMailSenderImpl mailSender = new JavaMailSenderImpl();
-            mailSender.setHost(config.getHost());
-            mailSender.setPort(config.getPort());
-            mailSender.setUsername(config.getUsername());
-            mailSender.setPassword(realPassword);
+            String subject = templateService.generateTitle(code, employee, fullName, cert.getValidUntil(), null, null);
+            String body = templateService.generateMessage(code, employee, fullName, cert.getValidUntil(), null, null);
 
-            Properties props = mailSender.getJavaMailProperties();
-            props.put("mail.smtp.auth", "true");
-            props.put("mail.smtp.starttls.enable", String.valueOf(config.getUseTls()));
-            props.put("mail.smtp.timeout", "30000");
-            props.put("mail.smtp.connectiontimeout", "30000");
-            props.put("mail.smtp.writetimeout", "30000");
+            sendNotification(employee.getId(), employee.getEmail(), subject, body,
+                    Notification.Type.CERT_REMINDER, "EmployeeCertification", cert.getId());
 
-            // 📨 Siapkan pesan email
-            SimpleMailMessage message = new SimpleMailMessage();
-            message.setFrom(config.getUsername());
-            message.setTo(to);
-            message.setSubject(subject);
-            message.setText(text + "\n\n--\nDikirim otomatis oleh Mega Certification System");
+            log.info("✅ Reminder cert dikirim ke {} untuk sertifikasi {}", employee.getEmail(), fullName);
 
-            // 🚀 Kirim email
-            mailSender.send(message);
-            System.out.println("✅ Email terkirim ke " + to);
+            // Tambah jeda kecil antar email biar Gmail gak nendang
+            TimeUnit.SECONDS.sleep(1);
 
         } catch (Exception e) {
-            System.err.println("❌ Gagal kirim email ke " + to + ": " + e.getMessage());
-            e.printStackTrace();
+            log.error("❌ Gagal kirim reminder cert ke {}: {}", employee != null ? employee.getEmail() : "null",
+                    e.getMessage(), e);
         }
     }
 
-    /**
-     * Ambil semua notifikasi user
-     */
-    public List<Notification> getUserNotifications(Long userId) {
-        return notificationRepository.findByRecipientIdOrderByCreatedAtDesc(userId);
+    // ================== NOTIFIKASI BATCH ==================
+    public void sendBatchNotification(Employee employee, String namaSertifikasi, String namaBatch,
+            LocalDateTime mulaiTanggal) {
+        try {
+            if (employee == null || employee.getEmail() == null || employee.getEmail().isBlank())
+                return;
+
+            NotificationTemplate.Code code = NotificationTemplate.Code.BATCH_NOTIFICATION;
+            String subject = templateService.generateTitle(
+                    code, employee, namaSertifikasi, null, namaBatch,
+                    mulaiTanggal != null ? mulaiTanggal.toLocalDate() : null);
+            String body = templateService.generateMessage(
+                    code, employee, namaSertifikasi, null, namaBatch,
+                    mulaiTanggal != null ? mulaiTanggal.toLocalDate() : null);
+
+            sendNotification(employee.getId(), employee.getEmail(), subject, body,
+                    Notification.Type.BATCH_NOTIFICATION, "Batch", null);
+
+            log.info("✅ Notifikasi batch '{}' dikirim ke {}", namaBatch, employee.getEmail());
+
+        } catch (Exception e) {
+            log.error("❌ Gagal kirim notifikasi batch ke {}: {}", employee != null ? employee.getEmail() : "null",
+                    e.getMessage(), e);
+        }
     }
 
-    /**
-     * Tandai notifikasi sebagai sudah dibaca
-     */
+    // ================== EMAIL SENDER (OPTIMIZED) ==================
+    @Async("mailExecutor")
+    protected void sendEmailAsync(String to, String subject, String htmlContent) {
+        log.info("🚀 Kirim email async ke {} | {}", to, subject);
+
+        int retries = 3;
+        while (retries-- > 0) {
+            try {
+                MimeMessage message = reusableMailSender.createMimeMessage();
+                MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+                helper.setFrom(reusableMailSender.getUsername());
+                helper.setTo(to);
+                helper.setSubject(subject);
+                helper.setText("""
+                        <div style='font-family: Arial, sans-serif; line-height: 1.6;'>
+                            %s
+                            <br><br>
+                            <p style='font-size: 12px; color: gray;'>
+                                --<br>Dikirim otomatis oleh <b>Mega Certification System</b>
+                            </p>
+                        </div>
+                        """.formatted(htmlContent.replace("\n", "<br>")), true);
+
+                reusableMailSender.send(message);
+                log.info("✅ Email sukses dikirim ke {}", to);
+                return;
+
+            } catch (Exception e) {
+                log.warn("⚠️ Gagal kirim email ke {} (retry {}x): {}", to, (3 - retries), e.getMessage());
+                try {
+                    TimeUnit.SECONDS.sleep(2);
+                } catch (InterruptedException ignored) {
+                }
+            }
+        }
+
+        log.error("❌ Email gagal dikirim ke {} setelah 3 percobaan", to);
+    }
+
+    // ================== UTIL ==================
+    public List<Notification> getUserNotifications(Long userId) {
+        return notificationRepository.findByUserIdOrderByCreatedAtDesc(userId);
+    }
+
     public void markAsRead(Long notificationId) {
         notificationRepository.findById(notificationId).ifPresent(notif -> {
-            notif.setReadStatus(true);
-            notif.setReadAt(LocalDateTime.now());
-            notificationRepository.save(notif);
+            if (!notif.isRead()) {
+                notif.setRead(true);
+                notif.setReadAt(LocalDateTime.now());
+                notificationRepository.save(notif);
+                log.info("📬 Notifikasi {} ditandai sudah dibaca", notificationId);
+            }
         });
     }
 
-    /**
-     * Hitung jumlah notifikasi yang belum dibaca
-     */
     public long getUnreadCount(Long userId) {
-        return notificationRepository.countByRecipientIdAndReadStatusFalse(userId);
+        return notificationRepository.countByUserIdAndIsReadFalse(userId);
     }
 
-    /**
-     * Endpoint test kirim email (buat testing dari Postman/FE)
-     */
+    // ================== TEST EMAIL ==================
     public void testEmail(String to) {
-        sendEmail(
+        log.info("📧 Kirim test email ke {}", to);
+        sendEmailAsync(
                 to,
-                "📧 Test Email dari Mega Certification System",
+                "Test Email dari Mega Certification System",
                 """
-                        Halo Bro 👋
-
-                        Ini adalah email test dari sistem sertifikasi Bank Mega.
-                        Kalau lo nerima email ini, berarti konfigurasi SMTP aktif udah beres 💪
-
-                        Salam,
-                        Mega Certification Team
+                        <p>Halo,</p>
+                        <p>Ini adalah email percobaan dari sistem sertifikasi Bank Mega.</p>
+                        <p>Kalau Anda menerima email ini, berarti konfigurasi SMTP sudah berfungsi dengan baik.</p>
+                        <p>Salam,<br><b>Divisi Learning & Development</b><br>Bank Mega</p>
                         """);
+    }
+
+    // ================== PROCESS CERT REMINDER ==================
+    public void processCertReminder() {
+        LocalDate today = LocalDate.now();
+        log.info("🔄 Proses reminder sertifikasi untuk tanggal {}", today);
+
+        List<EmployeeCertification> dueCerts = employeeCertificationRepository
+                .findByReminderDateAndDeletedAtIsNull(today);
+
+        if (dueCerts.isEmpty()) {
+            log.info("✅ Tidak ada sertifikasi due hari ini");
+            return;
+        }
+
+        List<Notification> sent = notificationRepository
+                .findByTypeAndRelatedEntity(Notification.Type.CERT_REMINDER, "EmployeeCertification");
+
+        Set<String> sentPairs = sent.stream()
+                .map(n -> n.getUserId() + "-" + n.getRelatedEntityId())
+                .collect(Collectors.toSet());
+
+        List<EmployeeCertification> toSend = dueCerts.stream()
+                .filter(c -> c.getEmployee() != null)
+                .filter(c -> !sentPairs.contains(c.getEmployee().getId() + "-" + c.getId()))
+                .toList();
+
+        log.info("📬 Ditemukan {} sertifikasi due untuk dikirim reminder", toSend.size());
+
+        for (EmployeeCertification cert : toSend) {
+            sendCertificationReminder(cert.getEmployee(), cert);
+        }
+
+        log.info("✅ Semua reminder sertifikasi ({}) berhasil diproses!", toSend.size());
+    }
+
+    // ================== PROCESS BATCH NOTIFICATION ==================
+    public void processBatchNotification() {
+        log.info("🔄 Proses notifikasi batch berjalan...");
+        List<EmployeeBatch> active = employeeBatchRepository.findByBatch_StatusInAndDeletedAtIsNull(
+                List.of(Batch.Status.PLANNED, Batch.Status.ONGOING));
+
+        for (EmployeeBatch eb : active) {
+            Employee emp = eb.getEmployee();
+            if (emp == null || emp.getEmail() == null || emp.getEmail().isBlank())
+                continue;
+
+            Batch batch = eb.getBatch();
+            if (batch == null || batch.getCertificationRule() == null)
+                continue;
+
+            var rule = batch.getCertificationRule();
+            String namaSertifikasi = rule.getCertification().getName();
+            if (rule.getCertificationLevel() != null)
+                namaSertifikasi += " - " + rule.getCertificationLevel().getName();
+            if (rule.getSubField() != null)
+                namaSertifikasi += " (" + rule.getSubField().getName() + ")";
+
+            sendBatchNotification(emp, namaSertifikasi, batch.getBatchName(),
+                    batch.getStartDate() != null ? batch.getStartDate().atStartOfDay() : LocalDateTime.now());
+        }
     }
 }

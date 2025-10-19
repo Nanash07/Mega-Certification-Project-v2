@@ -49,8 +49,9 @@ import DetailBatchPage from "./pages/batch/DetailBatchPage";
 // ================= USERS =================
 import UserPage from "./pages/users/UserPage";
 
-// ================= SETTINGS =================
-import EmailConfigPage from "./pages/Settings/EmailConfigPage";
+// ================= SETTINGS / NOTIFICATIONS =================
+import EmailConfigPage from "./pages/Notification/EmailConfigPage";
+import NotificationSettingsPage from "./pages/Notification/NotificationSettingsPage";
 
 export default function App() {
     return (
@@ -60,7 +61,7 @@ export default function App() {
                 <Route path="/login" element={<Login />} />
                 <Route path="/forgot-password" element={<ForgotPassword />} />
 
-                {/* ===== REDIRECT ROOT ===== */}
+                {/* ===== ROOT REDIRECT ===== */}
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
                 {/* ===== DASHBOARD ===== */}
@@ -329,7 +330,6 @@ export default function App() {
                     }
                 />
 
-                {/* ===== SETTINGS (EMAIL CONFIG) ===== */}
                 <Route
                     path="/settings/email-config"
                     element={
@@ -340,7 +340,16 @@ export default function App() {
                         </ProtectedRoute>
                     }
                 />
-
+                <Route
+                    path="/settings/notification-settings"
+                    element={
+                        <ProtectedRoute roles={["SUPERADMIN"]}>
+                            <MainLayout>
+                                <NotificationSettingsPage />
+                            </MainLayout>
+                        </ProtectedRoute>
+                    }
+                />
                 {/* ===== FALLBACK ===== */}
                 <Route path="*" element={<Navigate to="/login" replace />} />
             </Routes>
