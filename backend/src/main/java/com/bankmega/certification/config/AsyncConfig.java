@@ -15,7 +15,7 @@ public class AsyncConfig implements AsyncConfigurer {
     public Executor getAsyncExecutor() {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
         executor.setCorePoolSize(10); // 🔹 5 email bisa dikirim paralel
-        executor.setMaxPoolSize(20);
+        executor.setMaxPoolSize(5);
         executor.setQueueCapacity(200);
         executor.setThreadNamePrefix("EmailSender-");
         executor.setKeepAliveSeconds(120);

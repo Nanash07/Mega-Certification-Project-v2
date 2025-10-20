@@ -57,8 +57,10 @@ public class NotificationScheduleService {
         schedule.setUpdatedBy(req.getUpdatedBy());
         schedule.setUpdatedAt(LocalDateTime.now());
 
-        NotificationSchedule saved = repo.save(schedule);
-        log.info("✅ Jadwal notifikasi {} berhasil disimpan/diupdate", req.getType());
+        NotificationSchedule saved = repo.saveAndFlush(schedule);
+        log.info("✅ Jadwal notifikasi {} berhasil disimpan/diupdate (active={}, time={}, skipWeekend={})",
+                req.getType(), saved.getActive(), saved.getTime(), saved.getSkipWeekend());
+
         return toResponse(saved);
     }
 
@@ -107,9 +109,8 @@ public class NotificationScheduleService {
             LocalTime now = LocalTime.now().withSecond(0).withNano(0);
             LocalTime target = LocalTime.parse(schedule.getTime().trim());
 
-            // Kasih toleransi ±1 menit biar gak kelewat
-            boolean match = now.getHour() == target.getHour()
-                    && Math.abs(now.getMinute() - target.getMinute()) <= 15;
+            // ⏰ Toleransi ±2 menit dari waktu target
+            boolean match = now.isAfter(target.minusMinutes(2)) && now.isBefore(target.plusMinutes(2));
 
             if (match) {
                 log.info("⏰ Jadwal {} waktunya jalan (now={}, target={})", schedule.getType(), now, target);
@@ -126,8 +127,10 @@ public class NotificationScheduleService {
     public void markExecuted(NotificationSchedule schedule) {
         if (schedule == null)
             return;
+
         schedule.setLastRun(LocalDateTime.now());
-        repo.save(schedule);
-        log.info("🕒 Jadwal {} ditandai sudah dieksekusi pada {}", schedule.getType(), schedule.getLastRun());
+        repo.saveAndFlush(schedule); // ✅ langsung commit biar gak delay
+        log.info("🕒 Jadwal {} ditandai sudah dieksekusi pada {}",
+                schedule.getType(), schedule.getLastRun());
     }
 }

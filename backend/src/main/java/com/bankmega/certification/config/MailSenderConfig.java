@@ -1,20 +1,27 @@
 package com.bankmega.certification.config;
 
+import com.bankmega.certification.entity.EmailConfig;
+import com.bankmega.certification.security.AESUtil;
+import com.bankmega.certification.service.EmailConfigService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.mail.javamail.JavaMailSenderImpl;
-import com.bankmega.certification.service.EmailConfigService;
-import com.bankmega.certification.entity.EmailConfig;
-import com.bankmega.certification.security.AESUtil;
 
 import java.util.Properties;
 
 @Configuration
+@RequiredArgsConstructor
 public class MailSenderConfig {
 
+    private final EmailConfigService emailConfigService;
+
     @Bean
-    public JavaMailSenderImpl reusableMailSender(EmailConfigService emailConfigService) {
+    public JavaMailSenderImpl reusableMailSender() {
         EmailConfig config = emailConfigService.getActiveConfigEntity();
+        if (config == null) {
+            throw new IllegalStateException("⚠️ Tidak ada konfigurasi email aktif di database!");
+        }
 
         JavaMailSenderImpl mailSender = new JavaMailSenderImpl();
         mailSender.setHost(config.getHost());
@@ -24,11 +31,19 @@ public class MailSenderConfig {
 
         Properties props = mailSender.getJavaMailProperties();
         props.put("mail.smtp.auth", "true");
-        props.put("mail.smtp.starttls.enable", String.valueOf(config.getUseTls()));
+
+        if (Boolean.TRUE.equals(config.getUseTls())) {
+            props.put("mail.smtp.starttls.enable", "true");
+            props.put("mail.smtp.ssl.enable", "false");
+        } else {
+            props.put("mail.smtp.ssl.enable", "true");
+            props.put("mail.smtp.starttls.enable", "false");
+        }
+
         props.put("mail.smtp.ssl.trust", config.getHost());
-        props.put("mail.smtp.connectiontimeout", 10000);
-        props.put("mail.smtp.timeout", 10000);
-        props.put("mail.smtp.writetimeout", 10000);
+        props.put("mail.smtp.connectiontimeout", 30000);
+        props.put("mail.smtp.timeout", 30000);
+        props.put("mail.smtp.writetimeout", 30000);
 
         return mailSender;
     }

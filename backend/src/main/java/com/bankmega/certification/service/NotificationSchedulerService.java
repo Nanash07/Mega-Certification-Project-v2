@@ -8,6 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -20,32 +21,54 @@ public class NotificationSchedulerService {
     private final NotificationScheduleService scheduleService;
     private final NotificationService notificationService;
 
-    // ================== MAIN SCHEDULER ==================
     /**
-     * Scheduler utama, jalan setiap 1 menit (cron: detik=0)
+     * 🕐 Scheduler utama — jalan tiap 5 menit (hemat log & resource)
+     * - Cek semua jadwal aktif di DB
+     * - Jalanin hanya yang waktunya cocok dan belum dieksekusi hari ini
      */
-    @Scheduled(cron = "0 * * * * *")
+    @Scheduled(cron = "0 */5 * * * *") // tiap 5 menit
     public void runAllSchedules() {
-        log.info("🕐 [Scheduler] Checking all notification schedules at {}", LocalDateTime.now());
+        LocalDateTime now = LocalDateTime.now();
+        log.info("🕐 [Scheduler] Checking notification schedules at {}", now);
 
         List<NotificationSchedule> schedules = repo.findAll();
-
         if (schedules.isEmpty()) {
-            log.info("ℹ️ Tidak ada jadwal notifikasi yang terdaftar di database.");
+            log.info("ℹ️ Tidak ada jadwal notifikasi di database.");
             return;
         }
 
         for (NotificationSchedule s : schedules) {
             try {
-                if (!scheduleService.isActiveToday(s))
-                    continue;
-                if (!scheduleService.isTimeToRun(s))
-                    continue;
+                log.debug("🔍 Evaluating schedule {} (active={}, time={}, lastRun={})",
+                        s.getType(), s.getActive(), s.getTime(), s.getLastRun());
 
+                // Skip kalau jadwal tidak aktif / weekend
+                if (!scheduleService.isActiveToday(s)) {
+                    log.debug("⏸ Jadwal {} tidak aktif / skip weekend", s.getType());
+                    continue;
+                }
+
+                // Skip kalau belum waktunya
+                if (!scheduleService.isTimeToRun(s)) {
+                    log.debug("🕓 Belum waktunya untuk jadwal {}", s.getType());
+                    continue;
+                }
+
+                // Skip kalau sudah dijalankan hari ini
+                if (s.getLastRun() != null &&
+                        s.getLastRun().toLocalDate().isEqual(LocalDate.now()) &&
+                        LocalDateTime.now().isBefore(s.getLastRun().plusMinutes(10))) {
+                    log.debug("⏭ Jadwal {} sudah dijalankan hari ini (lastRun={})", s.getType(), s.getLastRun());
+                    continue;
+                }
+
+                // ✅ Jalankan jadwal
                 log.info("🚀 Menjalankan jadwal notifikasi untuk {}", s.getType());
                 runSchedule(s);
 
+                // ✅ Tandai sudah dieksekusi
                 scheduleService.markExecuted(s);
+                log.info("✅ Jadwal {} berhasil dijalankan dan ditandai executed", s.getType());
 
             } catch (Exception e) {
                 log.error("❌ Error saat menjalankan jadwal {}: {}", s.getType(), e.getMessage(), e);
@@ -53,10 +76,12 @@ public class NotificationSchedulerService {
         }
     }
 
-    // ================== JALANKAN SATU JADWAL ==================
+    /**
+     * ▶️ Jalankan satu jadwal berdasarkan tipe notifikasi
+     */
     public void runSchedule(NotificationSchedule schedule) {
         if (schedule == null || schedule.getType() == null) {
-            log.warn("⚠️ Jadwal kosong atau type null, dilewati.");
+            log.warn("⚠️ Jadwal kosong atau tipe null, dilewati.");
             return;
         }
 
@@ -68,10 +93,12 @@ public class NotificationSchedulerService {
                 case CERT_REMINDER -> {
                     log.info("🔔 Menjalankan proses CERT_REMINDER...");
                     notificationService.processCertReminder();
+                    log.info("✅ Proses CERT_REMINDER selesai.");
                 }
                 case BATCH_NOTIFICATION -> {
                     log.info("📢 Menjalankan proses BATCH_NOTIFICATION...");
                     notificationService.processBatchNotification();
+                    log.info("✅ Proses BATCH_NOTIFICATION selesai.");
                 }
                 default -> log.warn("⚠️ Belum ada handler untuk tipe notifikasi {}", type);
             }
@@ -80,12 +107,13 @@ public class NotificationSchedulerService {
         }
     }
 
-    // ================== RUN MANUAL DARI CONTROLLER ==================
+    /**
+     * 🧭 Manual trigger dari controller
+     */
     public void runManual(NotificationTemplate.Code type) {
         log.info("🧭 [Manual Trigger] Menjalankan jadwal {}", type);
 
         NotificationSchedule schedule = repo.findByType(type).orElse(null);
-
         if (schedule == null) {
             log.warn("⚠️ Jadwal {} tidak ditemukan di database", type);
             return;
