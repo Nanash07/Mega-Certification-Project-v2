@@ -27,11 +27,9 @@ public class EmployeeController {
             @RequestParam(required = false) List<Long> unitIds,
             @RequestParam(required = false) List<Long> jobPositionIds,
             @RequestParam(required = false) String search,
-            Pageable pageable
-    ) {
+            Pageable pageable) {
         return ResponseEntity.ok(
-                service.search(employeeIds, regionalIds, divisionIds, unitIds, jobPositionIds, search, pageable)
-        );
+                service.search(employeeIds, regionalIds, divisionIds, unitIds, jobPositionIds, search, pageable));
     }
 
     // 🔹 All (for dropdown)

@@ -25,8 +25,8 @@ public class EmployeeHistory {
     private Employee employee;
 
     // 🔹 Snapshot data pegawai
-    private String employeeNip;    // simpan NIP langsung
-    private String employeeName;   // simpan nama langsung
+    private String employeeNip; // simpan NIP langsung
+    private String employeeName; // simpan nama langsung
 
     // FK posisi lama & baru
     @ManyToOne
@@ -49,13 +49,13 @@ public class EmployeeHistory {
     private String newDivisionName;
     private String newRegionalName;
 
-    private LocalDate effectiveDate;   // tanggal SK efektif
+    private LocalDate effectiveDate; // tanggal SK efektif
 
     // 🔹 Enum actionType disimpan sebagai String
     @Enumerated(EnumType.STRING)
     private EmployeeActionType actionType;
 
-    private Instant actionAt;          
+    private Instant actionAt;
 
     // 🔹 Inner Enum
     public enum EmployeeActionType {

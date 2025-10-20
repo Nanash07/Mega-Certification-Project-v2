@@ -160,14 +160,6 @@ export default function NotificationSettingsPage() {
 
     return (
         <div className="space-y-6">
-            {/* Header */}
-            <div className="card bg-base-100 shadow p-5">
-                <h2 className="font-bold text-xl mb-1">Pengaturan Notifikasi</h2>
-                <p className="text-sm text-gray-500">
-                    Ubah template pesan dan jadwal notifikasi otomatis dalam satu halaman.
-                </p>
-            </div>
-
             {templates.map((tpl) => {
                 const previewData = renderPreview(
                     editing[tpl.id]?.title || tpl.title,
