@@ -336,7 +336,7 @@ export default function EmployeeCertificationPage() {
                                                     : r.status === "EXPIRED"
                                                     ? "badge-error"
                                                     : r.status === "INVALID"
-                                                    ? "badge-ghost"
+                                                    ? "badge-secondary"
                                                     : "badge-neutral"
                                             }`}
                                         >

@@ -207,6 +207,8 @@ export default function EmployeeDetailPage() {
                                                             ? "badge-warning"
                                                             : c.status === "PENDING"
                                                             ? "badge-info"
+                                                            : c.status === "INVALID"
+                                                            ? "badge-secondary"
                                                             : "badge-ghost"
                                                     }`}
                                                 >
