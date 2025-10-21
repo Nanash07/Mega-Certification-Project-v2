@@ -102,17 +102,13 @@ export default function EmailConfigPage() {
 
     return (
         <div className="space-y-6">
-            {/* Header Info */}
-            <div className="card bg-base-100 shadow p-5">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                    <div>
-                        <h2 className="font-bold text-xl mb-1">Konfigurasi Email (SMTP)</h2>
-                        <p className="text-sm text-gray-500">
-                            Ubah pengaturan server email pengirim untuk notifikasi sistem.
-                        </p>
-                    </div>
+            {/* Form Config */}
+            <div className="card bg-base-100 shadow p-5 space-y-5">
+                {/* Header Card Detail dengan info update */}
+                <div>
+                    <h3 className="font-semibold text-lg">Detail Konfigurasi</h3>
                     {activeConfig && (
-                        <div className="text-xs text-gray-400">
+                        <div className="text-xs text-gray-400 mt-1">
                             Terakhir diperbarui:{" "}
                             {new Date(activeConfig.updatedAt).toLocaleString("id-ID", {
                                 day: "2-digit",
@@ -124,18 +120,13 @@ export default function EmailConfigPage() {
                         </div>
                     )}
                 </div>
-            </div>
-
-            {/* Form Config */}
-            <div className="card bg-base-100 shadow p-5 space-y-5">
-                <h3 className="font-semibold text-lg mb-2">Detail Konfigurasi</h3>
 
                 {/* Baris 1: Host - Port - TLS */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-5 text-sm">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-5 text-xs">
                     <div>
                         <label className="text-gray-500 mb-1 block">SMTP Host</label>
                         <input
-                            className="input input-bordered w-full"
+                            className="input input-bordered w-full text-xs"
                             placeholder="smtp.gmail.com"
                             value={form.host}
                             onChange={(e) => handleChange("host", e.target.value)}
@@ -146,7 +137,7 @@ export default function EmailConfigPage() {
                         <label className="text-gray-500 mb-1 block">Port</label>
                         <input
                             type="number"
-                            className="input input-bordered w-full"
+                            className="input input-bordered w-full text-xs"
                             placeholder="587"
                             value={form.port}
                             onChange={(e) => handleChange("port", parseInt(e.target.value))}
@@ -156,7 +147,7 @@ export default function EmailConfigPage() {
                     <div>
                         <label className="text-gray-500 mb-1 block">Gunakan TLS</label>
                         <select
-                            className="select select-bordered w-full"
+                            className="select select-bordered w-full text-xs"
                             value={form.useTls}
                             onChange={(e) => handleChange("useTls", e.target.value === "true")}
                         >
@@ -167,11 +158,11 @@ export default function EmailConfigPage() {
                 </div>
 
                 {/* Baris 2: Username - Password - Simpan */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-5 text-sm">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-5 text-xs">
                     <div>
                         <label className="text-gray-500 mb-1 block">Email Pengirim</label>
                         <input
-                            className="input input-bordered w-full"
+                            className="input input-bordered w-full text-xs"
                             placeholder="contoh@gmail.com"
                             value={form.username}
                             onChange={(e) => handleChange("username", e.target.value)}
@@ -183,7 +174,7 @@ export default function EmailConfigPage() {
                         <div className="relative">
                             <input
                                 type={showPassword ? "text" : "password"}
-                                className="input input-bordered w-full pr-10"
+                                className="input input-bordered w-full pr-10 text-xs"
                                 placeholder={
                                     activeConfig && !passwordChanged
                                         ? "Password tersimpan (tidak diubah)"
@@ -204,7 +195,7 @@ export default function EmailConfigPage() {
 
                     <div className="flex items-end">
                         <button
-                            className="btn btn-warning w-full flex items-center justify-center gap-2 text-black"
+                            className="btn btn-warning w-full flex items-center justify-center gap-2 text-xs"
                             onClick={handleSave}
                             disabled={saving}
                         >
@@ -218,11 +209,11 @@ export default function EmailConfigPage() {
             {/* Card Test Email */}
             <div className="card bg-base-100 shadow p-5">
                 <h3 className="font-semibold text-lg mb-4">Test Pengiriman Email</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-4 text-sm items-center">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-4 text-xs items-center">
                     <div className="col-span-1">
                         <input
                             type="email"
-                            className="input input-bordered w-full"
+                            className="input input-bordered w-full text-xs"
                             placeholder="Masukkan email tujuan test"
                             value={testEmail}
                             onChange={(e) => setTestEmail(e.target.value)}
@@ -231,7 +222,7 @@ export default function EmailConfigPage() {
 
                     <div className="col-span-1">
                         <button
-                            className="btn btn-accent w-full flex items-center justify-center gap-2 text-white"
+                            className="btn btn-accent w-full flex items-center justify-center gap-2 text-xs"
                             onClick={handleTest}
                             disabled={testing}
                         >
