@@ -8,14 +8,32 @@ export default function NotificationSettingsPage() {
     const [loading, setLoading] = useState(true);
     const [templates, setTemplates] = useState([]);
     const [schedules, setSchedules] = useState([]);
+    const [activeTab, setActiveTab] = useState(null); // State untuk tab aktif
     const [editing, setEditing] = useState({});
     const [saving, setSaving] = useState(false);
-    const textareasRef = useRef({});
+    const textareaRef = useRef(null); // Ref tunggal untuk textarea yang aktif
+
+    // ===== Auto-resize Textarea Logic =====
+    const adjustTextarea = () => {
+        const ta = textareaRef.current;
+        if (ta) {
+            ta.style.height = "auto";
+            ta.style.height = ta.scrollHeight + "px";
+        }
+    };
 
     // Load data
     useEffect(() => {
         loadAll();
     }, []);
+
+    // Adjust textarea height when tab changes or data loads
+    useEffect(() => {
+        if (!loading && activeTab) {
+            // Beri sedikit delay agar DOM selesai render sebelum diukur
+            setTimeout(adjustTextarea, 50);
+        }
+    }, [activeTab, loading]);
 
     const loadAll = async () => {
         try {
@@ -23,7 +41,11 @@ export default function NotificationSettingsPage() {
             const [tplData, schedData] = await Promise.all([fetchAllTemplates(), fetchAllSchedules()]);
             setTemplates(tplData);
             setSchedules(schedData);
-            setTimeout(() => adjustAllTextareas(), 100);
+
+            // Set tab aktif pertama saat data dimuat
+            if (tplData.length > 0) {
+                setActiveTab(tplData[0].code);
+            }
         } catch (err) {
             console.error(err);
             toast.error("Gagal memuat data notifikasi");
@@ -33,15 +55,6 @@ export default function NotificationSettingsPage() {
     };
 
     // ===== Template Logic =====
-    const adjustAllTextareas = () => {
-        Object.values(textareasRef.current).forEach((ta) => {
-            if (ta) {
-                ta.style.height = "auto";
-                ta.style.height = ta.scrollHeight + "px";
-            }
-        });
-    };
-
     const handleChangeTemplate = (id, field, value) => {
         setEditing((prev) => ({
             ...prev,
@@ -50,12 +63,8 @@ export default function NotificationSettingsPage() {
                 [field]: value,
             },
         }));
-
-        const ta = textareasRef.current[id];
-        if (ta) {
-            ta.style.height = "auto";
-            ta.style.height = ta.scrollHeight + "px";
-        }
+        // Langsung adjust height saat mengetik
+        adjustTextarea();
     };
 
     const handleSaveTemplate = async (id) => {
@@ -74,12 +83,16 @@ export default function NotificationSettingsPage() {
             });
 
             toast.success("Template berhasil diperbarui");
-            await loadAll();
+
+            // Hapus state editing setelah simpan
             setEditing((prev) => {
                 const newState = { ...prev };
                 delete newState[id];
                 return newState;
             });
+
+            // Muat ulang data untuk refresh 'updatedAt' dll
+            await loadAll();
         } catch (err) {
             console.error(err);
             toast.error("Gagal menyimpan perubahan");
@@ -88,7 +101,7 @@ export default function NotificationSettingsPage() {
         }
     };
 
-    // ===== Schedule Logic =====
+    // ===== Schedule Logic (Tidak berubah) =====
     const getScheduleByType = (type) =>
         schedules.find((s) => s.type === type) || {
             time: "",
@@ -128,7 +141,7 @@ export default function NotificationSettingsPage() {
         }
     };
 
-    // ===== Preview Helper =====
+    // ===== Preview Helper (Tidak berubah) =====
     const renderPreview = (judul, isiPesan) => {
         const variabel = {
             sapaan: "Bapak",
@@ -150,6 +163,8 @@ export default function NotificationSettingsPage() {
         return { hasilJudul, hasilIsi };
     };
 
+    // ===== RENDER =====
+
     if (loading) {
         return (
             <div className="flex justify-center items-center h-64">
@@ -158,155 +173,172 @@ export default function NotificationSettingsPage() {
         );
     }
 
+    // Handle jika tidak ada template
+    if (!activeTab || templates.length === 0) {
+        return <div className="text-center p-10">Tidak ada template notifikasi yang ditemukan.</div>;
+    }
+
+    // Cari data untuk tab yang aktif
+    const tpl = templates.find((t) => t.code === activeTab);
+    const schedule = getScheduleByType(activeTab);
+
+    if (!tpl) return null; // Safety check
+
+    // Ambil data dari state 'editing' jika ada, jika tidak, ambil dari data 'tpl'
+    const currentTitle = editing[tpl.id]?.title ?? tpl.title;
+    const currentBody = editing[tpl.id]?.body ?? tpl.body;
+    const previewData = renderPreview(currentTitle, currentBody);
+
     return (
-        <div className="space-y-6">
-            {templates.map((tpl) => {
-                const previewData = renderPreview(
-                    editing[tpl.id]?.title || tpl.title,
-                    editing[tpl.id]?.body || tpl.body
-                );
+        <div className="space-y-2">
+            {/* NAVIGASI TAB */}
+            <div role="tablist" className="tabs tabs-border">
+                {templates.map((tabTpl) => (
+                    <a
+                        key={tabTpl.code}
+                        role="tab"
+                        className={`tab ${activeTab === tabTpl.code ? "tab-active" : ""} capitalize`}
+                        onClick={() => setActiveTab(tabTpl.code)}
+                    >
+                        {tabTpl.code.replaceAll("_", " ")}
+                    </a>
+                ))}
+            </div>
 
-                const schedule = getScheduleByType(tpl.code);
+            {/* KONTEN TAB - Sekarang hanya render 1 card */}
+            <div key={tpl.id} className="card bg-base-100 shadow p-4 space-y-2">
+                {/* Header Template */}
+                <div className="flex justify-between items-center flex-wrap gap-3">
+                    <div>
+                        <h3 className="font-semibold text-lg capitalize">{tpl.code.replaceAll("_", " ")}</h3>
+                        <p className="text-xs text-gray-400">
+                            Terakhir diperbarui:{" "}
+                            {new Date(tpl.updatedAt).toLocaleString("id-ID", {
+                                day: "2-digit",
+                                month: "short",
+                                year: "numeric",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                            })}{" "}
+                            oleh {tpl.updatedBy || "–"}
+                        </p>
+                    </div>
+                </div>
 
-                return (
-                    <div key={tpl.id} className="card bg-base-100 shadow p-5 space-y-5">
-                        {/* Header Template */}
-                        <div className="flex justify-between items-center flex-wrap gap-3">
+                {/* Grid Editor + Preview */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-3 items-stretch">
+                    {/* LEFT - Editor */}
+                    <div className="flex flex-col space-y-3 h-full">
+                        <div>
+                            <label className="text-gray-500 mb-1 block text-xs">Judul Notifikasi</label>
+                            <input
+                                type="text"
+                                className="input input-bordered w-full text-xs"
+                                value={currentTitle} // Gunakan 'value' agar konsisten
+                                onChange={(e) => handleChangeTemplate(tpl.id, "title", e.target.value)}
+                            />
+                        </div>
+
+                        <div className="flex-1 flex flex-col">
+                            <label className="text-gray-500 mb-1 block text-xs">Isi Pesan</label>
+                            <textarea
+                                ref={textareaRef}
+                                key={tpl.id} // Penting: 'key' di sini agar React me-remount textarea saat tab ganti
+                                className="textarea textarea-bordered w-full text-xs resize-none overflow-hidden break-words"
+                                style={{
+                                    wordBreak: "break-word",
+                                    whiteSpace: "pre-wrap",
+                                    lineHeight: "1.6",
+                                    minHeight: "80px",
+                                }}
+                                value={currentBody} // Gunakan 'value' agar konsisten
+                                onChange={(e) => handleChangeTemplate(tpl.id, "body", e.target.value)}
+                            />
+                        </div>
+                    </div>
+
+                    {/* RIGHT - Preview */}
+                    <div className="flex flex-col h-full">
+                        <label className="text-gray-500 mb-1 block text-xs">Preview</label>
+                        <div className="border border-gray-300 rounded-xl p-4 flex-1 text-xs leading-relaxed bg-gray-50 break-words">
+                            <p className="font-semibold text-base text-black mb-2 break-words">
+                                {previewData.hasilJudul}
+                            </p>
+                            <p className="text-gray-700 whitespace-pre-wrap break-words">{previewData.hasilIsi}</p>
+                        </div>
+                    </div>
+                </div>
+                {/* Tombol Simpan Template */}
+                <div className="flex justify-end py-1">
+                    <button
+                        className="btn btn-primary btn-sm flex items-center gap-2"
+                        onClick={() => handleSaveTemplate(tpl.id)}
+                        disabled={saving}
+                    >
+                        <Save size={16} />
+                        {saving ? "Menyimpan..." : "Simpan Template"}
+                    </button>
+                </div>
+
+                {/* Jadwal Otomatis */}
+                <div className="border-t pt-4">
+                    <h4 className="font-semibold text-xs mb-3 text-gray-600">Jadwal Notifikasi Otomatis</h4>
+
+                    {/* wrapper dibatasi setengah halaman */}
+                    <div className="w-full md:w-1/2 space-y-4">
+                        <div>
+                            <label className="text-gray-500 text-xs mb-1 block">Jam</label>
+                            <input
+                                type="time"
+                                className="input input-bordered w-full"
+                                value={schedule.time || ""}
+                                onChange={(e) => handleChangeSchedule(tpl.code, "time", e.target.value)}
+                            />
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                            <input
+                                type="checkbox"
+                                className="toggle toggle-success"
+                                checked={schedule.active || false}
+                                onChange={(e) => handleChangeSchedule(tpl.code, "active", e.target.checked)}
+                            />
                             <div>
-                                <h3 className="font-semibold text-lg capitalize">{tpl.code.replaceAll("_", " ")}</h3>
+                                <p className="font-medium text-xs text-gray-700">Aktif</p>
                                 <p className="text-xs text-gray-400">
-                                    Terakhir diperbarui:{" "}
-                                    {new Date(tpl.updatedAt).toLocaleString("id-ID", {
-                                        day: "2-digit",
-                                        month: "short",
-                                        year: "numeric",
-                                        hour: "2-digit",
-                                        minute: "2-digit",
-                                    })}{" "}
-                                    oleh {tpl.updatedBy || "–"}
+                                    Aktifkan agar notifikasi ini berjalan otomatis sesuai jadwal
                                 </p>
                             </div>
                         </div>
 
-                        {/* Grid Editor + Preview */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-3 items-stretch">
-                            {/* LEFT - Editor */}
-                            <div className="flex flex-col space-y-3 h-full">
-                                <div>
-                                    <label className="text-gray-500 mb-1 block text-sm">Judul Notifikasi</label>
-                                    <input
-                                        type="text"
-                                        className="input input-bordered w-full text-sm"
-                                        defaultValue={tpl.title}
-                                        onChange={(e) => handleChangeTemplate(tpl.id, "title", e.target.value)}
-                                    />
-                                </div>
-
-                                <div className="flex-1 flex flex-col">
-                                    <label className="text-gray-500 mb-1 block text-sm">Isi Pesan</label>
-                                    <textarea
-                                        ref={(el) => (textareasRef.current[tpl.id] = el)}
-                                        className="textarea textarea-bordered w-full text-sm resize-none overflow-hidden break-words"
-                                        style={{
-                                            wordBreak: "break-word",
-                                            whiteSpace: "pre-wrap",
-                                            lineHeight: "1.6",
-                                            minHeight: "80px",
-                                        }}
-                                        defaultValue={tpl.body}
-                                        onChange={(e) => handleChangeTemplate(tpl.id, "body", e.target.value)}
-                                    />
-                                </div>
-                            </div>
-
-                            {/* RIGHT - Preview */}
-                            <div className="flex flex-col h-full">
-                                <label className="text-gray-500 mb-1 block text-sm">Preview</label>
-                                <div className="border border-gray-300 rounded-xl p-4 flex-1 text-sm leading-relaxed bg-gray-50 break-words">
-                                    <p className="font-semibold text-base text-black mb-2 break-words">
-                                        {previewData.hasilJudul}
-                                    </p>
-                                    <p className="text-gray-700 whitespace-pre-wrap break-words">
-                                        {previewData.hasilIsi}
-                                    </p>
-                                </div>
+                        <div className="flex items-center gap-3">
+                            <input
+                                type="checkbox"
+                                className="toggle toggle-warning"
+                                checked={schedule.skipWeekend || false}
+                                onChange={(e) => handleChangeSchedule(tpl.code, "skipWeekend", e.target.checked)}
+                            />
+                            <div>
+                                <p className="font-medium text-xs text-gray-700">Skip Weekend</p>
+                                <p className="text-xs text-gray-400">
+                                    Lewati pengiriman notifikasi di hari Sabtu & Minggu
+                                </p>
                             </div>
                         </div>
-                        {/* Tombol Simpan Template */}
-                        <div className="flex justify-end">
+
+                        {/* Tombol Aksi */}
+                        <div className="flex justify-end gap-2 pt-2">
                             <button
                                 className="btn btn-primary btn-sm flex items-center gap-2"
-                                onClick={() => handleSaveTemplate(tpl.id)}
-                                disabled={saving}
+                                onClick={() => handleSaveSchedule(schedule)}
                             >
                                 <Save size={16} />
-                                {saving ? "Menyimpan..." : "Simpan Template"}
+                                Simpan Jadwal
                             </button>
                         </div>
-
-                        {/* Jadwal Otomatis */}
-                        <div className="border-t pt-4 mt-3">
-                            <h4 className="font-semibold text-sm mb-3 text-gray-600">Jadwal Notifikasi Otomatis</h4>
-
-                            {/* wrapper dibatasi setengah halaman */}
-                            <div className="w-full md:w-1/2 space-y-4">
-                                <div>
-                                    <label className="text-gray-500 text-sm mb-1 block">Jam</label>
-                                    <input
-                                        type="time"
-                                        className="input input-bordered w-full"
-                                        value={schedule.time || ""}
-                                        onChange={(e) => handleChangeSchedule(tpl.code, "time", e.target.value)}
-                                    />
-                                </div>
-
-                                <div className="flex items-center gap-3">
-                                    <input
-                                        type="checkbox"
-                                        className="toggle toggle-success"
-                                        checked={schedule.active || false}
-                                        onChange={(e) => handleChangeSchedule(tpl.code, "active", e.target.checked)}
-                                    />
-                                    <div>
-                                        <p className="font-medium text-sm text-gray-700">Aktif</p>
-                                        <p className="text-xs text-gray-400">
-                                            Aktifkan agar notifikasi ini berjalan otomatis sesuai jadwal
-                                        </p>
-                                    </div>
-                                </div>
-
-                                <div className="flex items-center gap-3">
-                                    <input
-                                        type="checkbox"
-                                        className="toggle toggle-warning"
-                                        checked={schedule.skipWeekend || false}
-                                        onChange={(e) =>
-                                            handleChangeSchedule(tpl.code, "skipWeekend", e.target.checked)
-                                        }
-                                    />
-                                    <div>
-                                        <p className="font-medium text-sm text-gray-700">Skip Weekend</p>
-                                        <p className="text-xs text-gray-400">
-                                            Lewati pengiriman notifikasi di hari Sabtu & Minggu
-                                        </p>
-                                    </div>
-                                </div>
-
-                                {/* Tombol Aksi */}
-                                <div className="flex justify-end gap-2 pt-2">
-                                    <button
-                                        className="btn btn-primary btn-sm flex items-center gap-2"
-                                        onClick={() => handleSaveSchedule(schedule)}
-                                    >
-                                        <Save size={16} />
-                                        Simpan Jadwal
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
                     </div>
-                );
-            })}
+                </div>
+            </div>
         </div>
     );
 }
