@@ -59,7 +59,7 @@ public class Employee {
     private LocalDate effectiveDate;
 
     @Column(name = "status", nullable = false)
-    private String status; // ACTIVE / INACTIVE / MUTASI
+    private String status; // ACTIVE / RESIGN / MUTASI
 
     @Column(name = "photo_url")
     private String photoUrl;
