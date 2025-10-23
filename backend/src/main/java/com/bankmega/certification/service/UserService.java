@@ -11,18 +11,22 @@ import com.bankmega.certification.repository.EmployeeRepository;
 import com.bankmega.certification.repository.RoleRepository;
 import com.bankmega.certification.repository.UserRepository;
 import com.bankmega.certification.specification.UserSpecification;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.*;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.crypto.bcrypt.BCrypt;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -32,11 +36,19 @@ public class UserService {
     private final RoleRepository roleRepo;
     private final EmployeeRepository empRepo;
 
+    @PersistenceContext
+    private EntityManager em;
+
+    // ===================== PERF CONSTANTS =====================
+    private static final int BATCH_SIZE = 1000;
+    private static final int IN_CHUNK = 800; // pecah IN(...) biar gak jebol
+    private static final int BCRYPT_COST_BULK = 6; // hashing cepat khusus import
+
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
             .withZone(ZoneId.systemDefault());
 
     // ===================== MAPPER =====================
-    private UserResponse toResponse(User user) {
+    private static UserResponse toResponse(User user) {
         return UserResponse.builder()
                 .id(user.getId())
                 .username(user.getUsername())
@@ -53,7 +65,7 @@ public class UserService {
                 .build();
     }
 
-    // ===================== PAGINATION + FILTER =====================
+    // ===================== PAGE & GET =====================
     @Transactional(readOnly = true)
     public Page<UserResponse> getPage(Long roleId, Boolean isActive, String q, Pageable pageable) {
         Specification<User> spec = UserSpecification.notDeleted()
@@ -62,25 +74,28 @@ public class UserService {
                 .and(UserSpecification.bySearch(q));
 
         Pageable sorted = pageable.getSort().isUnsorted()
-                ? PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(),
-                        Sort.by(Sort.Order.asc("username")))
+                ? PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), Sort.by(Sort.Order.asc("username")))
                 : pageable;
 
-        return userRepo.findAll(spec, sorted).map(this::toResponse);
+        // Saran: tambahkan @EntityGraph(attributePaths = {"role", "employee"}) di
+        // UserRepository untuk hilangin N+1
+        return userRepo.findAll(spec, sorted).map(UserService::toResponse);
     }
 
-    // ===================== GET ONE =====================
     @Transactional(readOnly = true)
     public UserResponse getById(Long id) {
         return userRepo.findByIdAndDeletedAtIsNull(id)
-                .map(this::toResponse)
+                .map(UserService::toResponse)
                 .orElseThrow(() -> new NotFoundException("User dengan id " + id + " tidak ditemukan"));
     }
 
-    // ===================== CREATE =====================
+    // ===================== CREATE / UPDATE / DELETE =====================
     @Transactional
     public UserResponse create(UserRequest req) {
-        validateUnique(req.getUsername(), req.getEmail());
+        String username = normalizeUsername(req.getUsername());
+        if (username == null || username.isBlank()) {
+            throw new ConflictException("Username wajib diisi");
+        }
 
         Role role = roleRepo.findById(req.getRoleId())
                 .orElseThrow(() -> new NotFoundException("Role tidak ditemukan dengan id " + req.getRoleId()));
@@ -92,10 +107,14 @@ public class UserService {
                             () -> new NotFoundException("Employee tidak ditemukan dengan id " + req.getEmployeeId()));
         }
 
+        String rawPassword = (req.getPassword() != null && !req.getPassword().isBlank())
+                ? req.getPassword()
+                : username;
+
         User user = User.builder()
-                .username(req.getUsername())
-                .email(req.getEmail())
-                .password(BCrypt.hashpw(req.getPassword(), BCrypt.gensalt()))
+                .username(username)
+                .email(trimToNull(req.getEmail())) // boleh null & duplikat
+                .password(BCrypt.hashpw(rawPassword, BCrypt.gensalt()))
                 .role(role)
                 .employee(emp)
                 .isActive(req.getIsActive() != null ? req.getIsActive() : true)
@@ -104,145 +123,411 @@ public class UserService {
                 .updatedAt(Instant.now())
                 .build();
 
-        return toResponse(userRepo.save(user));
+        try {
+            return toResponse(userRepo.save(user));
+        } catch (DataIntegrityViolationException e) {
+            // unik tetap ditahan oleh DB di username
+            throw new ConflictException("Username sudah digunakan: " + username);
+        }
     }
 
-    // ===================== UPDATE =====================
     @Transactional
     public UserResponse update(Long id, UserRequest req) {
         User user = userRepo.findByIdAndDeletedAtIsNull(id)
                 .orElseThrow(() -> new NotFoundException("User tidak ditemukan dengan id " + id));
 
-        if (!Objects.equals(user.getUsername(), req.getUsername()) &&
-                userRepo.findByUsername(req.getUsername()).isPresent()) {
-            throw new ConflictException("Username sudah digunakan: " + req.getUsername());
+        boolean changed = false;
+
+        // username
+        if (req.getUsername() != null) {
+            String newUsername = normalizeUsername(req.getUsername());
+            if (!Objects.equals(user.getUsername(), newUsername)) {
+                user.setUsername(newUsername);
+                changed = true;
+            }
         }
 
-        if (!Objects.equals(user.getEmail(), req.getEmail()) &&
-                userRepo.findByEmail(req.getEmail()).isPresent()) {
-            throw new ConflictException("Email sudah digunakan: " + req.getEmail());
+        // email (boleh null & dupe)
+        if (!Objects.equals(user.getEmail(), trimToNull(req.getEmail()))) {
+            user.setEmail(trimToNull(req.getEmail()));
+            changed = true;
         }
 
-        user.setUsername(req.getUsername());
-        user.setEmail(req.getEmail());
-
+        // password
         if (req.getPassword() != null && !req.getPassword().isBlank()) {
             user.setPassword(BCrypt.hashpw(req.getPassword(), BCrypt.gensalt()));
             user.setIsFirstLogin(true);
+            changed = true;
         }
 
+        // role
         if (req.getRoleId() != null) {
-            Role role = roleRepo.findById(req.getRoleId())
-                    .orElseThrow(() -> new NotFoundException("Role tidak ditemukan dengan id " + req.getRoleId()));
-            user.setRole(role);
+            Long currentRoleId = user.getRole() != null ? user.getRole().getId() : null;
+            if (!Objects.equals(currentRoleId, req.getRoleId())) {
+                Role role = roleRepo.findById(req.getRoleId())
+                        .orElseThrow(() -> new NotFoundException("Role tidak ditemukan dengan id " + req.getRoleId()));
+                user.setRole(role);
+                changed = true;
+            }
         }
 
+        // employee link
         if (req.getEmployeeId() != null) {
-            Employee emp = empRepo.findById(req.getEmployeeId())
-                    .orElseThrow(
-                            () -> new NotFoundException("Employee tidak ditemukan dengan id " + req.getEmployeeId()));
-            user.setEmployee(emp);
+            Long currentEmpId = user.getEmployee() != null ? user.getEmployee().getId() : null;
+            if (!Objects.equals(currentEmpId, req.getEmployeeId())) {
+                Employee emp = empRepo.findById(req.getEmployeeId())
+                        .orElseThrow(() -> new NotFoundException(
+                                "Employee tidak ditemukan dengan id " + req.getEmployeeId()));
+                user.setEmployee(emp);
+                changed = true;
+            }
         }
 
-        if (req.getIsActive() != null) {
+        // status aktif
+        if (req.getIsActive() != null && !Objects.equals(user.getIsActive(), req.getIsActive())) {
             user.setIsActive(req.getIsActive());
+            changed = true;
+        }
+
+        if (!changed) {
+            return toResponse(user); // no-op; hemat I/O
         }
 
         user.setUpdatedAt(Instant.now());
-        return toResponse(userRepo.save(user));
+
+        try {
+            return toResponse(userRepo.save(user));
+        } catch (DataIntegrityViolationException e) {
+            throw new ConflictException("Username sudah digunakan: " + user.getUsername());
+        }
     }
 
-    // ===================== SOFT DELETE =====================
     @Transactional
     public void softDelete(Long id) {
         User user = userRepo.findByIdAndDeletedAtIsNull(id)
                 .orElseThrow(() -> new NotFoundException("User tidak ditemukan dengan id " + id));
-
+        user.setIsActive(false);
         user.setDeletedAt(Instant.now());
         user.setUpdatedAt(Instant.now());
         userRepo.save(user);
     }
 
-    // ===================== TOGGLE STATUS =====================
     @Transactional
     public UserResponse toggleStatus(Long id) {
         User user = userRepo.findByIdAndDeletedAtIsNull(id)
                 .orElseThrow(() -> new NotFoundException("User tidak ditemukan dengan id " + id));
-
         user.setIsActive(!user.getIsActive());
         user.setUpdatedAt(Instant.now());
-
         return toResponse(userRepo.save(user));
     }
 
-    // ===================== PASSWORD MANAGEMENT =====================
     @Transactional
     public void changePasswordFirstLogin(Long userId, String newPassword) {
         User user = userRepo.findByIdAndDeletedAtIsNull(userId)
                 .orElseThrow(() -> new NotFoundException("User tidak ditemukan dengan id " + userId));
-
         user.setPassword(BCrypt.hashpw(newPassword, BCrypt.gensalt()));
         user.setIsFirstLogin(false);
         user.setUpdatedAt(Instant.now());
         userRepo.save(user);
     }
 
-    // ===================== AUTO CREATE USER DARI EMPLOYEE =====================
-    @Transactional
-    public User createUserForEmployee(Employee emp, Role pegawaiRole) {
-        return userRepo.findByEmployee(emp).orElseGet(() -> {
-            if (emp.getEmail() == null || emp.getEmail().isBlank()) {
-                throw new ConflictException("Pegawai " + emp.getName() + " tidak memiliki email.");
+    // ===================== BATCH OPS (AFTER COMMIT import) =====================
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public int batchUpsertAccountsByNips(List<String> nips, Role rolePegawai) {
+        if (nips == null || nips.isEmpty())
+            return 0;
+
+        List<String> uniqNips = nips.stream()
+                .filter(Objects::nonNull)
+                .map(UserService::normalizeUsername)
+                .filter(s -> !s.isBlank())
+                .distinct()
+                .toList();
+        if (uniqNips.isEmpty())
+            return 0;
+
+        List<Employee> employees = fetchEmployeesByNips(uniqNips);
+        if (employees.isEmpty())
+            return 0;
+
+        Map<String, Employee> empByNip = employees.stream().collect(Collectors.toMap(Employee::getNip, e -> e));
+        Map<Long, Employee> empById = employees.stream().collect(Collectors.toMap(Employee::getId, e -> e));
+
+        Set<Long> empIds = empById.keySet();
+        Set<String> usernames = empByNip.keySet();
+
+        List<User> usersByEmp = fetchUsersByEmployeeIds(empIds); // termasuk soft-deleted
+        Map<Long, User> userByEmpId = usersByEmp.stream().collect(Collectors.toMap(
+                u -> u.getEmployee() != null ? u.getEmployee().getId() : -1L,
+                u -> u,
+                UserService::newer));
+
+        List<User> usersByUsername = fetchUsersByUsernames(usernames);
+        Map<String, List<User>> usersByUsernameMultimap = new HashMap<>();
+        for (User u : usersByUsername) {
+            usersByUsernameMultimap.computeIfAbsent(u.getUsername(), k -> new ArrayList<>()).add(u);
+        }
+
+        List<User> toCreate = new ArrayList<>();
+        List<User> toUpdate = new ArrayList<>();
+        Instant now = Instant.now();
+
+        for (String nip : uniqNips) {
+            Employee e = empByNip.get(nip);
+            if (e == null)
+                continue;
+
+            // A) prefer yang sudah link ke employee_id
+            User linked = userByEmpId.get(e.getId());
+            if (linked != null) {
+                boolean needUpdate = false;
+                if (linked.getDeletedAt() != null) {
+                    linked.setDeletedAt(null);
+                    needUpdate = true;
+                }
+                if (!Boolean.TRUE.equals(linked.getIsActive())) {
+                    linked.setIsActive(true);
+                    needUpdate = true;
+                }
+                if (linked.getRole() == null && rolePegawai != null) {
+                    linked.setRole(rolePegawai);
+                    needUpdate = true;
+                }
+                if (!Objects.equals(linked.getEmail(), e.getEmail())) {
+                    linked.setEmail(e.getEmail());
+                    needUpdate = true;
+                }
+                if (needUpdate) {
+                    linked.setUpdatedAt(now);
+                    toUpdate.add(linked);
+                }
+
+                // dedup username lain yang sama
+                List<User> sameUsr = usersByUsernameMultimap.getOrDefault(nip, List.of());
+                for (User d : sameUsr) {
+                    if (!Objects.equals(d.getId(), linked.getId())) {
+                        if (Boolean.TRUE.equals(d.getIsActive()) || d.getDeletedAt() == null) {
+                            d.setIsActive(false);
+                            d.setDeletedAt(now);
+                            d.setUpdatedAt(now);
+                            toUpdate.add(d);
+                        }
+                    }
+                }
+                continue;
             }
 
-            if (userRepo.findByUsername(emp.getNip()).isPresent()) {
-                throw new ConflictException("Username (NIP) sudah digunakan: " + emp.getNip());
+            // B) belum ada link → cari by username (NIP)
+            List<User> sameUsername = usersByUsernameMultimap.getOrDefault(nip, List.of());
+            if (!sameUsername.isEmpty()) {
+                sameUsername.sort(UserService::compareByUpdatedThenIdDesc);
+                User primary = sameUsername.get(0);
+                boolean needUpdate = false;
+                if (primary.getEmployee() == null || !Objects.equals(primary.getEmployee().getId(), e.getId())) {
+                    primary.setEmployee(empRepo.getReferenceById(e.getId()));
+                    needUpdate = true;
+                }
+                if (primary.getDeletedAt() != null) {
+                    primary.setDeletedAt(null);
+                    needUpdate = true;
+                }
+                if (!Boolean.TRUE.equals(primary.getIsActive())) {
+                    primary.setIsActive(true);
+                    needUpdate = true;
+                }
+                if (primary.getRole() == null && rolePegawai != null) {
+                    primary.setRole(rolePegawai);
+                    needUpdate = true;
+                }
+                if (!Objects.equals(primary.getEmail(), e.getEmail())) {
+                    primary.setEmail(e.getEmail());
+                    needUpdate = true;
+                }
+                if (needUpdate) {
+                    primary.setUpdatedAt(now);
+                    toUpdate.add(primary);
+                }
+
+                for (int i = 1; i < sameUsername.size(); i++) {
+                    User d = sameUsername.get(i);
+                    if (Boolean.TRUE.equals(d.getIsActive()) || d.getDeletedAt() == null) {
+                        d.setIsActive(false);
+                        d.setDeletedAt(now);
+                        d.setUpdatedAt(now);
+                        toUpdate.add(d);
+                    }
+                }
+                continue;
             }
 
-            User newUser = User.builder()
-                    .username(emp.getNip())
-                    .email(emp.getEmail())
-                    .password(BCrypt.hashpw(emp.getNip(), BCrypt.gensalt()))
-                    .role(pegawaiRole)
-                    .employee(emp)
+            // C) bener-bener belum ada → create baru
+            User nu = User.builder()
+                    .username(nip)
+                    .email(e.getEmail()) // boleh null/duplikat
+                    .password(hashBulk(nip))
+                    .role(rolePegawai)
+                    .employee(empRepo.getReferenceById(e.getId()))
                     .isActive(true)
                     .isFirstLogin(true)
-                    .createdAt(Instant.now())
-                    .updatedAt(Instant.now())
+                    .createdAt(now)
+                    .updatedAt(now)
                     .build();
+            toCreate.add(nu);
+        }
 
-            return userRepo.save(newUser);
-        });
+        // dedup toUpdate by id
+        toUpdate = new ArrayList<>(toUpdate.stream()
+                .collect(Collectors.toMap(User::getId, u -> u, (a, b) -> b, LinkedHashMap::new))
+                .values());
+
+        int affected = 0;
+        affected += batchSaveUsers(toCreate);
+        affected += batchSaveUsers(toUpdate);
+        return affected;
     }
 
-    // ===================== ACTIVE USERS =====================
+    /** Nonaktifkan akun untuk pegawai resign — chunked & idempotent. */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public int batchDeactivateByEmployeeIds(List<Long> employeeIds) {
+        if (employeeIds == null || employeeIds.isEmpty())
+            return 0;
+
+        List<Long> ids = employeeIds.stream().filter(Objects::nonNull).distinct().toList();
+        if (ids.isEmpty())
+            return 0;
+
+        int total = 0;
+        Instant now = Instant.now();
+        for (List<Long> part : partition(ids, IN_CHUNK)) {
+            List<User> users = userRepo.findByEmployee_IdIn(part);
+            if (users.isEmpty())
+                continue;
+
+            boolean any = false;
+            for (User u : users) {
+                boolean need = false;
+                if (!Boolean.FALSE.equals(u.getIsActive())) {
+                    u.setIsActive(false);
+                    need = true;
+                }
+                if (u.getDeletedAt() == null) {
+                    u.setDeletedAt(now);
+                    need = true;
+                }
+                if (need) {
+                    u.setUpdatedAt(now);
+                    any = true;
+                }
+            }
+            if (any)
+                total += batchSaveUsers(users);
+        }
+        return total;
+    }
+
+    // ===================== SEARCH UTILS =====================
     @Transactional(readOnly = true)
     public List<UserResponse> getAllActive() {
         return userRepo.findByDeletedAtIsNull().stream()
                 .filter(User::getIsActive)
-                .map(this::toResponse)
+                .map(UserService::toResponse)
                 .toList();
     }
 
-    // 🔹 Search user aktif berdasarkan keyword (untuk React Select)
     @Transactional(readOnly = true)
     public List<UserResponse> searchActiveUsers(String q) {
         Specification<User> spec = UserSpecification.notDeleted()
                 .and(UserSpecification.byIsActive(true))
                 .and(UserSpecification.bySearch(q));
-
         return userRepo.findAll(spec).stream()
-                .map(this::toResponse)
+                .map(UserService::toResponse)
                 .toList();
     }
 
-    // ===================== UTILITIES =====================
-    private void validateUnique(String username, String email) {
-        if (userRepo.findByUsername(username).isPresent()) {
-            throw new ConflictException("Username sudah digunakan: " + username);
+    // ===================== INTERNAL UTILS =====================
+    private static String normalizeUsername(String username) {
+        return username == null ? null : username.trim();
+    }
+
+    private static String trimToNull(String s) {
+        if (s == null)
+            return null;
+        String t = s.trim();
+        return t.isEmpty() ? null : t;
+    }
+
+    private int batchSaveUsers(List<User> list) {
+        if (list == null || list.isEmpty())
+            return 0;
+        int n = 0;
+        for (int i = 0; i < list.size(); i += BATCH_SIZE) {
+            int end = Math.min(i + BATCH_SIZE, list.size());
+            userRepo.saveAll(list.subList(i, end));
+            em.flush();
+            em.clear();
+            n += (end - i);
         }
-        if (email != null && userRepo.findByEmail(email).isPresent()) {
-            throw new ConflictException("Email sudah digunakan: " + email);
+        return n;
+    }
+
+    private static String hashBulk(String raw) {
+        return BCrypt.hashpw(raw, BCrypt.gensalt(BCRYPT_COST_BULK));
+    }
+
+    private static User newer(User a, User b) {
+        Instant ua = a.getUpdatedAt(), ub = b.getUpdatedAt();
+        if (ua == null && ub == null)
+            return a.getId() > b.getId() ? a : b;
+        if (ua == null)
+            return b;
+        if (ub == null)
+            return a;
+        return ua.isAfter(ub) ? a : b;
+    }
+
+    private static int compareByUpdatedThenIdDesc(User a, User b) {
+        Instant ua = a.getUpdatedAt(), ub = b.getUpdatedAt();
+        if (ua == null && ub == null)
+            return Long.compare(b.getId(), a.getId());
+        if (ua == null)
+            return 1;
+        if (ub == null)
+            return -1;
+        return ub.compareTo(ua);
+    }
+
+    private List<Employee> fetchEmployeesByNips(Collection<String> nips) {
+        List<Employee> out = new ArrayList<>();
+        for (List<String> part : partition(nips, IN_CHUNK)) {
+            out.addAll(empRepo.findByNipIn(part));
         }
+        return out;
+    }
+
+    private List<User> fetchUsersByEmployeeIds(Collection<Long> ids) {
+        List<User> out = new ArrayList<>();
+        for (List<Long> part : partition(ids, IN_CHUNK)) {
+            out.addAll(userRepo.findByEmployee_IdIn(part));
+        }
+        return out;
+    }
+
+    private List<User> fetchUsersByUsernames(Collection<String> usernames) {
+        List<User> out = new ArrayList<>();
+        for (List<String> part : partition(usernames, IN_CHUNK)) {
+            out.addAll(userRepo.findByUsernameIn(part));
+        }
+        return out;
+    }
+
+    private static <T> List<List<T>> partition(Collection<T> src, int size) {
+        List<T> list = (src instanceof List<T> l) ? l : new ArrayList<>(src);
+        int n = list.size();
+        List<List<T>> chunks = new ArrayList<>((n + size - 1) / size);
+        for (int i = 0; i < n; i += size) {
+            chunks.add(list.subList(i, Math.min(i + size, n)));
+        }
+        return chunks;
     }
 }

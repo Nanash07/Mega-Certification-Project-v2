@@ -19,6 +19,10 @@ import java.time.LocalDate;
 @EntityListeners(AuditingEntityListener.class)
 public class Employee {
 
+    public enum EmploymentStatus {
+        ACTIVE, RESIGN, MUTASI
+    }
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;

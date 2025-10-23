@@ -11,9 +11,8 @@ import java.util.HashSet;
 import java.util.Set;
 
 @Entity
-@Table(name = "users", uniqueConstraints = {
-        @UniqueConstraint(columnNames = { "username" }),
-        @UniqueConstraint(columnNames = { "email" })
+@Table(name = "users", indexes = {
+        @Index(name = "idx_users_email", columnList = "email") // non-unique index (opsional)
 })
 @Getter
 @Setter
@@ -29,14 +28,13 @@ public class User {
     private Long id;
 
     // ===================== CREDENTIAL INFO =====================
-    @Column(length = 50, nullable = false, unique = true)
+    @Column(length = 50, nullable = false, unique = true) // unik cukup di sini
     private String username;
 
     /**
-     * Email wajib diisi — digunakan untuk login, reset password, dan notifikasi.
-     * Untuk user pegawai, email biasanya disamakan dengan employee.email.
+     * Email optional — boleh null & duplikat.
      */
-    @Column(length = 100, nullable = false, unique = true)
+    @Column(length = 100) // tidak unik
     private String email;
 
     @Column(length = 255, nullable = false)
@@ -69,11 +67,6 @@ public class User {
 
     // ===================== RELATIONSHIPS =====================
 
-    /**
-     * User dapat terhubung ke satu pegawai (Employee) — nullable karena
-     * superadmin/PIC
-     * mungkin bukan bagian dari entitas pegawai.
-     */
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "employee_id")
     private Employee employee;

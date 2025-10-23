@@ -2,21 +2,31 @@ package com.bankmega.certification.service;
 
 import com.bankmega.certification.dto.EmployeeCertificationRequest;
 import com.bankmega.certification.dto.EmployeeCertificationResponse;
-import com.bankmega.certification.entity.*;
-import com.bankmega.certification.repository.*;
+import com.bankmega.certification.entity.CertificationRule;
+import com.bankmega.certification.entity.Employee;
+import com.bankmega.certification.entity.EmployeeCertification;
+import com.bankmega.certification.entity.EmployeeCertificationHistory.ActionType;
+import com.bankmega.certification.entity.Institution;
+import com.bankmega.certification.repository.CertificationRuleRepository;
+import com.bankmega.certification.repository.EmployeeCertificationRepository;
+import com.bankmega.certification.repository.EmployeeRepository;
+import com.bankmega.certification.repository.InstitutionRepository;
 import com.bankmega.certification.specification.EmployeeCertificationSpecification;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.*;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
@@ -28,6 +38,13 @@ public class EmployeeCertificationService {
     private final InstitutionRepository institutionRepo;
     private final FileStorageService fileStorageService;
     private final EmployeeCertificationHistoryService historyService;
+
+    @PersistenceContext
+    private EntityManager em;
+
+    // batching
+    private static final int BATCH_SIZE = 500; // saveAll chunk size
+    private static final int IN_CHUNK = 800; // query IN(...) chunk size
 
     // ================== Mapper ==================
     private EmployeeCertificationResponse toResponse(EmployeeCertification ec) {
@@ -77,16 +94,30 @@ public class EmployeeCertificationService {
 
             if (ec.getRuleValidityMonths() != null) {
                 ec.setValidUntil(ec.getCertDate().plusMonths(ec.getRuleValidityMonths()));
+            } else {
+                ec.setValidUntil(null);
             }
             if (ec.getRuleReminderMonths() != null && ec.getValidUntil() != null) {
                 ec.setReminderDate(ec.getValidUntil().minusMonths(ec.getRuleReminderMonths()));
+            } else {
+                ec.setReminderDate(null);
             }
+        } else {
+            ec.setValidFrom(null);
+            ec.setValidUntil(null);
+            ec.setReminderDate(null);
         }
     }
 
     private void updateStatus(EmployeeCertification ec) {
+        // Kalau sudah INVALID (mis. resign/soft delete), jangan auto naik status
+        if (ec.getStatus() == EmployeeCertification.Status.INVALID) {
+            return;
+        }
+
         LocalDate today = LocalDate.now();
 
+        // Dokumen belum lengkap
         if (ec.getCertNumber() == null || ec.getCertNumber().isBlank()
                 || ec.getFileUrl() == null || ec.getFileUrl().isBlank()) {
             ec.setStatus(EmployeeCertification.Status.PENDING);
@@ -114,6 +145,17 @@ public class EmployeeCertificationService {
                 ||
                 (req.getCertificationRuleId() != null &&
                         !Objects.equals(ec.getCertificationRule().getId(), req.getCertificationRuleId()));
+    }
+
+    private void batchSave(List<EmployeeCertification> list) {
+        if (list == null || list.isEmpty())
+            return;
+        for (int i = 0; i < list.size(); i += BATCH_SIZE) {
+            int end = Math.min(i + BATCH_SIZE, list.size());
+            repo.saveAll(list.subList(i, end));
+            em.flush();
+            em.clear();
+        }
     }
 
     // ================== Create ==================
@@ -144,7 +186,7 @@ public class EmployeeCertificationService {
                 .jobPositionTitle(employee.getJobPosition() != null
                         ? employee.getJobPosition().getName()
                         : null)
-                .ruleValidityMonths(rule.getValidityMonths()) // 🔹 snapshot rule setting
+                .ruleValidityMonths(rule.getValidityMonths()) // snapshot
                 .ruleReminderMonths(rule.getReminderMonths())
                 .createdAt(Instant.now())
                 .updatedAt(Instant.now())
@@ -153,11 +195,8 @@ public class EmployeeCertificationService {
         updateValidity(ec);
         updateStatus(ec);
 
-        // ✅ Simpan ke DB dulu
         EmployeeCertification saved = repo.save(ec);
-
-        // ✅ Tambahkan histori CREATED (⬅️ ini barunya)
-        historyService.snapshot(saved, EmployeeCertificationHistory.ActionType.CREATED);
+        historyService.snapshot(saved, ActionType.CREATED);
 
         return toResponse(saved);
     }
@@ -169,14 +208,15 @@ public class EmployeeCertificationService {
                 .orElseThrow(() -> new RuntimeException("Certification not found"));
 
         if (!hasChanged(ec, req)) {
-            return toResponse(ec); // ⛔ Skip kalau tidak ada perubahan
+            return toResponse(ec); // no-op
         }
 
-        if (req.getCertificationRuleId() != null) {
+        if (req.getCertificationRuleId() != null &&
+                !Objects.equals(ec.getCertificationRule().getId(), req.getCertificationRuleId())) {
             CertificationRule rule = ruleRepo.findById(req.getCertificationRuleId())
                     .orElseThrow(() -> new RuntimeException("Certification Rule not found"));
             ec.setCertificationRule(rule);
-            ec.setRuleValidityMonths(rule.getValidityMonths()); // 🔹 update snapshot
+            ec.setRuleValidityMonths(rule.getValidityMonths());
             ec.setRuleReminderMonths(rule.getReminderMonths());
         }
 
@@ -194,12 +234,12 @@ public class EmployeeCertificationService {
         updateStatus(ec);
 
         EmployeeCertification saved = repo.save(ec);
-        historyService.snapshot(saved, EmployeeCertificationHistory.ActionType.UPDATED);
+        historyService.snapshot(saved, ActionType.UPDATED);
 
         return toResponse(saved);
     }
 
-    // ================== Soft Delete ==================
+    // ================== Soft Delete (record) ==================
     @Transactional
     public void softDelete(Long id) {
         EmployeeCertification ec = repo.findByIdAndDeletedAtIsNull(id)
@@ -210,7 +250,7 @@ public class EmployeeCertificationService {
         ec.setUpdatedAt(Instant.now());
 
         EmployeeCertification saved = repo.save(ec);
-        historyService.snapshot(saved, EmployeeCertificationHistory.ActionType.DELETED);
+        historyService.snapshot(saved, ActionType.DELETED);
     }
 
     // ================== Handle File Update ==================
@@ -218,7 +258,7 @@ public class EmployeeCertificationService {
             MultipartFile file,
             boolean isReupload,
             boolean isDelete,
-            EmployeeCertificationHistory.ActionType actionType) {
+            ActionType actionType) {
         if (isDelete) {
             fileStorageService.deleteCertificate(ec.getId());
             ec.setFileUrl(null);
@@ -249,8 +289,7 @@ public class EmployeeCertificationService {
         EmployeeCertification ec = repo.findByIdAndDeletedAtIsNull(id)
                 .orElseThrow(() -> new RuntimeException("Certification not found"));
 
-        return toResponse(handleFileUpdate(ec, file, false, false,
-                EmployeeCertificationHistory.ActionType.UPLOAD_CERTIFICATE));
+        return toResponse(handleFileUpdate(ec, file, false, false, ActionType.UPLOAD_CERTIFICATE));
     }
 
     // ================== Reupload Certificate ==================
@@ -259,18 +298,16 @@ public class EmployeeCertificationService {
         EmployeeCertification ec = repo.findByIdAndDeletedAtIsNull(id)
                 .orElseThrow(() -> new RuntimeException("Certification not found"));
 
-        return toResponse(handleFileUpdate(ec, file, true, false,
-                EmployeeCertificationHistory.ActionType.REUPLOAD_CERTIFICATE));
+        return toResponse(handleFileUpdate(ec, file, true, false, ActionType.REUPLOAD_CERTIFICATE));
     }
 
-    // ================== Delete Certificate ==================
+    // ================== Delete Certificate (file only) ==================
     @Transactional
     public void deleteCertificate(Long id) {
         EmployeeCertification ec = repo.findByIdAndDeletedAtIsNull(id)
                 .orElseThrow(() -> new RuntimeException("Certification not found"));
 
-        handleFileUpdate(ec, null, false, true,
-                EmployeeCertificationHistory.ActionType.DELETE_CERTIFICATE);
+        handleFileUpdate(ec, null, false, true, ActionType.DELETE_CERTIFICATE);
     }
 
     // ================== Detail ==================
@@ -308,5 +345,160 @@ public class EmployeeCertificationService {
                 .and(EmployeeCertificationSpecification.byValidUntilRange(validUntilStart, validUntilEnd));
 
         return repo.findAll(spec, pageable).map(this::toResponse);
+    }
+
+    // =========================================================
+    // 🔥 Bulk ops optimized (chunked + only-changed writes)
+    // =========================================================
+
+    /**
+     * Invalidasi semua sertifikat milik pegawai-pegawai (mis. saat RESIGN).
+     * Chunked biar hemat memori; hanya update kalau status bukan INVALID.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public int bulkInvalidateByEmployeeIds(List<Long> employeeIds) {
+        if (employeeIds == null || employeeIds.isEmpty())
+            return 0;
+
+        List<Long> ids = employeeIds.stream().filter(Objects::nonNull).distinct().toList();
+        if (ids.isEmpty())
+            return 0;
+
+        int total = 0;
+        for (List<Long> part : partition(ids, IN_CHUNK)) {
+            List<EmployeeCertification> list = repo.findByEmployeeIdInAndDeletedAtIsNull(part);
+            if (list.isEmpty())
+                continue;
+
+            List<EmployeeCertification> changed = new ArrayList<>(list.size());
+            Instant now = Instant.now();
+
+            for (EmployeeCertification ec : list) {
+                if (ec.getStatus() != EmployeeCertification.Status.INVALID) {
+                    ec.setStatus(EmployeeCertification.Status.INVALID);
+                    ec.setUpdatedAt(now);
+                    changed.add(ec);
+                    historyService.snapshot(ec, ActionType.UPDATED);
+                }
+            }
+
+            batchSave(changed);
+            total += changed.size();
+        }
+        return total;
+    }
+
+    /**
+     * Opsi saat rehire: INVALID -> PENDING (kalau kebijakan bisnis mau reset).
+     * Chunked + recompute setelah di-set PENDING.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public int markInvalidToPendingForEmployeeIds(List<Long> employeeIds) {
+        if (employeeIds == null || employeeIds.isEmpty())
+            return 0;
+
+        List<Long> ids = employeeIds.stream().filter(Objects::nonNull).distinct().toList();
+        if (ids.isEmpty())
+            return 0;
+
+        int total = 0;
+        for (List<Long> part : partition(ids, IN_CHUNK)) {
+            List<EmployeeCertification> list = repo.findByEmployeeIdInAndDeletedAtIsNull(part);
+            if (list.isEmpty())
+                continue;
+
+            List<EmployeeCertification> changed = new ArrayList<>();
+            Instant now = Instant.now();
+
+            for (EmployeeCertification ec : list) {
+                if (ec.getStatus() == EmployeeCertification.Status.INVALID) {
+                    ec.setStatus(EmployeeCertification.Status.PENDING);
+                    ec.setUpdatedAt(now);
+                    updateValidity(ec);
+                    updateStatus(ec);
+                    changed.add(ec);
+                    historyService.snapshot(ec, ActionType.UPDATED);
+                }
+            }
+
+            batchSave(changed);
+            total += changed.size();
+        }
+        return total;
+    }
+
+    /**
+     * Recompute status untuk sertifikat milik pegawai-pegawai tertentu.
+     * Chunked + write hanya saat status berubah.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public int recomputeStatusesForEmployeeIds(List<Long> employeeIds) {
+        if (employeeIds == null || employeeIds.isEmpty())
+            return 0;
+
+        List<Long> ids = employeeIds.stream().filter(Objects::nonNull).distinct().toList();
+        if (ids.isEmpty())
+            return 0;
+
+        int total = 0;
+        for (List<Long> part : partition(ids, IN_CHUNK)) {
+            List<EmployeeCertification> list = repo.findByEmployeeIdInAndDeletedAtIsNull(part);
+            if (list.isEmpty())
+                continue;
+
+            List<EmployeeCertification> changed = new ArrayList<>();
+            Instant now = Instant.now();
+
+            for (EmployeeCertification ec : list) {
+                EmployeeCertification.Status before = ec.getStatus();
+                updateValidity(ec);
+                updateStatus(ec);
+                if (before != ec.getStatus()) {
+                    ec.setUpdatedAt(now);
+                    changed.add(ec);
+                    historyService.snapshot(ec, ActionType.UPDATED);
+                }
+            }
+
+            batchSave(changed);
+            total += changed.size();
+        }
+        return total;
+    }
+
+    // ================== Util single-employee ==================
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public int invalidateByEmployeeId(Long employeeId) {
+        if (employeeId == null)
+            return 0;
+
+        List<EmployeeCertification> list = repo.findByEmployeeIdAndDeletedAtIsNull(employeeId);
+        if (list.isEmpty())
+            return 0;
+
+        List<EmployeeCertification> changed = new ArrayList<>();
+        Instant now = Instant.now();
+
+        for (EmployeeCertification ec : list) {
+            if (ec.getStatus() != EmployeeCertification.Status.INVALID) {
+                ec.setStatus(EmployeeCertification.Status.INVALID);
+                ec.setUpdatedAt(now);
+                changed.add(ec);
+                historyService.snapshot(ec, ActionType.UPDATED);
+            }
+        }
+        batchSave(changed);
+        return changed.size();
+    }
+
+    // ================== internal helpers ==================
+    private static <T> List<List<T>> partition(Collection<T> src, int size) {
+        List<T> list = (src instanceof List<T> l) ? l : new ArrayList<>(src);
+        int n = list.size();
+        List<List<T>> chunks = new ArrayList<>((n + size - 1) / size);
+        for (int i = 0; i < n; i += size) {
+            chunks.add(list.subList(i, Math.min(i + size, n)));
+        }
+        return chunks;
     }
 }

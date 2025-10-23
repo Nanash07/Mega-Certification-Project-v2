@@ -1,23 +1,30 @@
 package com.bankmega.certification.service.employee_import;
 
-import com.bankmega.certification.dto.*;
+import com.bankmega.certification.dto.EmployeeImportResponse;
 import com.bankmega.certification.entity.*;
 import com.bankmega.certification.repository.*;
+import com.bankmega.certification.service.EmployeeCertificationService;
 import com.bankmega.certification.service.EmployeeHistoryService;
 import com.bankmega.certification.service.UserService;
 import jakarta.annotation.PostConstruct;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.time.*;
+import java.time.Instant;
+import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -31,10 +38,14 @@ public class EmployeeImportProcessor {
     private final JobPositionRepository jobRepo;
     private final EmployeeRepository empRepo;
     private final EmployeeImportLogRepository logRepo;
+
     private final EmployeeHistoryService historyService;
+    private final EmployeeCertificationService certificationService;
     private final UserService userService;
-    private final UserRepository userRepo;
     private final RoleRepository roleRepo;
+
+    @PersistenceContext
+    private EntityManager em;
 
     private final Map<String, Regional> regionalCache = new ConcurrentHashMap<>();
     private final Map<String, Division> divisionCache = new ConcurrentHashMap<>();
@@ -43,9 +54,7 @@ public class EmployeeImportProcessor {
 
     private Role pegawaiRole;
 
-    private final List<Employee> newEmployees = new ArrayList<>();
-    private final List<Employee> changedEmployees = new ArrayList<>();
-    private final List<Employee> resignedEmployees = new ArrayList<>();
+    private static final int BATCH_SIZE = 500;
 
     @PostConstruct
     public void initRole() {
@@ -59,12 +68,14 @@ public class EmployeeImportProcessor {
     }
 
     // ===========================================================
-    // 🔹 PUBLIC ENTRY POINTS
+    // PUBLIC
     // ===========================================================
 
+    @Transactional(readOnly = true)
     public EmployeeImportResponse dryRun(MultipartFile file, User user) throws Exception {
         preloadMasters();
-        EmployeeImportResponse res = process(file, true, user);
+        ImportPlan plan = buildPlan(file, true, true); // strictGuard ON
+        EmployeeImportResponse res = plan.toResponse(file.getOriginalFilename(), true);
         res.setMessage("✅ Dry run selesai oleh " + user.getUsername());
         return res;
     }
@@ -72,212 +83,295 @@ public class EmployeeImportProcessor {
     @Transactional
     public EmployeeImportResponse confirm(MultipartFile file, User user) throws Exception {
         preloadMasters();
-        EmployeeImportResponse res = process(file, false, user);
+        ImportPlan plan = buildPlan(file, false, true); // strictGuard ON
 
-        empRepo.saveAll(newEmployees);
-        empRepo.saveAll(changedEmployees);
-        empRepo.saveAll(resignedEmployees);
+        // 1) Persist employees (batch)
+        batchSave(plan.newEmployees, empRepo::saveAll);
+        batchSave(plan.updatedEmployees, empRepo::saveAll);
+        batchSave(plan.mutatedEmployees, empRepo::saveAll);
+        batchSave(plan.resignedEmployees, empRepo::saveAll);
+
         historyService.flushBatch();
-        saveImportLog(user, file, res);
 
+        // 2) AFTER COMMIT — aman FK
+        runAfterCommit(() -> {
+            // akun (by NIP)
+            if (!plan.createdOrRehiredForAccount.isEmpty()) {
+                List<String> upsertNips = plan.createdOrRehiredForAccount.stream()
+                        .map(Employee::getNip)
+                        .filter(Objects::nonNull)
+                        .distinct()
+                        .toList();
+                safe(() -> userService.batchUpsertAccountsByNips(upsertNips, pegawaiRole));
+            }
+            // resign → deactivate accounts + invalidate certs
+            if (!plan.resignedEmployees.isEmpty()) {
+                List<Long> resignedIds = plan.resignedEmployees.stream()
+                        .map(Employee::getId)
+                        .filter(Objects::nonNull)
+                        .distinct()
+                        .toList();
+                safe(() -> userService.batchDeactivateByEmployeeIds(resignedIds));
+                safe(() -> certificationService.bulkInvalidateByEmployeeIds(resignedIds));
+                // Optional: revoke tokens kalau ada modulnya
+                // safe(() -> authTokenService.revokeByEmployeeIds(resignedIds));
+            }
+            // rehire → re-enable cert flow
+            if (!plan.rehiredEmployees.isEmpty()) {
+                List<Long> rehiredIds = plan.rehiredEmployees.stream()
+                        .map(Employee::getId)
+                        .filter(Objects::nonNull)
+                        .distinct()
+                        .toList();
+                safe(() -> certificationService.markInvalidToPendingForEmployeeIds(rehiredIds));
+                safe(() -> certificationService.recomputeStatusesForEmployeeIds(rehiredIds));
+            }
+        });
+
+        // 3) Log
+        saveImportLog(user, file, plan);
+
+        EmployeeImportResponse res = plan.toResponse(file.getOriginalFilename(), false);
         res.setMessage("✅ Import pegawai berhasil oleh " + user.getUsername());
         return res;
     }
 
     public void preloadMasters() {
         if (regionalCache.isEmpty())
-            regionalRepo.findAll().forEach(r -> regionalCache.put(r.getName().toLowerCase(), r));
+            regionalRepo.findAll().forEach(r -> regionalCache.put(norm(r.getName()), r));
         if (divisionCache.isEmpty())
-            divisionRepo.findAll().forEach(d -> divisionCache.put(d.getName().toLowerCase(), d));
+            divisionRepo.findAll().forEach(d -> divisionCache.put(norm(d.getName()), d));
         if (unitCache.isEmpty())
-            unitRepo.findAll().forEach(u -> unitCache.put(u.getName().toLowerCase(), u));
+            unitRepo.findAll().forEach(u -> unitCache.put(norm(u.getName()), u));
         if (jobCache.isEmpty())
-            jobRepo.findAll().forEach(j -> jobCache.put(j.getName().toLowerCase(), j));
-
-        log.info("✅ Master data preloaded: {} regionals, {} divisions, {} units, {} jobs",
-                regionalCache.size(), divisionCache.size(), unitCache.size(), jobCache.size());
+            jobRepo.findAll().forEach(j -> jobCache.put(norm(j.getName()), j));
     }
 
     // ===========================================================
-    // 🔸 INTERNAL PROCESS (Stable)
+    // CORE
     // ===========================================================
 
-    private EmployeeImportResponse process(MultipartFile file, boolean dryRun, User user) throws Exception {
-        int processed = 0, created = 0, updated = 0, mutated = 0, resigned = 0, errors = 0;
-        List<String> errorDetails = new ArrayList<>();
+    private ImportPlan buildPlan(MultipartFile file, boolean dryRun, boolean strictGuard) throws Exception {
+        List<ImportRow> rows = parseExcel(file);
+        ImportPlan plan = new ImportPlan();
+        if (rows.isEmpty())
+            return plan;
 
-        Map<String, Employee> existingEmpMap = empRepo.findAll().stream()
-                .collect(Collectors.toMap(Employee::getNip, e -> e));
-        Set<String> existingNips = existingEmpMap.keySet();
-        Set<String> importedNips = new HashSet<>();
-        Set<String> existingUsernames = userRepo.findAll().stream()
-                .map(User::getUsername)
-                .collect(Collectors.toSet());
+        // Guard: full snapshot detection (hindari mass-resign karena file parsial)
+        if (strictGuard) {
+            // NOTE: pakai size() biar gak perlu nambah repository method
+            int activeNow = empRepo.findByDeletedAtIsNull().size();
+            if (!dryRun && rows.size() < Math.max(50, (int) (activeNow * 0.6))) {
+                throw new IllegalStateException("Import terdeteksi bukan full snapshot ("
+                        + rows.size() + " < 60% dari aktif: " + activeNow + "). "
+                        + "Batalkan untuk mencegah mass-resign.");
+            }
+        }
 
-        newEmployees.clear();
-        changedEmployees.clear();
-        resignedEmployees.clear();
+        plan.processed = rows.size();
 
-        try (Workbook wb = new XSSFWorkbook(file.getInputStream())) {
-            Sheet sheet = wb.getSheetAt(0);
-            DataFormatter fmt = new DataFormatter();
+        // Deteksi NIP duplikat di file
+        Map<String, List<Integer>> dupMap = new HashMap<>();
+        for (ImportRow rr : rows) {
+            if (rr.nip != null && !rr.nip.isBlank()) {
+                dupMap.computeIfAbsent(rr.nip, k -> new ArrayList<>()).add(rr.rowIndex);
+            }
+        }
+        dupMap.entrySet().removeIf(e -> e.getValue().size() < 2);
+        if (!dupMap.isEmpty()) {
+            for (var e : dupMap.entrySet()) {
+                plan.errors++;
+                plan.errorDetails.add("Duplikat NIP " + e.getKey() + " pada baris " + e.getValue());
+            }
+            // Proses kemunculan pertama saja (deterministic)
+            rows = rows.stream()
+                    .collect(Collectors.toMap(r -> r.nip, Function.identity(), (a, b) -> a, LinkedHashMap::new))
+                    .values().stream().toList();
+        }
 
-            for (int i = 1; i <= sheet.getLastRowNum(); i++) {
-                Row row = sheet.getRow(i);
-                if (row == null)
+        Set<String> importedNips = rows.stream()
+                .map(r -> r.nip)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+
+        Map<String, Employee> existingByNip = empRepo.findByNipIn(importedNips).stream()
+                .collect(Collectors.toMap(Employee::getNip, Function.identity()));
+
+        for (ImportRow r : rows) {
+            try {
+                Regional regional = resolveRegional(r.regionalName, !dryRun);
+                Division division = resolveDivision(r.divisionName, !dryRun);
+                Unit unit = resolveUnit(r.unitName, !dryRun);
+                JobPosition job = resolveJob(r.jobName, !dryRun);
+
+                Employee existing = existingByNip.get(r.nip);
+
+                if (existing == null) {
+                    Employee emp = Employee.builder()
+                            .nip(r.nip)
+                            .name(r.name)
+                            .gender(r.gender)
+                            .email(r.email)
+                            .regional(regional)
+                            .division(division)
+                            .unit(unit)
+                            .jobPosition(job)
+                            .status("ACTIVE") // tetap pakai String biar backward-compatible
+                            .effectiveDate(r.effectiveDate)
+                            .createdAt(Instant.now())
+                            .updatedAt(Instant.now())
+                            .build();
+                    plan.newEmployees.add(emp);
+                    plan.createdOrRehiredForAccount.add(emp);
+                    plan.created++;
                     continue;
-                processed++;
+                }
 
-                try {
-                    String regionalName = fmt.formatCellValue(row.getCell(0)).trim();
-                    String divisionName = fmt.formatCellValue(row.getCell(1)).trim();
-                    String unitName = fmt.formatCellValue(row.getCell(2)).trim();
-                    String jobName = fmt.formatCellValue(row.getCell(3)).trim();
-                    String nip = fmt.formatCellValue(row.getCell(4)).trim();
-                    String name = fmt.formatCellValue(row.getCell(5)).trim();
-                    String gender = fmt.formatCellValue(row.getCell(6)).trim();
-                    String email = fmt.formatCellValue(row.getCell(7)).trim();
-                    String effStr = fmt.formatCellValue(row.getCell(8)).trim();
+                boolean mutasi = placementChanged(existing, regional, division, unit, job);
+                boolean changedProfile = profileChanged(existing, r.name, r.email, r.gender);
+                boolean wasResign = "RESIGN".equalsIgnoreCase(existing.getStatus());
 
-                    if (nip.isEmpty())
-                        continue;
-                    importedNips.add(nip);
-
-                    LocalDate effDate = parseDateSafe(row.getCell(8), effStr);
-                    Regional regional = resolveRegional(regionalName);
-                    Division division = resolveDivision(divisionName);
-                    Unit unit = resolveUnit(unitName);
-                    JobPosition job = resolveJob(jobName);
-
-                    Employee emp = existingEmpMap.get(nip);
-
-                    if (emp == null) {
-                        created++;
-                        if (!dryRun) {
-                            emp = Employee.builder()
-                                    .nip(nip)
-                                    .name(name)
-                                    .gender(gender)
-                                    .email(email)
-                                    .regional(regional)
-                                    .division(division)
-                                    .unit(unit)
-                                    .jobPosition(job)
-                                    .status("ACTIVE")
-                                    .effectiveDate(effDate)
-                                    .createdAt(Instant.now())
-                                    .updatedAt(Instant.now())
-                                    .build();
-                            newEmployees.add(emp);
-
-                            if (!existingUsernames.contains(nip)) {
-                                userService.create(UserRequest.builder()
-                                        .username(nip)
-                                        .email(email)
-                                        .password(nip)
-                                        .roleId(pegawaiRole.getId())
-                                        .isActive(true)
-                                        .build());
-                                existingUsernames.add(nip);
-                            }
-                        }
-                    } else {
-                        boolean mutasi = emp.getJobPosition() != null &&
-                                !Objects.equals(emp.getJobPosition().getId(), job.getId());
-                        boolean changed = hasChanged(emp, name, email, gender, regional, division, unit, job);
-
-                        if (mutasi) {
-                            mutated++;
-                            if (!dryRun) {
-                                JobPosition oldJob = emp.getJobPosition();
-                                emp.setJobPosition(job);
-                                emp.setUpdatedAt(Instant.now());
-                                if (effDate != null)
-                                    emp.setEffectiveDate(effDate);
-                                changedEmployees.add(emp);
-                                historyService.snapshot(emp, oldJob, job, effDate,
-                                        EmployeeHistory.EmployeeActionType.MUTASI);
-                            }
-                        } else if (changed) {
-                            updated++;
-                            if (!dryRun) {
-                                emp.setName(name);
-                                emp.setEmail(email);
-                                emp.setGender(gender);
-                                emp.setRegional(regional);
-                                emp.setDivision(division);
-                                emp.setUnit(unit);
-                                emp.setUpdatedAt(Instant.now());
-                                if (effDate != null)
-                                    emp.setEffectiveDate(effDate);
-                                changedEmployees.add(emp);
-                                historyService.snapshot(emp, EmployeeHistory.EmployeeActionType.UPDATED, effDate);
-                            }
+                if (mutasi) {
+                    if (!dryRun) {
+                        existing.setRegional(regional);
+                        existing.setDivision(division);
+                        existing.setUnit(unit);
+                        existing.setJobPosition(job);
+                        if (r.effectiveDate != null)
+                            existing.setEffectiveDate(r.effectiveDate);
+                        existing.setUpdatedAt(Instant.now());
+                        historyService.snapshot(existing, EmployeeHistory.EmployeeActionType.MUTASI);
+                        if (wasResign) {
+                            existing.setStatus("ACTIVE");
+                            plan.createdOrRehiredForAccount.add(existing);
+                            plan.rehiredEmployees.add(existing);
                         }
                     }
+                    plan.mutatedEmployees.add(existing);
+                    plan.mutated++;
+                } else if (changedProfile || wasResign) {
+                    if (!dryRun) {
+                        if (!Objects.equals(existing.getName(), r.name))
+                            existing.setName(r.name);
+                        if (!Objects.equals(existing.getEmail(), r.email))
+                            existing.setEmail(r.email);
+                        if (!Objects.equals(existing.getGender(), r.gender))
+                            existing.setGender(r.gender);
+                        if (regional != null)
+                            existing.setRegional(regional);
+                        if (division != null)
+                            existing.setDivision(division);
+                        if (unit != null)
+                            existing.setUnit(unit);
+                        if (job != null)
+                            existing.setJobPosition(job);
+                        if (r.effectiveDate != null)
+                            existing.setEffectiveDate(r.effectiveDate);
+                        if (wasResign) {
+                            existing.setStatus("ACTIVE");
+                            plan.createdOrRehiredForAccount.add(existing);
+                            plan.rehiredEmployees.add(existing);
+                        }
+                        existing.setUpdatedAt(Instant.now());
+                        historyService.snapshot(existing, EmployeeHistory.EmployeeActionType.UPDATED, r.effectiveDate);
+                    }
+                    plan.updatedEmployees.add(existing);
+                    plan.updated++;
+                }
+            } catch (Exception ex) {
+                plan.errors++;
+                plan.errorDetails.add("Row " + r.rowIndex + ": " + ex.getMessage());
+            }
+        }
 
-                } catch (Exception e) {
-                    errors++;
-                    errorDetails.add("Row " + i + ": " + e.getMessage());
+        // Resign detection via set-diff (non-deleted)
+        List<Employee> allNonDeleted = empRepo.findByDeletedAtIsNull();
+        for (Employee e : allNonDeleted) {
+            if (!importedNips.contains(e.getNip())) {
+                if (!"RESIGN".equalsIgnoreCase(e.getStatus())) {
+                    if (!dryRun) {
+                        e.setStatus("RESIGN");
+                        e.setUpdatedAt(Instant.now());
+                        historyService.snapshot(e, EmployeeHistory.EmployeeActionType.RESIGN, LocalDate.now());
+                    }
+                    plan.resignedEmployees.add(e);
+                    plan.resigned++;
                 }
             }
         }
 
-        // Handle resign
-        Set<String> resignedNips = new HashSet<>(existingNips);
-        resignedNips.removeAll(importedNips);
-        resigned = resignedNips.size();
-
-        if (!dryRun && resigned > 0) {
-            resignedEmployees.addAll(empRepo.findByNipInAndDeletedAtIsNull(resignedNips));
-            resignedEmployees.forEach(emp -> {
-                emp.setStatus("RESIGN");
-                emp.setUpdatedAt(Instant.now());
-                historyService.snapshot(emp, EmployeeHistory.EmployeeActionType.RESIGN, LocalDate.now());
-            });
-        }
-
-        return EmployeeImportResponse.builder()
-                .fileName(file.getOriginalFilename())
-                .dryRun(dryRun)
-                .processed(processed)
-                .created(created)
-                .updated(updated)
-                .mutated(mutated)
-                .resigned(resigned)
-                .errors(errors)
-                .errorDetails(errorDetails)
-                .build();
+        return plan;
     }
 
     // ===========================================================
-    // 🔸 HELPERS
+    // Excel & Utils
     // ===========================================================
 
-    private void saveImportLog(User user, MultipartFile file, EmployeeImportResponse res) {
+    private List<ImportRow> parseExcel(MultipartFile file) throws Exception {
+        List<ImportRow> out = new ArrayList<>();
+        try (Workbook wb = new XSSFWorkbook(file.getInputStream())) {
+            Sheet sheet = wb.getSheetAt(0);
+            DataFormatter fmt = new DataFormatter();
+
+            // (opsional) validasi header di row 0
+
+            for (int i = 1; i <= sheet.getLastRowNum(); i++) { // mulai dari baris ke-1 (0 = header)
+                Row row = sheet.getRow(i);
+                if (row == null)
+                    continue;
+
+                String nip = safe(fmt.formatCellValue(row.getCell(4)));
+                if (nip.isEmpty())
+                    continue; // skip kosong
+
+                String regionalName = safe(fmt.formatCellValue(row.getCell(0)));
+                String divisionName = safe(fmt.formatCellValue(row.getCell(1)));
+                String unitName = safe(fmt.formatCellValue(row.getCell(2)));
+                String jobName = safe(fmt.formatCellValue(row.getCell(3)));
+                String name = safe(fmt.formatCellValue(row.getCell(5)));
+                String gender = safe(fmt.formatCellValue(row.getCell(6)));
+                String email = safe(fmt.formatCellValue(row.getCell(7)));
+                String effStr = safe(fmt.formatCellValue(row.getCell(8)));
+
+                LocalDate effDate = parseDateSafe(row.getCell(8), effStr);
+
+                // simpan rowIndex = i+1 biar sesuai excel (1-based)
+                out.add(new ImportRow(i + 1, regionalName, divisionName, unitName, jobName,
+                        nip, name, gender, email, effDate));
+            }
+        }
+        return out;
+    }
+
+    private String safe(String s) {
+        return s == null ? "" : s.trim();
+    }
+
+    private void saveImportLog(User user, MultipartFile file, ImportPlan plan) {
         logRepo.save(EmployeeImportLog.builder()
                 .user(user)
                 .fileName(file.getOriginalFilename())
-                .totalProcessed(res.getProcessed())
-                .totalCreated(res.getCreated())
-                .totalUpdated(res.getUpdated())
-                .totalMutated(res.getMutated())
-                .totalResigned(res.getResigned())
-                .totalErrors(res.getErrors())
+                .totalProcessed(plan.processed)
+                .totalCreated(plan.created)
+                .totalUpdated(plan.updated)
+                .totalMutated(plan.mutated)
+                .totalResigned(plan.resigned)
+                .totalErrors(plan.errors)
                 .dryRun(false)
                 .createdAt(Instant.now())
                 .build());
     }
 
-    private boolean hasChanged(Employee emp, String name, String email, String gender,
-            Regional reg, Division div, Unit unit, JobPosition job) {
+    private boolean profileChanged(Employee emp, String name, String email, String gender) {
         return !Objects.equals(emp.getName(), name)
                 || !Objects.equals(emp.getEmail(), email)
-                || !Objects.equals(emp.getGender(), gender)
-                || !sameEntity(emp.getRegional(), reg)
-                || !sameEntity(emp.getDivision(), div)
-                || !sameEntity(emp.getUnit(), unit)
-                || !sameEntity(emp.getJobPosition(), job);
+                || !Objects.equals(emp.getGender(), gender);
+    }
+
+    private boolean placementChanged(Employee e, Regional r, Division d, Unit u, JobPosition j) {
+        return !sameEntity(e.getRegional(), r)
+                || !sameEntity(e.getDivision(), d)
+                || !sameEntity(e.getUnit(), u)
+                || !sameEntity(e.getJobPosition(), j);
     }
 
     private boolean sameEntity(Object a, Object b) {
@@ -298,39 +392,118 @@ public class EmployeeImportProcessor {
         try {
             if (cell != null && cell.getCellType() == CellType.NUMERIC)
                 return cell.getLocalDateTimeCellValue().toLocalDate();
-            if (val.matches("\\d{4}-\\d{2}-\\d{2}"))
+            if (val != null && val.matches("\\d{4}-\\d{2}-\\d{2}"))
                 return LocalDate.parse(val, DateTimeFormatter.ISO_LOCAL_DATE);
         } catch (Exception ignored) {
         }
         return null;
     }
 
-    private Regional resolveRegional(String name) {
+    private Regional resolveRegional(String name, boolean createIfMissing) {
         return resolveCached(name, regionalCache, regionalRepo::findByNameIgnoreCase,
-                n -> regionalRepo.save(Regional.builder().name(n).build()));
+                n -> createIfMissing ? regionalRepo.save(Regional.builder().name(n).build()) : null);
     }
 
-    private Division resolveDivision(String name) {
+    private Division resolveDivision(String name, boolean createIfMissing) {
         return resolveCached(name, divisionCache, divisionRepo::findByNameIgnoreCase,
-                n -> divisionRepo.save(Division.builder().name(n).build()));
+                n -> createIfMissing ? divisionRepo.save(Division.builder().name(n).build()) : null);
     }
 
-    private Unit resolveUnit(String name) {
+    private Unit resolveUnit(String name, boolean createIfMissing) {
         return resolveCached(name, unitCache, unitRepo::findByNameIgnoreCase,
-                n -> unitRepo.save(Unit.builder().name(n).build()));
+                n -> createIfMissing ? unitRepo.save(Unit.builder().name(n).build()) : null);
     }
 
-    private JobPosition resolveJob(String name) {
+    private JobPosition resolveJob(String name, boolean createIfMissing) {
         return resolveCached(name, jobCache, jobRepo::findByNameIgnoreCase,
-                n -> jobRepo.save(JobPosition.builder().name(n).build()));
+                n -> createIfMissing ? jobRepo.save(JobPosition.builder().name(n).build()) : null);
     }
 
-    private <T> T resolveCached(String name, Map<String, T> cache,
+    private <T> T resolveCached(
+            String name,
+            Map<String, T> cache,
             java.util.function.Function<String, Optional<T>> finder,
             java.util.function.Function<String, T> creator) {
         if (name == null || name.isBlank())
             return null;
-        return cache.computeIfAbsent(name.toLowerCase(),
-                key -> finder.apply(name).orElseGet(() -> creator.apply(name)));
+        String key = norm(name);
+        T cached = cache.get(key);
+        if (cached != null)
+            return cached;
+
+        Optional<T> found = finder.apply(name);
+        if (found.isPresent()) {
+            T val = found.get();
+            cache.put(key, val);
+            return val;
+        }
+
+        T created = creator.apply(name);
+        if (created != null)
+            cache.put(key, created);
+        return created;
+    }
+
+    private String norm(String s) {
+        return s == null ? "" : s.trim().toLowerCase();
+    }
+
+    private <T> void batchSave(List<T> list, java.util.function.Consumer<List<T>> saver) {
+        if (list == null || list.isEmpty())
+            return;
+        for (int i = 0; i < list.size(); i += BATCH_SIZE) {
+            int end = Math.min(i + BATCH_SIZE, list.size());
+            saver.accept(list.subList(i, end));
+            em.flush();
+            em.clear();
+        }
+    }
+
+    private void runAfterCommit(Runnable task) {
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                task.run();
+            }
+        });
+    }
+
+    private void safe(Runnable r) {
+        try {
+            r.run();
+        } catch (Exception ex) {
+            log.warn("Post-commit task failed: {}", ex.getMessage(), ex);
+        }
+    }
+
+    // ================== DTO internal ==================
+    private record ImportRow(
+            int rowIndex, String regionalName, String divisionName, String unitName, String jobName,
+            String nip, String name, String gender, String email, LocalDate effectiveDate) {
+    }
+
+    private static class ImportPlan {
+        int processed = 0, created = 0, updated = 0, mutated = 0, resigned = 0, errors = 0;
+        List<String> errorDetails = new ArrayList<>();
+        List<Employee> newEmployees = new ArrayList<>();
+        List<Employee> updatedEmployees = new ArrayList<>();
+        List<Employee> mutatedEmployees = new ArrayList<>();
+        List<Employee> resignedEmployees = new ArrayList<>();
+        List<Employee> rehiredEmployees = new ArrayList<>();
+        List<Employee> createdOrRehiredForAccount = new ArrayList<>();
+
+        EmployeeImportResponse toResponse(String fileName, boolean dryRun) {
+            return EmployeeImportResponse.builder()
+                    .fileName(fileName)
+                    .dryRun(dryRun)
+                    .processed(processed)
+                    .created(created)
+                    .updated(updated)
+                    .mutated(mutated)
+                    .resigned(resigned)
+                    .errors(errors)
+                    .errorDetails(errorDetails)
+                    .build();
+        }
     }
 }

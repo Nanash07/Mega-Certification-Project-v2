@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -33,4 +34,9 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
     long countByRole_Id(Long roleId);
 
     Optional<User> findByEmployee(Employee employee);
+
+    List<User> findByUsernameIn(Collection<String> usernames);
+
+    List<User> findByEmployee_IdIn(Collection<Long> employeeIds);
+
 }
