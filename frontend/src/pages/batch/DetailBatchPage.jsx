@@ -211,7 +211,7 @@ export default function DetailBatchPage() {
                     <div className="col-span-2"></div>
                     <div className="col-span-1">
                         <button
-                            className="btn btn-secondary btn-sm w-full flex items-center gap-1"
+                            className="btn btn-primary btn-sm w-full flex items-center gap-1"
                             onClick={() => setOpenAdd(true)}
                         >
                             <Plus className="w-4 h-4" />

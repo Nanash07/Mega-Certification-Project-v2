@@ -18,5 +18,5 @@ public class BatchRequest {
     private LocalDate endDate;
     private Integer quota;
     private Batch.Status status;
-    private String notes;
+    private Batch.BatchType type;
 }

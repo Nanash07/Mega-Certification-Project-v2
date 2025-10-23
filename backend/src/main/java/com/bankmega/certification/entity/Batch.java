@@ -52,8 +52,9 @@ public class Batch {
     @Column(length = 20, nullable = false)
     private Status status;
 
-    @Column(name = "notes", length = 500)
-    private String notes;
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20, nullable = false)
+    private BatchType type;
 
     // 🔹 Relasi ke peserta batch
     @OneToMany(mappedBy = "batch", cascade = CascadeType.ALL, orphanRemoval = true)
@@ -72,9 +73,15 @@ public class Batch {
     private Instant deletedAt;
 
     public enum Status {
-        PLANNED,   // direncanakan
-        ONGOING,   // sedang berjalan
-        FINISHED,  // sudah selesai
-        CANCELED   // dibatalkan
+        PLANNED, // direncanakan
+        ONGOING, // sedang berjalan
+        FINISHED, // sudah selesai
+        CANCELED // dibatalkan
+    }
+
+    public enum BatchType {
+        CERTIFICATION,
+        TRAINING,
+        REFRESHMENT
     }
 }

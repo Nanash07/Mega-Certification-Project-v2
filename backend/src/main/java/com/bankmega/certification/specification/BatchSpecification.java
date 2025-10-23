@@ -46,6 +46,10 @@ public class BatchSpecification {
                 : cb.equal(root.get("institution").get("id"), institutionId);
     }
 
+    public static Specification<Batch> byType(Batch.BatchType type) {
+        return (root, query, cb) -> type == null ? cb.conjunction() : cb.equal(root.get("type"), type);
+    }
+
     // 🔹 Filter: by date range (startDate / endDate)
     public static Specification<Batch> byDateRange(LocalDate start, LocalDate end) {
         return (root, query, cb) -> {

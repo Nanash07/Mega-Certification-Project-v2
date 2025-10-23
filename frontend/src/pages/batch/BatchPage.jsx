@@ -5,6 +5,7 @@ import toast from "react-hot-toast";
 import Select from "react-select";
 import AsyncSelect from "react-select/async";
 import Pagination from "../../components/common/Pagination";
+import { Plus } from "lucide-react";
 import { fetchBatches, deleteBatch, searchBatches } from "../../services/batchService";
 import { fetchCertificationRules } from "../../services/certificationRuleService";
 import CreateBatchModal from "../../components/batches/CreateBatchModal";
@@ -162,7 +163,8 @@ export default function BatchPage() {
                     />
                     <div className="col-span-1"></div>
                     <div className="col-span-1">
-                        <button className="btn btn-secondary btn-sm w-full" onClick={() => setOpenCreate(true)}>
+                        <button className="btn btn-primary btn-sm w-full" onClick={() => setOpenCreate(true)}>
+                            <Plus className="w-4 h-4" />
                             Tambah Batch
                         </button>
                     </div>

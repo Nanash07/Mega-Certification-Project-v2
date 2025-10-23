@@ -14,14 +14,14 @@ export default function EditBatchModal({ open, data, onClose, onSaved }) {
         if (open && data) {
             setForm({
                 id: data.id,
-                batchName: data.batchName,
-                certificationRuleId: data.certificationRuleId,
-                institutionId: data.institutionId,
+                batchName: data.batchName || "",
+                certificationRuleId: data.certificationRuleId || null,
+                institutionId: data.institutionId || null,
                 startDate: data.startDate || "",
                 endDate: data.endDate || "",
-                quota: data.quota ?? "", // kalau null jadinya string kosong
-                status: data.status,
-                notes: data.notes,
+                quota: data.quota ?? "",
+                status: data.status || "PLANNED",
+                type: data.type || "CERTIFICATION", // ✅ tambahin jenis batch
             });
 
             Promise.all([fetchCertificationRules(), fetchInstitutions()])
@@ -54,7 +54,7 @@ export default function EditBatchModal({ open, data, onClose, onSaved }) {
             const payload = { ...form };
             delete payload.id;
 
-            // ✅ pastikan quota number atau null
+            // pastikan quota number atau null
             if (payload.quota === "") {
                 delete payload.quota;
             } else {
@@ -77,19 +77,38 @@ export default function EditBatchModal({ open, data, onClose, onSaved }) {
 
     if (!open) return null;
 
+    const typeOptions = [
+        { value: "CERTIFICATION", label: "Sertifikasi" },
+        { value: "TRAINING", label: "Training" },
+        { value: "REFRESHMENT", label: "Refreshment" },
+    ];
+
     return (
         <dialog className="modal" open={open}>
             <div className="modal-box max-w-3xl">
                 <h3 className="font-bold text-lg mb-4">Edit Batch</h3>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                     {/* Nama Batch */}
                     <div>
                         <label className="block mb-1">Nama Batch</label>
                         <input
                             type="text"
-                            value={form.batchName || ""}
+                            value={form.batchName}
                             onChange={(e) => setForm({ ...form, batchName: e.target.value })}
                             className="input input-bordered w-full"
+                        />
+                    </div>
+
+                    {/* Jenis Batch */}
+                    <div>
+                        <label className="block mb-1">Jenis Batch</label>
+                        <Select
+                            options={typeOptions}
+                            value={typeOptions.find((t) => t.value === form.type) || null}
+                            onChange={(opt) => setForm({ ...form, type: opt?.value || "CERTIFICATION" })}
+                            placeholder="Pilih Jenis Batch"
+                            isClearable={false}
                         />
                     </div>
 
@@ -127,7 +146,7 @@ export default function EditBatchModal({ open, data, onClose, onSaved }) {
                             className="input input-bordered w-full"
                             placeholder="Contoh: 50"
                             min={1}
-                            max={250} // ✅ validasi di FE
+                            max={250}
                         />
                         <p className="text-xs text-gray-500 mt-1">
                             Quota minimal 1, maksimal 250. Kosongkan untuk unlimited.
@@ -139,7 +158,7 @@ export default function EditBatchModal({ open, data, onClose, onSaved }) {
                         <label className="block mb-1">Tanggal Mulai</label>
                         <input
                             type="date"
-                            value={form.startDate || ""}
+                            value={form.startDate}
                             onChange={(e) => setForm({ ...form, startDate: e.target.value })}
                             className="input input-bordered w-full"
                         />
@@ -150,7 +169,7 @@ export default function EditBatchModal({ open, data, onClose, onSaved }) {
                         <label className="block mb-1">Tanggal Selesai</label>
                         <input
                             type="date"
-                            value={form.endDate || ""}
+                            value={form.endDate}
                             onChange={(e) => setForm({ ...form, endDate: e.target.value })}
                             className="input input-bordered w-full"
                         />
@@ -160,7 +179,7 @@ export default function EditBatchModal({ open, data, onClose, onSaved }) {
                     <div>
                         <label className="block mb-1">Status</label>
                         <select
-                            value={form.status || "PLANNED"}
+                            value={form.status}
                             onChange={(e) => setForm({ ...form, status: e.target.value })}
                             className="select select-bordered w-full"
                         >
@@ -170,18 +189,9 @@ export default function EditBatchModal({ open, data, onClose, onSaved }) {
                             <option value="CANCELED">Canceled</option>
                         </select>
                     </div>
-
-                    {/* Catatan */}
-                    <div>
-                        <label className="block mb-1">Catatan</label>
-                        <textarea
-                            value={form.notes || ""}
-                            onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                            className="textarea textarea-bordered w-full"
-                        />
-                    </div>
                 </div>
 
+                {/* Buttons */}
                 <div className="modal-action">
                     <button className="btn" onClick={onClose}>
                         Batal
@@ -191,6 +201,8 @@ export default function EditBatchModal({ open, data, onClose, onSaved }) {
                     </button>
                 </div>
             </div>
+
+            {/* Backdrop close */}
             <form method="dialog" className="modal-backdrop">
                 <button onClick={onClose}>close</button>
             </form>

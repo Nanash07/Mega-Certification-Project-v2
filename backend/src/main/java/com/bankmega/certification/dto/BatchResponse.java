@@ -50,7 +50,7 @@ public class BatchResponse {
     private LocalDate endDate;
     private Integer quota;
     private Batch.Status status;
-    private String notes;
+    private Batch.BatchType type;
 
     // Audit
     private Instant createdAt;

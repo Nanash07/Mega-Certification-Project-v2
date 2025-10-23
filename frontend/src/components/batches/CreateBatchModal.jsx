@@ -1,4 +1,3 @@
-// src/components/batches/CreateBatchModal.jsx
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import Select from "react-select";
@@ -20,7 +19,7 @@ export default function CreateBatchModal({ open, onClose, onSaved }) {
             endDate: "",
             quota: "",
             status: "PLANNED",
-            notes: "",
+            type: "CERTIFICATION", // ✅ default
         };
     }
 
@@ -79,10 +78,17 @@ export default function CreateBatchModal({ open, onClose, onSaved }) {
 
     if (!open) return null;
 
+    const typeOptions = [
+        { value: "CERTIFICATION", label: "Sertifikasi" },
+        { value: "TRAINING", label: "Training" },
+        { value: "REFRESHMENT", label: "Refreshment" },
+    ];
+
     return (
         <dialog className="modal" open={open}>
             <div className="modal-box max-w-3xl">
                 <h3 className="font-bold text-lg mb-4">Tambah Batch</h3>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                     {/* Nama Batch */}
                     <div>
@@ -96,18 +102,25 @@ export default function CreateBatchModal({ open, onClose, onSaved }) {
                         />
                     </div>
 
+                    {/* Jenis Batch */}
+                    <div>
+                        <label className="block mb-1">Jenis Batch</label>
+                        <Select
+                            options={typeOptions}
+                            value={typeOptions.find((t) => t.value === form.type) || null}
+                            onChange={(opt) => setForm({ ...form, type: opt?.value || "CERTIFICATION" })}
+                            placeholder="Pilih Jenis Batch"
+                            isClearable={false}
+                        />
+                    </div>
+
                     {/* Aturan Sertifikasi */}
                     <div>
                         <label className="block mb-1">Aturan Sertifikasi</label>
                         <Select
                             options={rules}
                             value={rules.find((r) => r.value === form.certificationRuleId) || null}
-                            onChange={(opt) =>
-                                setForm({
-                                    ...form,
-                                    certificationRuleId: opt?.value || null,
-                                })
-                            }
+                            onChange={(opt) => setForm({ ...form, certificationRuleId: opt?.value || null })}
                             placeholder="Pilih Aturan Sertifikasi"
                             isClearable
                         />
@@ -135,7 +148,7 @@ export default function CreateBatchModal({ open, onClose, onSaved }) {
                             className="input input-bordered w-full"
                             placeholder="Contoh: 50"
                             min={1}
-                            max={250} // ✅ batasin di FE juga
+                            max={250}
                         />
                         <p className="text-xs text-gray-500 mt-1">
                             Quota minimal 1, maksimal 250. Kosongkan untuk unlimited.
@@ -178,19 +191,9 @@ export default function CreateBatchModal({ open, onClose, onSaved }) {
                             <option value="CANCELED">Canceled</option>
                         </select>
                     </div>
-
-                    {/* Catatan */}
-                    <div>
-                        <label className="block mb-1">Catatan</label>
-                        <textarea
-                            value={form.notes}
-                            onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                            className="textarea textarea-bordered w-full"
-                            placeholder="Catatan tambahan"
-                        />
-                    </div>
                 </div>
 
+                {/* Action Buttons */}
                 <div className="modal-action">
                     <button className="btn" onClick={onClose}>
                         Batal
@@ -200,6 +203,8 @@ export default function CreateBatchModal({ open, onClose, onSaved }) {
                     </button>
                 </div>
             </div>
+
+            {/* Background Click Close */}
             <form method="dialog" className="modal-backdrop">
                 <button onClick={onClose}>close</button>
             </form>
