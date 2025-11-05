@@ -19,72 +19,74 @@ public class EmployeeBatchController {
 
     private final EmployeeBatchService service;
 
-    // 🔹 Ambil semua peserta batch (tanpa paging)
+    // Get semua peserta batch (tanpa paging)
     @GetMapping("/batch/{batchId}")
-    public List<EmployeeBatchResponse> getByBatch(@PathVariable Long batchId) {
-        return service.getByBatch(batchId);
+    public ResponseEntity<List<EmployeeBatchResponse>> getByBatch(@PathVariable Long batchId) {
+        return ResponseEntity.ok(service.getByBatch(batchId));
     }
 
-    // 🔹 Ambil peserta batch dengan paging (recommended FE pakai ini)
+    // Get peserta batch dengan paging
     @GetMapping("/batch/{batchId}/paged")
     public ResponseEntity<Page<EmployeeBatchResponse>> getPagedByBatch(
             @PathVariable Long batchId,
             @RequestParam(required = false) String search,
             @RequestParam(required = false) EmployeeBatch.Status status,
-            Pageable pageable
-    ) {
+            Pageable pageable) {
         return ResponseEntity.ok(service.search(batchId, search, status, pageable));
     }
 
-    // 🔹 Search global (optional)
+    // Search global (optional)
     @GetMapping
-    public Page<EmployeeBatchResponse> search(
+    public ResponseEntity<Page<EmployeeBatchResponse>> search(
             @RequestParam(required = false) Long batchId,
             @RequestParam(required = false) String search,
             @RequestParam(required = false) EmployeeBatch.Status status,
-            Pageable pageable
-    ) {
-        return service.search(batchId, search, status, pageable);
+            Pageable pageable) {
+        return ResponseEntity.ok(service.search(batchId, search, status, pageable));
     }
 
-    // 🔹 Tambah peserta single
+    // Tambah peserta single (auto-restore jika soft-deleted)
     @PostMapping("/batch/{batchId}/employee/{employeeId}")
-    public EmployeeBatchResponse addParticipant(
+    public ResponseEntity<EmployeeBatchResponse> addParticipant(
             @PathVariable Long batchId,
-            @PathVariable Long employeeId
-    ) {
-        return service.addParticipant(batchId, employeeId);
+            @PathVariable Long employeeId) {
+        return ResponseEntity.ok(service.addParticipant(batchId, employeeId));
     }
 
-    // 🔹 Tambah peserta bulk
+    // Tambah peserta bulk (auto-restore jika soft-deleted)
     @PostMapping("/batch/{batchId}/employees/bulk")
     public ResponseEntity<List<EmployeeBatchResponse>> addParticipantsBulk(
             @PathVariable Long batchId,
-            @RequestBody List<Long> employeeIds
-    ) {
+            @RequestBody List<Long> employeeIds) {
         return ResponseEntity.ok(service.addParticipantsBulk(batchId, employeeIds));
     }
 
-    // 🔹 Update status peserta
+    // Update status peserta (REGISTERED -> ATTENDED -> PASSED/FAILED)
     @PutMapping("/{id}/status")
-    public EmployeeBatchResponse updateStatus(
+    public ResponseEntity<EmployeeBatchResponse> updateStatus(
             @PathVariable Long id,
             @RequestParam EmployeeBatch.Status status,
             @RequestParam(required = false) Integer score,
-            @RequestParam(required = false) String notes
-    ) {
-        return service.updateStatus(id, status, score, notes);
+            @RequestParam(required = false) String notes) {
+        return ResponseEntity.ok(service.updateStatus(id, status, score, notes));
     }
 
-    // 🔹 Soft delete peserta
+    // Retry peserta FAILED -> REGISTERED
+    @PatchMapping("/{id}/retry")
+    public ResponseEntity<EmployeeBatchResponse> retryFailed(@PathVariable Long id) {
+        return ResponseEntity.ok(service.retryFailed(id));
+    }
+
+    // Soft delete peserta (hanya boleh REGISTERED)
     @DeleteMapping("/{id}")
-    public void removeParticipant(@PathVariable Long id) {
+    public ResponseEntity<Void> removeParticipant(@PathVariable Long id) {
         service.removeParticipant(id);
+        return ResponseEntity.noContent().build();
     }
 
-    // 🔹 Eligible employees untuk batch
+    // Eligible employees untuk batch
     @GetMapping("/batch/{batchId}/eligible")
-    public List<EmployeeEligibilityResponse> getEligibleForBatch(@PathVariable Long batchId) {
-        return service.getEligibleEmployeesForBatch(batchId);
+    public ResponseEntity<List<EmployeeEligibilityResponse>> getEligibleForBatch(@PathVariable Long batchId) {
+        return ResponseEntity.ok(service.getEligibleEmployeesForBatch(batchId));
     }
 }

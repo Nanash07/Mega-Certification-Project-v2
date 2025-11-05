@@ -22,81 +22,82 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class PicCertificationScopeService {
 
-    private final PicCertificationScopeRepository scopeRepo;
-    private final UserRepository userRepo;
-    private final CertificationRepository certRepo;
+        private final PicCertificationScopeRepository scopeRepo;
+        private final UserRepository userRepo;
+        private final CertificationRepository certRepo;
 
-    // 🔹 Ambil semua PIC + scope-nya
-    public List<PicCertificationScopeResponse> getAll() {
-        return userRepo.findByDeletedAtIsNull().stream()
-                .filter(u -> u.getRole() != null && "PIC".equalsIgnoreCase(u.getRole().getName()))
-                .map(this::mapUserToResponse)
-                .toList();
-    }
-
-    // 🔹 Ambil scope untuk 1 PIC
-    public PicCertificationScopeResponse getByUser(Long userId) {
-        User user = userRepo.findById(userId)
-                .orElseThrow(() -> new NotFoundException("User not found: " + userId));
-        return mapUserToResponse(user);
-    }
-
-    // 🔹 Update scope PIC
-    @Transactional
-    public PicCertificationScopeResponse updateScope(Long userId, PicCertificationScopeRequest req) {
-        User user = userRepo.findById(userId)
-                .orElseThrow(() -> new NotFoundException("User not found: " + userId));
-
-        // ambil scope lama
-        List<PicCertificationScope> existing = scopeRepo.findByUser_Id(user.getId());
-        Set<Long> existingIds = existing.stream()
-                .map(s -> s.getCertification().getId())
-                .collect(Collectors.toSet());
-
-        // ambil scope baru dari request
-        Set<Long> newIds = new HashSet<>(req.getCertificationIds());
-
-        // ✅ kalau sama persis → skip update
-        if (existingIds.equals(newIds)) {
-            return mapUserToResponse(user);
+        // Ambil semua PIC + scope-nya
+        public List<PicCertificationScopeResponse> getAll() {
+                return userRepo.findByDeletedAtIsNull().stream()
+                                .filter(u -> u.getRole() != null && "PIC".equalsIgnoreCase(u.getRole().getName()))
+                                .map(this::mapUserToResponse)
+                                .toList();
         }
 
-        // ❌ hapus scope yg sudah tidak ada di request
-        existing.stream()
-                .filter(s -> !newIds.contains(s.getCertification().getId()))
-                .forEach(scopeRepo::delete);
+        // Ambil scope untuk 1 PIC
+        public PicCertificationScopeResponse getByUser(Long userId) {
+                User user = userRepo.findById(userId)
+                                .orElseThrow(() -> new NotFoundException("User not found: " + userId));
+                return mapUserToResponse(user);
+        }
 
-        // ➕ tambahkan scope baru
-        newIds.stream()
-                .filter(id -> !existingIds.contains(id))
-                .forEach(certId -> {
-                    Certification c = certRepo.findById(certId)
-                            .orElseThrow(() -> new NotFoundException("Certification not found: " + certId));
-                    scopeRepo.save(PicCertificationScope.builder()
-                            .user(user)
-                            .certification(c)
-                            .build());
-                });
+        // Update scope PIC
+        @Transactional
+        public PicCertificationScopeResponse updateScope(Long userId, PicCertificationScopeRequest req) {
+                User user = userRepo.findById(userId)
+                                .orElseThrow(() -> new NotFoundException("User not found: " + userId));
 
-        return mapUserToResponse(user);
-    }
+                // ambil scope lama
+                List<PicCertificationScope> existing = scopeRepo.findByUser_Id(user.getId());
+                Set<Long> existingIds = existing.stream()
+                                .map(s -> s.getCertification().getId())
+                                .collect(Collectors.toSet());
 
-    // 🔹 Mapper User + Scope → DTO
-    private PicCertificationScopeResponse mapUserToResponse(User user) {
-        var certs = scopeRepo.findByUser_Id(user.getId()).stream()
-                .map(s -> PicCertificationScopeResponse.ScopeDto.builder()
-                        .certificationId(s.getCertification().getId())
-                        .certificationCode(s.getCertification().getCode())
-                        .build())
-                .toList();
+                // ambil scope baru dari request
+                Set<Long> newIds = new HashSet<>(req.getCertificationIds());
 
-        return PicCertificationScopeResponse.builder()
-                .userId(user.getId())
-                .username(user.getUsername())
-                .email(user.getEmail())
-                .createdAt(user.getCreatedAt())
-                .updatedAt(user.getUpdatedAt())
-                .certifications(certs)
-                .build();
-    }
+                // kalau sama persis → skip update
+                if (existingIds.equals(newIds)) {
+                        return mapUserToResponse(user);
+                }
+
+                // hapus scope yg sudah tidak ada di request
+                existing.stream()
+                                .filter(s -> !newIds.contains(s.getCertification().getId()))
+                                .forEach(scopeRepo::delete);
+
+                // tambahkan scope baru
+                newIds.stream()
+                                .filter(id -> !existingIds.contains(id))
+                                .forEach(certId -> {
+                                        Certification c = certRepo.findById(certId)
+                                                        .orElseThrow(() -> new NotFoundException(
+                                                                        "Certification not found: " + certId));
+                                        scopeRepo.save(PicCertificationScope.builder()
+                                                        .user(user)
+                                                        .certification(c)
+                                                        .build());
+                                });
+
+                return mapUserToResponse(user);
+        }
+
+        // Mapper User + Scope → DTO
+        private PicCertificationScopeResponse mapUserToResponse(User user) {
+                var certs = scopeRepo.findByUser_Id(user.getId()).stream()
+                                .map(s -> PicCertificationScopeResponse.ScopeDto.builder()
+                                                .certificationId(s.getCertification().getId())
+                                                .certificationCode(s.getCertification().getCode())
+                                                .build())
+                                .toList();
+
+                return PicCertificationScopeResponse.builder()
+                                .userId(user.getId())
+                                .username(user.getUsername())
+                                .email(user.getEmail())
+                                .createdAt(user.getCreatedAt())
+                                .updatedAt(user.getUpdatedAt())
+                                .certifications(certs)
+                                .build();
+        }
 }

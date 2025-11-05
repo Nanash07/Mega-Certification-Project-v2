@@ -36,6 +36,8 @@ public class SecurityConfig {
                         // auth
                         .requestMatchers("/api/auth/**").permitAll()
 
+                        .requestMatchers(HttpMethod.GET, "/api/dashboard/**").hasAnyRole("SUPERADMIN", "PIC")
+
                         // users
                         .requestMatchers(HttpMethod.GET, "/api/users/**").hasAnyRole("SUPERADMIN", "PIC")
                         .requestMatchers(HttpMethod.POST, "/api/users").hasRole("SUPERADMIN")

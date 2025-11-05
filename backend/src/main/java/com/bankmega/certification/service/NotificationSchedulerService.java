@@ -1,190 +1,115 @@
 package com.bankmega.certification.service;
 
-import com.bankmega.certification.entity.NotificationSchedule;
+import com.bankmega.certification.dto.NotificationScheduleResponse;
 import com.bankmega.certification.entity.NotificationTemplate;
-import com.bankmega.certification.repository.NotificationScheduleRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
+import java.time.*;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
-@ConditionalOnProperty(value = "app.notifications.scheduler-enabled", havingValue = "true", matchIfMissing = true)
 public class NotificationSchedulerService {
 
-    private final NotificationScheduleRepository repo;
     private final NotificationScheduleService scheduleService;
     private final NotificationService notificationService;
 
-    private static final ZoneId ZONE = ZoneId.of("Asia/Jakarta");
+    private static final DateTimeFormatter HHMM = DateTimeFormatter.ofPattern("HH:mm");
 
-    /** In-memory lock per tipe (non-distributed). */
-    private final Map<NotificationTemplate.Code, AtomicBoolean> runningFlags = new ConcurrentHashMap<>();
+    /**
+     * Cek tiap menit; jalankan job yang jam-nya match.
+     */
+    @Scheduled(cron = "0 * * * * *") // detik=0, setiap menit
+    public void tick() {
+        LocalDate today = LocalDate.now();
+        LocalTime now = LocalTime.now().withSecond(0).withNano(0);
+        boolean weekend = isWeekend(today);
 
-    private AtomicBoolean flag(NotificationTemplate.Code type) {
-        return runningFlags.computeIfAbsent(type, k -> new AtomicBoolean(false));
-    }
+        log.info("[Scheduler] Checking notification schedules at {}", LocalDateTime.now());
 
-    // 🕐 default tiap 5 menit (override via app.notifications.scheduler-cron)
-    @Scheduled(cron = "${app.notifications.scheduler-cron:0 */5 * * * *}", zone = "Asia/Jakarta")
-    public void runAllSchedules() {
-        final LocalDateTime now = LocalDateTime.now(ZONE);
-        log.info("🕐 [Scheduler] Checking notification schedules at {}", now);
-
-        List<NotificationSchedule> schedules = repo.findAll();
-        if (schedules.isEmpty()) {
-            log.info("ℹ️ Tidak ada jadwal notifikasi di database.");
+        List<NotificationScheduleResponse> schedules = scheduleService.getAll();
+        if (schedules == null || schedules.isEmpty())
             return;
-        }
 
-        for (NotificationSchedule s : schedules) {
+        for (NotificationScheduleResponse sch : schedules) {
             try {
-                NotificationTemplate.Code type = s.getType();
-                log.debug("🔍 Evaluating schedule {} (active={}, time={}, lastRun={})",
-                        type, s.getActive(), s.getTime(), s.getLastRun());
+                if (sch.getActive() == null || !sch.getActive())
+                    continue;
+                if (Boolean.TRUE.equals(sch.getSkipWeekend()) && weekend)
+                    continue;
 
-                if (type == null) {
-                    log.warn("⚠️ Schedule tanpa type, id={} dilewati.", s.getId());
+                String timeStr = sch.getTime();
+                if (timeStr == null || timeStr.isBlank())
                     continue;
-                }
-                if (!scheduleService.isActiveToday(s)) {
-                    log.debug("⏸ Jadwal {} tidak aktif hari ini / skip weekend", type);
-                    continue;
-                }
-                if (!scheduleService.isTimeToRun(s)) {
-                    log.debug("🕓 Belum waktunya untuk jadwal {}", type);
-                    continue;
-                }
-                if (alreadyExecutedRecently(s, now)) {
-                    log.debug("⏭ Jadwal {} sudah dieksekusi baru-baru ini (lastRun={})", type, s.getLastRun());
-                    continue;
-                }
 
-                if (!flag(type).compareAndSet(false, true)) {
-                    log.warn("⛔ {} masih berjalan, skip eksekusi paralel.", type);
-                    continue;
-                }
-
+                LocalTime runAt;
                 try {
-                    log.info("🚀 Menjalankan jadwal notifikasi untuk {}", type);
-                    runScheduleInternal(s);
-                    scheduleService.markExecuted(s);
-                    log.info("✅ Jadwal {} berhasil dijalankan & ditandai executed", type);
-                } finally {
-                    flag(type).set(false);
+                    runAt = LocalTime.parse(timeStr, HHMM);
+                } catch (Exception e) {
+                    log.warn("Invalid schedule time {} for type {}", timeStr, sch.getType());
+                    continue;
                 }
 
-            } catch (Exception e) {
-                log.error("❌ Error saat menjalankan jadwal id={} type={}: {}", s.getId(), s.getType(), e.getMessage(),
-                        e);
+                if (now.equals(runAt)) {
+                    log.info("Jadwal {} waktunya jalan (now={}, target={})",
+                            sch.getType(), now.format(HHMM), timeStr);
+                    execute(sch.getType(), false);
+                    scheduleService.markExecuted(sch.getType()); // last_run
+                }
+            } catch (Exception ex) {
+                log.error("Scheduler error for {}: {}", sch.getType(), ex.getMessage(), ex);
             }
         }
-    }
-
-    // ▶️ Jalankan satu jadwal (normal)
-    public void runSchedule(NotificationSchedule schedule) {
-        runSchedule(schedule, false);
     }
 
     /**
-     * Versi force:
-     * - force=true → abaikan active/time/lastRun; tetap lock per-type.
+     * Run Now dari controller: langsung eksekusi tanpa cek jam/active.
      */
-    public void runSchedule(NotificationSchedule schedule, boolean force) {
-        if (schedule == null || schedule.getType() == null) {
-            log.warn("⚠️ Jadwal kosong atau tipe null, dilewati.");
-            return;
-        }
-
-        final NotificationTemplate.Code type = schedule.getType();
-        final LocalDateTime now = LocalDateTime.now(ZONE);
-
-        if (!force) {
-            if (!scheduleService.isActiveToday(schedule)) {
-                log.debug("⏸ Jadwal {} tidak aktif hari ini.", type);
-                return;
-            }
-            if (!scheduleService.isTimeToRun(schedule)) {
-                log.debug("🕓 Belum waktunya untuk jadwal {}", type);
-                return;
-            }
-            if (alreadyExecutedRecently(schedule, now)) {
-                log.debug("⏭ Jadwal {} sudah dieksekusi baru-baru ini (lastRun={})", type, schedule.getLastRun());
-                return;
-            }
-        } else {
-            log.info("🧭 [Force] Menjalankan jadwal {} tanpa cek active/time/lastRun", type);
-        }
-
-        if (!flag(type).compareAndSet(false, true)) {
-            log.warn("⛔ {} masih berjalan, skip eksekusi paralel (force={})", type, force);
-            return;
-        }
-
-        try {
-            log.info("▶️ Eksekusi jadwal notifikasi {} (force={})", type, force);
-            runScheduleInternal(schedule);
-            scheduleService.markExecuted(schedule);
-            log.info("✅ Jadwal {} selesai & ditandai executed (force={})", type, force);
-        } catch (Exception e) {
-            log.error("❌ Gagal menjalankan jadwal {}: {}", type, e.getMessage(), e);
-        } finally {
-            flag(type).set(false);
-        }
-    }
-
-    // 🧭 Manual trigger (ambil schedule dari DB)
     public void runManual(NotificationTemplate.Code type) {
-        log.info("🧭 [Manual Trigger] Menjalankan jadwal {}", type);
-
-        NotificationSchedule schedule = repo.findByType(type).orElse(null);
-        if (schedule == null) {
-            log.warn("⚠️ Jadwal {} tidak ditemukan di database", type);
-            return;
+        log.info("[Manual Trigger] Menjalankan jadwal {}", type);
+        // optional: validasi/ambil jadwal by type untuk logging konsisten
+        try {
+            scheduleService.getByType(type);
+        } catch (Exception ignored) {
         }
+        log.info("[Force] Menjalankan jadwal {} tanpa cek active/time/lastRun", type);
 
-        // manual → force run
-        runSchedule(schedule, true);
+        execute(type, true);
+        scheduleService.markExecuted(type);
+        log.info("Jadwal {} selesai & ditandai executed (force=true)", type);
     }
 
-    // Core eksekusi per type
-    private void runScheduleInternal(NotificationSchedule schedule) {
-        NotificationTemplate.Code type = schedule.getType();
+    // ================= internal =================
+
+    private void execute(NotificationTemplate.Code type, boolean force) {
+        log.info("{} Eksekusi jadwal notifikasi {} (force={})",
+                force ? "[Manual]" : "[Auto]", type, force);
 
         switch (type) {
             case CERT_REMINDER -> {
-                log.info("🔔 Menjalankan proses CERT_REMINDER...");
                 notificationService.processCertReminder();
-                log.info("✅ Proses CERT_REMINDER selesai.");
+                log.info("Handler CERT_REMINDER executed.");
+            }
+            case EXPIRED_NOTICE -> {
+                // Handler expired - PENTING
+                notificationService.processCertExpired();
+                log.info("Handler EXPIRED_NOTICE executed.");
             }
             case BATCH_NOTIFICATION -> {
-                // TIDAK kirim global. Batch notif hanya via tombol per-batch
-                // (notifyParticipantsByBatch).
-                log.info("📢 Skip BATCH_NOTIFICATION dari scheduler (gunakan trigger per-batch via UI).");
+                // Biasanya trigger per-batch; skip eksekusi global
+                log.info("BATCH_NOTIFICATION is not executed globally via scheduler.");
             }
-            default -> log.warn("⚠️ Belum ada handler untuk tipe notifikasi {}", type);
+            default -> log.warn("Unsupported schedule type: {}", type);
         }
     }
 
-    // Guard anti double-run dalam 10 menit, per hari.
-    private boolean alreadyExecutedRecently(NotificationSchedule s, LocalDateTime now) {
-        if (s.getLastRun() == null)
-            return false;
-        LocalDate lastDay = s.getLastRun().atZone(ZONE).toLocalDate();
-        LocalDate today = now.toLocalDate();
-        if (!today.isEqual(lastDay))
-            return false;
-        return now.isBefore(s.getLastRun().plusMinutes(10));
+    private boolean isWeekend(LocalDate d) {
+        DayOfWeek w = d.getDayOfWeek();
+        return (w == DayOfWeek.SATURDAY || w == DayOfWeek.SUNDAY);
     }
 }

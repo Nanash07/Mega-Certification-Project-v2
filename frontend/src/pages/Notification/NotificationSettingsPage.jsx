@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import toast from "react-hot-toast";
-import { Save, Play } from "lucide-react";
+import { Save } from "lucide-react";
 import { fetchAllTemplates, updateTemplate } from "../../services/notificationTemplateService";
 import { fetchAllSchedules, updateSchedule, runScheduleNow } from "../../services/notificationScheduleService";
 
@@ -12,6 +12,21 @@ export default function NotificationSettingsPage() {
     const [editing, setEditing] = useState({});
     const [saving, setSaving] = useState(false);
     const textareaRef = useRef(null); // Ref tunggal untuk textarea yang aktif
+
+    // ===== Variabel Placeholder yang Didukung (disesuaikan BE) =====
+    const VARIABLE_GUIDE = {
+        sapaan: "Bapak/Ibu sesuai gender",
+        nama: "Nama karyawan",
+        namaSertifikasi: "Nama sertifikasi.",
+        berlakuSampai: "Tanggal akhir masa berlaku",
+        namaBatch: "Kode/nama batch pelaksanaan.",
+        mulaiTanggal: "Tanggal pelaksanaan batch",
+    };
+
+    const extractUsedVariables = (text = "") => {
+        const keys = Object.keys(VARIABLE_GUIDE);
+        return keys.filter((k) => text.includes(`{{${k}}}`));
+    };
 
     // ===== Auto-resize Textarea Logic =====
     const adjustTextarea = () => {
@@ -141,7 +156,15 @@ export default function NotificationSettingsPage() {
         }
     };
 
-    // ===== Preview Helper (Tidak berubah) =====
+    // ===== Preview Helper (dibuat HTML + nilai variabel dibold) =====
+    const escapeHtml = (str = "") =>
+        str
+            .replaceAll("&", "&amp;")
+            .replaceAll("<", "&lt;")
+            .replaceAll(">", "&gt;")
+            .replaceAll('"', "&quot;")
+            .replaceAll("'", "&#039;");
+
     const renderPreview = (judul, isiPesan) => {
         const variabel = {
             sapaan: "Bapak",
@@ -152,15 +175,21 @@ export default function NotificationSettingsPage() {
             mulaiTanggal: "1 Desember 2025",
         };
 
+        // SUBJECT: plain (email subject tidak support HTML)
         let hasilJudul = judul || "";
-        let hasilIsi = isiPesan || "";
-
         for (const [key, val] of Object.entries(variabel)) {
             hasilJudul = hasilJudul.replaceAll(`{{${key}}}`, val);
-            hasilIsi = hasilIsi.replaceAll(`{{${key}}}`, val);
         }
 
-        return { hasilJudul, hasilIsi };
+        // BODY: escape dulu, lalu ganti placeholder -> <b>…</b>, lalu newline -> <br/>
+        let html = escapeHtml(isiPesan || "");
+        for (const [key, val] of Object.entries(variabel)) {
+            const safeVal = `<b>${escapeHtml(String(val))}</b>`;
+            html = html.replaceAll(`{{${key}}}`, safeVal);
+        }
+        html = html.replaceAll("\n", "<br/>");
+
+        return { hasilJudul, hasilIsiHTML: html };
     };
 
     // ===== RENDER =====
@@ -189,6 +218,9 @@ export default function NotificationSettingsPage() {
     const currentBody = editing[tpl.id]?.body ?? tpl.body;
     const previewData = renderPreview(currentTitle, currentBody);
 
+    // Selalu tampilkan semua variabel (BE default)
+    const allKeys = Object.keys(VARIABLE_GUIDE);
+
     return (
         <div className="space-y-2">
             {/* NAVIGASI TAB */}
@@ -212,7 +244,7 @@ export default function NotificationSettingsPage() {
                     <div>
                         <h3 className="font-semibold text-lg capitalize">{tpl.code.replaceAll("_", " ")}</h3>
                         <p className="text-xs text-gray-400">
-                            Terakhir diperbarui:{" "}
+                            Terakhir diperbarui{" "}
                             {new Date(tpl.updatedAt).toLocaleString("id-ID", {
                                 day: "2-digit",
                                 month: "short",
@@ -255,6 +287,21 @@ export default function NotificationSettingsPage() {
                                 onChange={(e) => handleChangeTemplate(tpl.id, "body", e.target.value)}
                             />
                         </div>
+
+                        {/* Penjelasan Variabel yang Dipakai - 2 kolom grid */}
+                        <div className="mt-2">
+                            <label className="text-gray-500 mb-3 block text-xs">Penjelasan variabel yang dipakai</label>
+                            <div className="">
+                                <div className="grid grid-cols-2 gap-3 text-xs">
+                                    {allKeys.map((key) => (
+                                        <div key={key} className="flex items-start gap-2">
+                                            <code className="badge badge-xs badge-soft">{`{{${key}}}`}</code>
+                                            <span className="text-gray-600">{VARIABLE_GUIDE[key]}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     {/* RIGHT - Preview */}
@@ -264,7 +311,12 @@ export default function NotificationSettingsPage() {
                             <p className="font-semibold text-base text-black mb-2 break-words">
                                 {previewData.hasilJudul}
                             </p>
-                            <p className="text-gray-700 whitespace-pre-wrap break-words">{previewData.hasilIsi}</p>
+
+                            {/* Body render as HTML (nilai variabel <b>...</b>) */}
+                            <div
+                                className="text-gray-700 break-words"
+                                dangerouslySetInnerHTML={{ __html: previewData.hasilIsiHTML }}
+                            />
                         </div>
                     </div>
                 </div>
@@ -335,6 +387,8 @@ export default function NotificationSettingsPage() {
                                 <Save size={16} />
                                 Simpan Jadwal
                             </button>
+                            {/* (Opsional) tombol run now kalau masih mau dipakai */}
+                            {/* <button className="btn btn-ghost btn-sm" onClick={() => handleRunNow(tpl.code)}>Run Now</button> */}
                         </div>
                     </div>
                 </div>

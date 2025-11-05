@@ -6,11 +6,12 @@ import {
     fetchEmployeeBatchesPaged,
     updateEmployeeBatchStatus,
     deleteEmployeeFromBatch,
+    retryEmployeeBatch,
 } from "../../services/employeeBatchService";
-import { fetchBatchById } from "../../services/batchService";
+import { fetchBatchById, sendBatchNotifications } from "../../services/batchService";
 import AddEmployeeBatchModal from "../../components/batches/AddEmployeeBatchModal";
 import Pagination from "../../components/common/Pagination";
-import { ArrowLeft, Plus } from "lucide-react";
+import { ArrowLeft, Plus, Send, RotateCcw } from "lucide-react";
 import Select from "react-select";
 
 export default function DetailBatchPage() {
@@ -29,10 +30,14 @@ export default function DetailBatchPage() {
 
     const [openAdd, setOpenAdd] = useState(false);
     const [confirmDelete, setConfirmDelete] = useState({ open: false, id: null });
+    const [confirmSend, setConfirmSend] = useState(false);
 
-    // filters
+    // filters (table)
     const [filterEmployee, setFilterEmployee] = useState(null);
     const [filterStatus, setFilterStatus] = useState(null);
+
+    // kirim email
+    const [sendingEmails, setSendingEmails] = useState(false);
 
     const statusOptions = [
         { value: "REGISTERED", label: "Registered" },
@@ -68,6 +73,7 @@ export default function DetailBatchPage() {
 
     useEffect(() => {
         loadData();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [id, page, rowsPerPage, filterEmployee, filterStatus]);
 
     // ================== HANDLERS ==================
@@ -75,10 +81,9 @@ export default function DetailBatchPage() {
         try {
             const updated = await updateEmployeeBatchStatus(pid, status);
             toast.success("Status peserta diperbarui");
-
             setParticipants((prev) => prev.map((p) => (p.id === pid ? { ...p, ...updated } : p)));
-        } catch {
-            toast.error("Gagal update status");
+        } catch (e) {
+            toast.error(e?.response?.data?.message || "Gagal update status");
         }
     }
 
@@ -87,10 +92,36 @@ export default function DetailBatchPage() {
             await deleteEmployeeFromBatch(pid);
             toast.success("Peserta dihapus");
             loadData(); // reload biar quota & total peserta update
-        } catch {
-            toast.error("Gagal hapus peserta");
+        } catch (e) {
+            toast.error(e?.response?.data?.message || "Gagal hapus peserta");
         } finally {
             setConfirmDelete({ open: false, id: null });
+        }
+    }
+
+    async function handleRetry(pid) {
+        try {
+            const updated = await retryEmployeeBatch(pid);
+            toast.success("Peserta di-set ulang ke REGISTERED");
+            setParticipants((prev) => prev.map((p) => (p.id === pid ? { ...p, ...updated } : p)));
+        } catch (e) {
+            toast.error(e?.response?.data?.message || "Gagal set ulang peserta");
+        }
+    }
+
+    // Kirim email (tanpa confirm, dipanggil dari modal)
+    async function doSendEmails() {
+        try {
+            if (!batch) return;
+            setSendingEmails(true);
+            const sent = await sendBatchNotifications(batch.id);
+            toast.success(`Email terkirim ke ${sent} peserta`);
+        } catch (err) {
+            console.error(err);
+            toast.error(err?.response?.data?.message || "Gagal mengirim email");
+        } finally {
+            setSendingEmails(false);
+            setConfirmSend(false);
         }
     }
 
@@ -186,7 +217,7 @@ export default function DetailBatchPage() {
                 </div>
             )}
 
-            {/* Filters + Tambah Peserta */}
+            {/* Filters + Actions */}
             <div className="mb-4 space-y-3">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 text-xs">
                     <Select
@@ -208,7 +239,7 @@ export default function DetailBatchPage() {
                             Clear Filter
                         </button>
                     </div>
-                    <div className="col-span-2"></div>
+                    <div className="col-span-1"></div>
                     <div className="col-span-1">
                         <button
                             className="btn btn-primary btn-sm w-full flex items-center gap-1"
@@ -216,6 +247,16 @@ export default function DetailBatchPage() {
                         >
                             <Plus className="w-4 h-4" />
                             Tambah Peserta
+                        </button>
+                    </div>
+                    <div className="col-span-1">
+                        <button
+                            className="btn btn-success btn-sm w-full flex items-center gap-1 disabled:opacity-60"
+                            onClick={() => setConfirmSend(true)}
+                            disabled={sendingEmails || !batch}
+                        >
+                            <Send className="w-4 h-4" />
+                            Kirim Email ke Peserta
                         </button>
                     </div>
                 </div>
@@ -271,15 +312,25 @@ export default function DetailBatchPage() {
                                             </span>
                                         </td>
                                         <td className="flex justify-center gap-2">
+                                            {/* REGISTERED: Attend + Hapus */}
                                             {p.status === "REGISTERED" && (
-                                                <button
-                                                    className="btn btn-xs btn-warning btn-soft border-warning"
-                                                    onClick={() => handleUpdateStatus(p.id, "ATTENDED")}
-                                                >
-                                                    Attend
-                                                </button>
+                                                <>
+                                                    <button
+                                                        className="btn btn-xs btn-warning btn-soft border-warning"
+                                                        onClick={() => handleUpdateStatus(p.id, "ATTENDED")}
+                                                    >
+                                                        Attend
+                                                    </button>
+                                                    <button
+                                                        className="btn btn-xs btn-neutral btn-soft border-neutral"
+                                                        onClick={() => setConfirmDelete({ open: true, id: p.id })}
+                                                    >
+                                                        Hapus
+                                                    </button>
+                                                </>
                                             )}
 
+                                            {/* ATTENDED: Passed/Failed */}
                                             {p.status === "ATTENDED" && (
                                                 <>
                                                     <button
@@ -297,12 +348,22 @@ export default function DetailBatchPage() {
                                                 </>
                                             )}
 
-                                            <button
-                                                className="btn btn-xs btn-neutral btn-soft border-neutral"
-                                                onClick={() => setConfirmDelete({ open: true, id: p.id })}
-                                            >
-                                                Hapus
-                                            </button>
+                                            {/* FAILED: Ulangi */}
+                                            {p.status === "FAILED" && (
+                                                <button
+                                                    className="btn btn-xs btn-info btn-soft border-info flex items-center gap-1"
+                                                    onClick={() => handleRetry(p.id)}
+                                                    title="Ulang attempt (balik ke REGISTERED)"
+                                                >
+                                                    <RotateCcw className="w-3 h-3" />
+                                                    Ulang
+                                                </button>
+                                            )}
+
+                                            {/* PASSED: read-only */}
+                                            {p.status === "PASSED" && (
+                                                <span className="text-xs text-gray-400 italic">Final</span>
+                                            )}
                                         </td>
                                     </tr>
                                 ))
@@ -345,6 +406,43 @@ export default function DetailBatchPage() {
                     </div>
                     <form method="dialog" className="modal-backdrop">
                         <button onClick={() => setConfirmDelete({ open: false, id: null })}>close</button>
+                    </form>
+                </dialog>
+            )}
+
+            {/* Confirm Send Emails Modal */}
+            {confirmSend && (
+                <dialog className="modal" open>
+                    <div className="modal-box">
+                        <h3 className="font-bold text-lg">Kirim Email ke Peserta?</h3>
+                        <p className="py-2">
+                            Sistem akan mengirim email ke <b>semua peserta</b> pada batch ini.
+                            {typeof totalElements === "number" && totalElements > 0 ? (
+                                <>
+                                    {" "}
+                                    Total peserta: <b>{totalElements}</b>.
+                                </>
+                            ) : null}
+                        </p>
+                        <div className="modal-action">
+                            <button className="btn" onClick={() => setConfirmSend(false)} disabled={sendingEmails}>
+                                Batal
+                            </button>
+                            <button
+                                className={`btn btn-info ${sendingEmails ? "btn-disabled" : ""}`}
+                                onClick={doSendEmails}
+                            >
+                                {sendingEmails ? (
+                                    <span className="loading loading-spinner loading-sm" />
+                                ) : (
+                                    <Send className="w-4 h-4 mr-1" />
+                                )}
+                                {sendingEmails ? "Mengirim..." : "Kirim Sekarang"}
+                            </button>
+                        </div>
+                    </div>
+                    <form method="dialog" className="modal-backdrop">
+                        <button onClick={() => !sendingEmails && setConfirmSend(false)}>close</button>
                     </form>
                 </dialog>
             )}

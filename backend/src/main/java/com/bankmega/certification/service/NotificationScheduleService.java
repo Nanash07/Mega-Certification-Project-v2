@@ -25,21 +25,25 @@ public class NotificationScheduleService {
 
     private final NotificationScheduleRepository repo;
 
-    // ================== GET ALL ==================
+    // ================== GET ALL (DTO) ==================
     public List<NotificationScheduleResponse> getAll() {
-        log.info("📅 Mengambil semua jadwal notifikasi...");
+        log.info("Mengambil semua jadwal notifikasi...");
         return repo.findAll(Sort.by(Sort.Order.asc("type")))
                 .stream()
                 .map(this::toResponse)
                 .toList();
     }
 
-    // ================== GET BY TYPE ==================
+    // ================== GET BY TYPE (DTO) ==================
     public NotificationScheduleResponse getByType(NotificationTemplate.Code type) {
-        log.info("🔍 Mengambil jadwal notifikasi untuk {}", type);
-        NotificationSchedule s = repo.findByType(type)
+        log.info("Mengambil jadwal notifikasi untuk {}", type);
+        return toResponse(getByTypeEntity(type));
+    }
+
+    // ================== GET BY TYPE (ENTITY) ==================
+    public NotificationSchedule getByTypeEntity(NotificationTemplate.Code type) {
+        return repo.findByType(type)
                 .orElseThrow(() -> new NotFoundException("Jadwal untuk " + type + " tidak ditemukan"));
-        return toResponse(s);
     }
 
     // ================== SAVE OR UPDATE ==================
@@ -58,7 +62,7 @@ public class NotificationScheduleService {
         schedule.setUpdatedAt(LocalDateTime.now());
 
         NotificationSchedule saved = repo.saveAndFlush(schedule);
-        log.info("✅ Jadwal notifikasi {} berhasil disimpan/diupdate (active={}, time={}, skipWeekend={})",
+        log.info("Jadwal notifikasi {} disimpan/diupdate (active={}, time={}, skipWeekend={})",
                 req.getType(), saved.getActive(), saved.getTime(), saved.getSkipWeekend());
 
         return toResponse(saved);
@@ -83,25 +87,24 @@ public class NotificationScheduleService {
             return false;
 
         if (!Boolean.TRUE.equals(schedule.getActive())) {
-            log.debug("⏸ Jadwal {} tidak aktif", schedule.getType());
+            log.debug("Jadwal {} tidak aktif", schedule.getType());
             return false;
         }
 
         if (Boolean.TRUE.equals(schedule.getSkipWeekend())) {
             DayOfWeek today = LocalDate.now().getDayOfWeek();
             if (today == DayOfWeek.SATURDAY || today == DayOfWeek.SUNDAY) {
-                log.debug("🚫 Skip weekend untuk jadwal {}", schedule.getType());
+                log.debug("Skip weekend untuk jadwal {}", schedule.getType());
                 return false;
             }
         }
-
         return true;
     }
 
-    // ================== CEK WAKTU SEKARANG SESUAI JADWAL ==================
+    // ================== CEK WAKTU SESUAI JADWAL ==================
     public boolean isTimeToRun(NotificationSchedule schedule) {
         if (schedule == null || schedule.getTime() == null || schedule.getTime().isBlank()) {
-            log.debug("⚠️ Jadwal {} belum punya waktu eksekusi", schedule != null ? schedule.getType() : "null");
+            log.debug("Jadwal {} belum memiliki waktu eksekusi", schedule != null ? schedule.getType() : "null");
             return false;
         }
 
@@ -109,16 +112,16 @@ public class NotificationScheduleService {
             LocalTime now = LocalTime.now().withSecond(0).withNano(0);
             LocalTime target = LocalTime.parse(schedule.getTime().trim());
 
-            // ⏰ Toleransi ±2 menit dari waktu target
-            boolean match = now.isAfter(target.minusMinutes(2)) && now.isBefore(target.plusMinutes(2));
+            // Toleransi ±2 menit dari jam target
+            boolean match = !now.isBefore(target.minusMinutes(2)) && !now.isAfter(target.plusMinutes(2));
 
             if (match) {
-                log.info("⏰ Jadwal {} waktunya jalan (now={}, target={})", schedule.getType(), now, target);
+                log.info("Jadwal {} waktunya jalan (now={}, target={})", schedule.getType(), now, target);
             }
             return match;
 
         } catch (DateTimeParseException e) {
-            log.error("❌ Format jam invalid untuk jadwal {}: {}", schedule.getType(), schedule.getTime());
+            log.error("Format jam invalid untuk jadwal {}: {}", schedule.getType(), schedule.getTime());
             return false;
         }
     }
@@ -129,8 +132,20 @@ public class NotificationScheduleService {
             return;
 
         schedule.setLastRun(LocalDateTime.now());
-        repo.saveAndFlush(schedule); // ✅ langsung commit biar gak delay
-        log.info("🕒 Jadwal {} ditandai sudah dieksekusi pada {}",
-                schedule.getType(), schedule.getLastRun());
+        repo.saveAndFlush(schedule);
+        log.info("Jadwal {} ditandai executed pada {}", schedule.getType(), schedule.getLastRun());
+    }
+
+    /**
+     * Overload: tandai executed berdasar type (fix untuk pemanggilan di Scheduler).
+     */
+    public void markExecuted(NotificationTemplate.Code type) {
+        try {
+            NotificationSchedule schedule = getByTypeEntity(type);
+            markExecuted(schedule);
+        } catch (NotFoundException e) {
+            // tidak fatal: hanya log supaya scheduler tetap lanjut untuk type lain
+            log.warn("Tidak bisa menandai executed: jadwal {} tidak ditemukan", type);
+        }
     }
 }

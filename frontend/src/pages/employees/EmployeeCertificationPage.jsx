@@ -247,6 +247,7 @@ export default function EmployeeCertificationPage() {
                     <thead className="bg-base-200 text-xs">
                         <tr>
                             <th>No</th>
+                            <th>Aksi</th>
                             <th>NIP</th>
                             <th>Nama Pegawai</th>
                             <th>Jabatan</th>
@@ -260,7 +261,6 @@ export default function EmployeeCertificationPage() {
                             <th>Status</th>
                             <th>Lembaga</th>
                             <th>Updated At</th>
-                            <th>Aksi</th>
                         </tr>
                     </thead>
                     <tbody className="text-xs whitespace-nowrap">
@@ -280,6 +280,29 @@ export default function EmployeeCertificationPage() {
                             rows.map((r, idx) => (
                                 <tr key={r.id}>
                                     <td>{startIdx + idx}</td>
+                                    {/* 🔹 Kolom aksi (hapus tombol "Lihat") */}
+                                    <td className="whitespace-nowrap space-x-1">
+                                        <button
+                                            className="btn btn-xs border-warning btn-soft btn-warning"
+                                            onClick={() => setEditData(r)}
+                                        >
+                                            Edit
+                                        </button>
+                                        <button
+                                            className="btn btn-xs border-error btn-soft btn-error"
+                                            onClick={() => setConfirm({ open: true, id: r.id })}
+                                        >
+                                            Hapus
+                                        </button>
+                                        {r.status === "PENDING" && (
+                                            <button
+                                                className="btn btn-xs border-info btn-soft btn-info"
+                                                onClick={() => setUploadData(r)}
+                                            >
+                                                Upload
+                                            </button>
+                                        )}
+                                    </td>
                                     <td>{r.nip}</td>
 
                                     {/* 🔹 Nama Pegawai jadi link ke halaman detail */}
@@ -354,31 +377,6 @@ export default function EmployeeCertificationPage() {
                                                   minute: "2-digit",
                                               })
                                             : "-"}
-                                    </td>
-
-                                    {/* 🔹 Kolom aksi (hapus tombol "Lihat") */}
-                                    <td className="whitespace-nowrap space-x-1">
-                                        <button
-                                            className="btn btn-xs border-warning btn-soft btn-warning"
-                                            onClick={() => setEditData(r)}
-                                        >
-                                            Edit
-                                        </button>
-                                        <button
-                                            className="btn btn-xs border-error btn-soft btn-error"
-                                            onClick={() => setConfirm({ open: true, id: r.id })}
-                                        >
-                                            Hapus
-                                        </button>
-                                        {r.status === "PENDING" && (
-                                            <button
-                                                className="btn btn-xs border-info btn-soft btn-info"
-                                                onClick={() => setUploadData(r)}
-                                            >
-                                                Upload
-                                            </button>
-                                        )}
-                                        {/* 🔹 Tombol "Lihat" dihapus */}
                                     </td>
                                 </tr>
                             ))

@@ -194,13 +194,13 @@ export default function JobCertificationMappingPage() {
                     <thead className="bg-base-200 text-xs">
                         <tr>
                             <th>No</th>
+                            <th>Aksi</th>
                             <th>Jabatan</th>
                             <th>Sertifikasi</th>
                             <th>Jenjang</th>
                             <th>Sub Bidang</th>
                             <th>Status</th>
                             <th>Updated At</th>
-                            <th>Aksi</th>
                         </tr>
                     </thead>
                     <tbody className="text-xs">
@@ -220,6 +220,30 @@ export default function JobCertificationMappingPage() {
                             rows.map((r, idx) => (
                                 <tr key={r.id}>
                                     <td>{startIdx + idx}</td>
+                                    <td className="space-x-1">
+                                        <button
+                                            className={`btn btn-xs ${
+                                                r.isActive
+                                                    ? "btn-secondary border-secondary btn-soft"
+                                                    : "btn-success border-success btn-soft"
+                                            }`}
+                                            onClick={() => toggleJobCertificationMapping(r.id).then(load)}
+                                        >
+                                            {r.isActive ? "Nonaktifkan" : "Aktifkan"}
+                                        </button>
+                                        <button
+                                            className="btn btn-xs border-warning btn-soft btn-warning"
+                                            onClick={() => setEditItem(r)}
+                                        >
+                                            Edit
+                                        </button>
+                                        <button
+                                            className="btn btn-xs border-error btn-soft btn-error"
+                                            onClick={() => setConfirm({ open: true, id: r.id })}
+                                        >
+                                            Delete
+                                        </button>
+                                    </td>
                                     <td>{r.jobName}</td>
                                     <td>{r.certificationCode}</td>
                                     <td>{r.certificationLevelLevel || "-"}</td>
@@ -245,30 +269,6 @@ export default function JobCertificationMappingPage() {
                                                   minute: "2-digit",
                                               })
                                             : "-"}
-                                    </td>
-                                    <td className="space-x-1">
-                                        <button
-                                            className={`btn btn-xs ${
-                                                r.isActive
-                                                    ? "btn-secondary border-secondary btn-soft"
-                                                    : "btn-success border-success btn-soft"
-                                            }`}
-                                            onClick={() => toggleJobCertificationMapping(r.id).then(load)}
-                                        >
-                                            {r.isActive ? "Nonaktifkan" : "Aktifkan"}
-                                        </button>
-                                        <button
-                                            className="btn btn-xs border-warning btn-soft btn-warning"
-                                            onClick={() => setEditItem(r)}
-                                        >
-                                            Edit
-                                        </button>
-                                        <button
-                                            className="btn btn-xs border-error btn-soft btn-error"
-                                            onClick={() => setConfirm({ open: true, id: r.id })}
-                                        >
-                                            Delete
-                                        </button>
                                     </td>
                                 </tr>
                             ))

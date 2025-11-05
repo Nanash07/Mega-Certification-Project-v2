@@ -14,8 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
@@ -26,7 +25,7 @@ public class EmployeeBatchService {
     private final EmployeeRepository employeeRepo;
     private final EmployeeEligibilityRepository eligibilityRepo;
     private final EmployeeCertificationRepository certificationRepo;
-    private final EmployeeCertificationHistoryService historyService; // ✅ Tambahan baru
+    private final EmployeeCertificationHistoryService historyService;
 
     // ================== MAPPER ==================
     private EmployeeBatchResponse toResponse(EmployeeBatch eb) {
@@ -99,7 +98,8 @@ public class EmployeeBatchService {
         return repo.findAll(spec, pageable).map(this::toResponse);
     }
 
-    // ================== ADD SINGLE PARTICIPANT ==================
+    // ================== ADD SINGLE PARTICIPANT (restore if soft-deleted)
+    // ==================
     @Transactional
     public EmployeeBatchResponse addParticipant(Long batchId, Long employeeId) {
         Batch batch = batchRepo.findByIdAndDeletedAtIsNull(batchId)
@@ -115,8 +115,10 @@ public class EmployeeBatchService {
         return repo.findByBatch_IdAndEmployee_Id(batchId, employeeId)
                 .map(eb -> {
                     if (eb.getDeletedAt() == null) {
+                        // sudah aktif
                         throw new IllegalStateException("Peserta sudah ada di batch ini");
                     }
+                    // 🔁 restore
                     eb.setDeletedAt(null);
                     eb.setStatus(EmployeeBatch.Status.REGISTERED);
                     eb.setRegistrationDate(LocalDate.now());
@@ -136,26 +138,49 @@ public class EmployeeBatchService {
                 });
     }
 
-    // ================== ADD MULTIPLE PARTICIPANTS ==================
+    // ================== ADD MULTIPLE PARTICIPANTS (restore if soft-deleted)
+    // ==================
     @Transactional
     public List<EmployeeBatchResponse> addParticipantsBulk(Long batchId, List<Long> employeeIds) {
         Batch batch = batchRepo.findByIdAndDeletedAtIsNull(batchId)
                 .orElseThrow(() -> new NotFoundException("Batch not found"));
 
         long currentCount = repo.countByBatch_IdAndDeletedAtIsNull(batchId);
-        if (batch.getQuota() != null && currentCount + employeeIds.size() > batch.getQuota()) {
-            throw new IllegalStateException("Jumlah peserta melebihi quota batch");
-        }
+        Integer quota = batch.getQuota();
+        int remaining = quota == null ? Integer.MAX_VALUE : Math.max(0, quota - (int) currentCount);
+
+        List<Long> ids = employeeIds == null ? List.of()
+                : employeeIds.stream().filter(Objects::nonNull).distinct().toList();
 
         List<EmployeeBatchResponse> responses = new ArrayList<>();
-        for (Long empId : employeeIds) {
+        int added = 0;
+
+        for (Long empId : ids) {
+            if (added >= remaining)
+                break;
+
             Employee emp = employeeRepo.findByIdAndDeletedAtIsNull(empId)
                     .orElseThrow(() -> new NotFoundException("Employee not found"));
 
-            boolean exists = repo.existsByBatch_IdAndEmployee_IdAndDeletedAtIsNull(batchId, empId);
-            if (exists)
+            // cek termasuk soft-deleted
+            var existingOpt = repo.findByBatch_IdAndEmployee_Id(batchId, empId);
+            if (existingOpt.isPresent()) {
+                EmployeeBatch eb = existingOpt.get();
+                if (eb.getDeletedAt() == null) {
+                    // sudah aktif -> skip
+                    continue;
+                }
+                // 🔁 restore
+                eb.setDeletedAt(null);
+                eb.setStatus(EmployeeBatch.Status.REGISTERED);
+                eb.setRegistrationDate(LocalDate.now());
+                eb.setUpdatedAt(Instant.now());
+                responses.add(toResponse(repo.save(eb)));
+                added++;
                 continue;
+            }
 
+            // tambah baru
             EmployeeBatch eb = EmployeeBatch.builder()
                     .batch(batch)
                     .employee(emp)
@@ -164,14 +189,14 @@ public class EmployeeBatchService {
                     .createdAt(Instant.now())
                     .updatedAt(Instant.now())
                     .build();
-
             responses.add(toResponse(repo.save(eb)));
+            added++;
         }
 
         return responses;
     }
 
-    // ================== UPDATE STATUS ==================
+    // ================== UPDATE STATUS (lock PASSED) ==================
     @Transactional
     public EmployeeBatchResponse updateStatus(
             Long id,
@@ -182,6 +207,13 @@ public class EmployeeBatchService {
                 .orElseThrow(() -> new NotFoundException("EmployeeBatch not found"));
 
         EmployeeBatch.Status current = eb.getStatus();
+
+        // ⛔ lock total saat sudah PASSED
+        if (current == EmployeeBatch.Status.PASSED) {
+            throw new IllegalStateException("Peserta sudah PASSED dan tidak dapat diubah lagi.");
+        }
+
+        // Validasi transisi
         if (status == EmployeeBatch.Status.ATTENDED && current != EmployeeBatch.Status.REGISTERED) {
             throw new IllegalStateException("Hanya peserta REGISTERED yang bisa jadi ATTENDED");
         }
@@ -207,7 +239,7 @@ public class EmployeeBatchService {
 
         EmployeeBatch saved = repo.save(eb);
 
-        // ✅ Jika lulus, buat atau update sertifikasi + histori CREATED/UPDATED
+        // ✅ Jika lulus, buat/update sertifikat pakai attempt terbaru
         if (status == EmployeeBatch.Status.PASSED) {
             createOrUpdateCertification(saved);
         }
@@ -215,7 +247,28 @@ public class EmployeeBatchService {
         return toResponse(saved);
     }
 
-    // ================== CREATE / UPDATE CERTIFICATION ==================
+    // ================== RETRY FAILED -> REGISTERED ==================
+    @Transactional
+    public EmployeeBatchResponse retryFailed(Long id) {
+        EmployeeBatch eb = repo.findByIdAndDeletedAtIsNull(id)
+                .orElseThrow(() -> new NotFoundException("EmployeeBatch not found"));
+
+        if (eb.getStatus() != EmployeeBatch.Status.FAILED) {
+            throw new IllegalStateException("Hanya peserta FAILED yang bisa diulang.");
+        }
+
+        eb.setStatus(EmployeeBatch.Status.REGISTERED);
+        eb.setAttendedAt(null);
+        eb.setResultDate(null);
+        eb.setScore(null);
+        // eb.setNotes(null); // opsional: reset catatan
+        eb.setUpdatedAt(Instant.now());
+
+        return toResponse(repo.save(eb));
+    }
+
+    // ================== CREATE / UPDATE CERTIFICATION (attempt terbaru)
+    // ==================
     private void createOrUpdateCertification(EmployeeBatch eb) {
         Employee emp = eb.getEmployee();
         CertificationRule rule = eb.getBatch().getCertificationRule();
@@ -226,53 +279,84 @@ public class EmployeeBatchService {
                 .orElse(null);
 
         boolean isNew = false;
+        // Pakai tanggal hasil terbaru sebagai certDate
+        LocalDate passDate = eb.getResultDate() != null ? eb.getResultDate() : LocalDate.now();
 
         if (ec == null) {
             ec = EmployeeCertification.builder()
                     .employee(emp)
                     .certificationRule(rule)
                     .institution(institution)
-                    .certDate(LocalDate.now())
+                    .certDate(passDate)
                     .processType(EmployeeCertification.ProcessType.SERTIFIKASI)
                     .status(EmployeeCertification.Status.PENDING)
+                    // snapshot rule saat create
+                    .ruleValidityMonths(rule != null ? rule.getValidityMonths() : null)
+                    .ruleReminderMonths(rule != null ? rule.getReminderMonths() : null)
                     .createdAt(Instant.now())
                     .updatedAt(Instant.now())
                     .build();
             isNew = true;
         } else {
-            ec.setCertDate(LocalDate.now());
+            // update attempt terbaru
+            ec.setCertDate(passDate);
             ec.setUpdatedAt(Instant.now());
-            ec.setStatus(
-                    (ec.getCertNumber() == null || ec.getCertNumber().isBlank())
-                            ? EmployeeCertification.Status.PENDING
-                            : EmployeeCertification.Status.ACTIVE);
+            ec.setStatus((ec.getCertNumber() == null || ec.getCertNumber().isBlank())
+                    ? EmployeeCertification.Status.PENDING
+                    : EmployeeCertification.Status.ACTIVE);
+
+            // pastikan snapshot ada
+            if (ec.getRuleValidityMonths() == null && rule != null) {
+                ec.setRuleValidityMonths(rule.getValidityMonths());
+            }
+            if (ec.getRuleReminderMonths() == null && rule != null) {
+                ec.setRuleReminderMonths(rule.getReminderMonths());
+            }
         }
 
+        // Hitung validity + reminder (lifetime kalau validity null)
         if (ec.getCertDate() != null) {
             ec.setValidFrom(ec.getCertDate());
-            if (rule != null && rule.getValidityMonths() != null) {
-                ec.setValidUntil(ec.getCertDate().plusMonths(rule.getValidityMonths()));
+
+            Integer v = ec.getRuleValidityMonths() != null ? ec.getRuleValidityMonths()
+                    : (rule != null ? rule.getValidityMonths() : null);
+            Integer r = ec.getRuleReminderMonths() != null ? ec.getRuleReminderMonths()
+                    : (rule != null ? rule.getReminderMonths() : null);
+
+            if (v != null) {
+                ec.setValidUntil(ec.getCertDate().plusMonths(v));
+            } else {
+                ec.setValidUntil(null); // non-expiring
             }
-            if (rule != null && rule.getReminderMonths() != null && ec.getValidUntil() != null) {
-                ec.setReminderDate(ec.getValidUntil().minusMonths(rule.getReminderMonths()));
+
+            if (ec.getValidUntil() != null && r != null) {
+                ec.setReminderDate(ec.getValidUntil().minusMonths(r));
+            } else {
+                ec.setReminderDate(null);
             }
+        } else {
+            ec.setValidFrom(null);
+            ec.setValidUntil(null);
+            ec.setReminderDate(null);
         }
 
         EmployeeCertification saved = certificationRepo.save(ec);
 
-        // ✅ Catat histori CREATED / UPDATED
-        if (isNew) {
-            historyService.snapshot(saved, EmployeeCertificationHistory.ActionType.CREATED);
-        } else {
-            historyService.snapshot(saved, EmployeeCertificationHistory.ActionType.UPDATED);
-        }
+        historyService.snapshot(saved,
+                isNew ? EmployeeCertificationHistory.ActionType.CREATED
+                        : EmployeeCertificationHistory.ActionType.UPDATED);
     }
 
-    // ================== SOFT DELETE ==================
+    // ================== SOFT DELETE (hanya REGISTERED) ==================
     @Transactional
     public void removeParticipant(Long id) {
         EmployeeBatch eb = repo.findByIdAndDeletedAtIsNull(id)
                 .orElseThrow(() -> new NotFoundException("EmployeeBatch not found"));
+
+        if (eb.getStatus() != EmployeeBatch.Status.REGISTERED) {
+            throw new IllegalStateException("Peserta sudah ATTENDED/PASSED/FAILED, tidak boleh dihapus.");
+        }
+
         eb.setDeletedAt(Instant.now());
         eb.setUpdatedAt(Instant.now());
         repo.save(eb);

@@ -1,7 +1,6 @@
 package com.bankmega.certification.service;
 
 import com.bankmega.certification.entity.Batch;
-import com.bankmega.certification.entity.CertificationRule;
 import com.bankmega.certification.entity.Employee;
 import com.bankmega.certification.entity.EmployeeBatch;
 import com.bankmega.certification.entity.EmployeeCertification;
@@ -22,12 +21,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Locale;
-import java.util.Objects;
-import java.util.Set;
-import java.util.concurrent.TimeUnit;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -39,27 +33,29 @@ public class NotificationService {
     private final EmployeeCertificationRepository employeeCertificationRepository;
     private final EmployeeBatchRepository employeeBatchRepository;
     private final BatchRepository batchRepository;
+    private final EmailConfigService emailConfigService; // masih disuntik, ga dipakai di sini (opsional dipakai nanti)
+    private final NotificationTemplateService templateService;
+    private final JavaMailSenderImpl reusableMailSender;
 
-    // masih dipakai utk reminder sertifikasi
-    private final EmailConfigService emailConfigService; // inject existing bean (meski di sini hanya fallback)
-    private final NotificationTemplateService templateService; // generate title/body untuk CERT_REMINDER
+    // =========================================================================
+    // SAVE NOTIFICATION + EMAIL
+    // =========================================================================
 
-    private final JavaMailSenderImpl reusableMailSender; // bean dari MailSenderConfig
-
-    // ================== NOTIFICATION RECORD + EMAIL ==================
+    /** Overload baru: simpan plain ke DB, email kirim versi HTML. */
     public Notification sendNotification(
             Long userId,
             String email,
             String title,
-            String message,
+            String messagePlain,
+            String messageEmailHtml,
             Notification.Type type,
             String relatedEntity,
             Long relatedEntityId) {
 
-        Notification notification = Notification.builder()
+        final Notification notif = Notification.builder()
                 .userId(userId)
                 .title(title)
-                .message(message)
+                .message(messagePlain) // in-app: plain
                 .type(type)
                 .isRead(false)
                 .relatedEntity(relatedEntity)
@@ -68,214 +64,265 @@ public class NotificationService {
                 .sentAt(LocalDateTime.now())
                 .build();
 
-        notificationRepository.save(notification);
-        log.info("📨 Notifikasi disimpan untuk userId={} | {}", userId, title);
+        notificationRepository.save(notif);
 
-        if (email != null && !email.isBlank()) {
-            sendEmailAsync(email, title, message);
+        if (!isBlank(email)) {
+            sendEmailAsync(email, title, messageEmailHtml); // email: HTML (bold)
         }
-
-        return notification;
+        return notif;
     }
 
-    // ================== EMAIL SENDER (ASYNC + RETRY) ==================
+    /**
+     * Back-compat: kalau dipanggil versi lama, email & in-app sama-sama pakai
+     * plain.
+     */
+    public Notification sendNotification(
+            Long userId,
+            String email,
+            String title,
+            String message,
+            Notification.Type type,
+            String relatedEntity,
+            Long relatedEntityId) {
+        return sendNotification(userId, email, title, message, message, type, relatedEntity, relatedEntityId);
+    }
+
     @Async("mailExecutor")
     protected void sendEmailAsync(String to, String subject, String htmlContent) {
-        log.info("🚀 Kirim email async ke {} | {}", to, subject);
-
-        int retries = 3;
-        while (retries-- > 0) {
+        // 1 kali retry ringan sudah cukup biar gak nge-blok lama
+        for (int attempt = 1; attempt <= 2; attempt++) {
             try {
-                MimeMessage message = reusableMailSender.createMimeMessage();
-                MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+                final MimeMessage message = reusableMailSender.createMimeMessage();
+                final MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
-                // fallback from address kalau username null
-                String fromAddr = Objects.toString(reusableMailSender.getUsername(), "no-reply@megacert.local");
+                final String fromAddr = Objects.toString(reusableMailSender.getUsername(), "no-reply@megacert.local");
                 helper.setFrom(fromAddr);
                 helper.setTo(to);
                 helper.setSubject(subject);
-                helper.setText("""
-                        <div style='font-family: Arial, sans-serif; line-height: 1.6; font-size:14px;'>
-                            %s
-                            <br><br>
-                            <p style='font-size: 12px; color: gray;'>
-                                --<br>Dikirim otomatis oleh <b>Mega Certification System</b>
-                            </p>
-                        </div>
-                        """.formatted(htmlContent.replace("\n", "<br>")), true);
 
+                // wrapper HTML: newline di body sudah dikonversi ke <br/> di builder kita
+                final String html = "<div style='font-family:Arial,sans-serif;line-height:1.6;font-size:14px'>"
+                        + htmlContent
+                        + "<br><p style='font-size:12px;color:gray;margin-top:8px;'>--<br>"
+                        + "Dikirim otomatis oleh <b>Mega Certification System</b></p></div>";
+
+                helper.setText(html, true);
                 reusableMailSender.send(message);
-                log.info("✅ Email sukses dikirim ke {}", to);
-                return;
-
+                return; // sukses, stop retry
             } catch (Exception e) {
-                log.warn("⚠️ Gagal kirim email ke {} (retry {}x): {}", to, (3 - retries), e.getMessage());
-                try {
-                    TimeUnit.SECONDS.sleep(2);
-                } catch (InterruptedException ignored) {
+                if (attempt == 2) {
+                    log.error("Email gagal ke {} setelah {} kali coba: {}", to, attempt, e.getMessage());
+                } else {
+                    log.warn("Gagal kirim email ke {} (attempt {}): {}", to, attempt, e.getMessage());
                 }
             }
         }
-
-        log.error("❌ Email gagal dikirim ke {} setelah 3 percobaan", to);
     }
 
-    // ================== REMINDER SERTIFIKASI ==================
+    // =========================================================================
+    // CERT REMINDER
+    // =========================================================================
     public void sendCertificationReminder(Employee employee, EmployeeCertification cert) {
-        try {
-            if (employee == null || employee.getEmail() == null || employee.getEmail().isBlank())
-                return;
-            if (cert == null || cert.getCertificationRule() == null)
-                return;
+        if (employee == null || isBlank(employee.getEmail()))
+            return;
+        if (cert == null || cert.getCertificationRule() == null)
+            return;
 
-            var rule = cert.getCertificationRule();
-            var certEntity = rule.getCertification();
+        final String certName = buildCertificationFullName(cert);
+        final String subject = templateService.generateTitle(
+                NotificationTemplate.Code.CERT_REMINDER, employee, certName, cert.getValidUntil(), null, null);
+        final String bodyPlain = templateService.generateMessage(
+                NotificationTemplate.Code.CERT_REMINDER, employee, certName, cert.getValidUntil(), null, null);
 
-            String fullName = (certEntity != null ? certEntity.getName() : "-");
-            if (rule.getCertificationLevel() != null)
-                fullName += " - " + rule.getCertificationLevel().getName();
-            if (rule.getSubField() != null)
-                fullName += " (" + rule.getSubField().getName() + ")";
+        // Build HTML dengan nilai variabel dibold
+        Map<String, String> vars = buildCommonVars(employee);
+        vars.put("{{namaSertifikasi}}", certName);
+        vars.put("{{berlakuSampai}}", formatDateId(cert.getValidUntil()));
 
-            String subject = templateService.generateTitle(
-                    NotificationTemplate.Code.CERT_REMINDER, employee, fullName, cert.getValidUntil(), null, null);
-            String body = templateService.generateMessage(
-                    NotificationTemplate.Code.CERT_REMINDER, employee, fullName, cert.getValidUntil(), null, null);
+        final String bodyHtml = buildHtmlWithBold(bodyPlain, vars);
 
-            sendNotification(employee.getId(), employee.getEmail(), subject, body,
-                    Notification.Type.CERT_REMINDER, "EmployeeCertification", cert.getId());
-
-            log.info("✅ Reminder cert dikirim ke {} untuk {}", employee.getEmail(), fullName);
-            TimeUnit.MILLISECONDS.sleep(300);
-
-        } catch (Exception e) {
-            log.error("❌ Gagal kirim reminder cert ke {}: {}", employee != null ? employee.getEmail() : "null",
-                    e.getMessage(), e);
-        }
+        sendNotification(
+                employee.getId(),
+                employee.getEmail(),
+                subject,
+                bodyPlain,
+                bodyHtml,
+                Notification.Type.CERT_REMINDER,
+                "EmployeeCertification",
+                cert.getId());
     }
 
     public void processCertReminder() {
-        LocalDate today = LocalDate.now();
-        log.info("🔄 Proses reminder sertifikasi untuk {}", today);
-
-        List<EmployeeCertification> dueCerts = employeeCertificationRepository
+        final LocalDate today = LocalDate.now();
+        final List<EmployeeCertification> due = employeeCertificationRepository
                 .findByReminderDateAndDeletedAtIsNull(today);
 
-        if (dueCerts.isEmpty()) {
-            log.info("✅ Tidak ada sertifikasi due hari ini");
+        if (due == null || due.isEmpty())
             return;
-        }
 
-        List<Notification> sent = notificationRepository.findByTypeAndRelatedEntity(Notification.Type.CERT_REMINDER,
-                "EmployeeCertification");
+        final List<Notification> already = notificationRepository
+                .findByTypeAndRelatedEntity(Notification.Type.CERT_REMINDER, "EmployeeCertification");
 
-        Set<String> sentPairs = sent.stream()
+        final Set<String> sentPairs = already.stream()
                 .map(n -> n.getUserId() + "-" + n.getRelatedEntityId())
                 .collect(Collectors.toSet());
 
-        List<EmployeeCertification> toSend = dueCerts.stream()
+        final List<EmployeeCertification> toSend = due.stream()
+                .filter(c -> c.getEmployee() != null)
+                .filter(c -> !sentPairs.contains(c.getEmployee().getId() + "-" + c.getId()))
+                .collect(Collectors.toList());
+
+        for (EmployeeCertification c : toSend) {
+            sendCertificationReminder(c.getEmployee(), c);
+        }
+    }
+
+    // =========================================================================
+    // CERT EXPIRED
+    // =========================================================================
+    public void sendCertificationExpired(Employee employee, EmployeeCertification cert) {
+        if (employee == null || isBlank(employee.getEmail()))
+            return;
+        if (cert == null || cert.getCertificationRule() == null)
+            return;
+
+        final String certName = buildCertificationFullName(cert);
+        final String subject = templateService.generateTitle(
+                NotificationTemplate.Code.EXPIRED_NOTICE, employee, certName, cert.getValidUntil(), null, null);
+        final String bodyPlain = templateService.generateMessage(
+                NotificationTemplate.Code.EXPIRED_NOTICE, employee, certName, cert.getValidUntil(), null, null);
+
+        Map<String, String> vars = buildCommonVars(employee);
+        vars.put("{{namaSertifikasi}}", certName);
+        vars.put("{{berlakuSampai}}", formatDateId(cert.getValidUntil()));
+
+        final String bodyHtml = buildHtmlWithBold(bodyPlain, vars);
+
+        sendNotification(
+                employee.getId(),
+                employee.getEmail(),
+                subject,
+                bodyPlain,
+                bodyHtml,
+                Notification.Type.EXPIRED_NOTICE,
+                "EmployeeCertification",
+                cert.getId());
+    }
+
+    public void processCertExpired() {
+        final LocalDate today = LocalDate.now();
+
+        // <= today (bukan H+1)
+        final List<EmployeeCertification> expired = employeeCertificationRepository
+                .findByValidUntilLessThanEqualAndDeletedAtIsNull(today);
+
+        if (expired == null || expired.isEmpty())
+            return;
+
+        final List<Notification> already = notificationRepository
+                .findByTypeAndRelatedEntity(Notification.Type.EXPIRED_NOTICE, "EmployeeCertification");
+
+        final Set<String> sentPairs = already.stream()
+                .map(n -> n.getUserId() + "-" + n.getRelatedEntityId())
+                .collect(Collectors.toSet());
+
+        final List<EmployeeCertification> toSend = expired.stream()
                 .filter(c -> c.getEmployee() != null)
                 .filter(c -> !sentPairs.contains(c.getEmployee().getId() + "-" + c.getId()))
                 .toList();
 
-        log.info("📬 {} sertifikasi due akan dikirim reminder", toSend.size());
-
-        for (EmployeeCertification cert : toSend) {
-            sendCertificationReminder(cert.getEmployee(), cert);
+        for (EmployeeCertification c : toSend) {
+            sendCertificationExpired(c.getEmployee(), c);
         }
-
-        log.info("✅ Selesai proses reminder sertifikasi ({} kirim)", toSend.size());
     }
 
-    // ================== BATCH NOTIFICATION (HANYA UNTUK 1 BATCH)
-    // ==================
-    /**
-     * Kirim notifikasi ke semua peserta dalam 1 batch tertentu (sesuai tombol yang
-     * diklik).
-     * Bisa difilter by status peserta (opsional).
-     */
+    // =========================================================================
+    // BATCH NOTIFICATION
+    // =========================================================================
+    /** Kirim notifikasi ke semua peserta dalam 1 batch (boleh filter by status). */
     public int notifyParticipantsByBatch(Long batchId, EmployeeBatch.Status onlyStatus) {
-        Batch batch = batchRepository.findByIdAndDeletedAtIsNull(batchId)
+        final Batch batch = batchRepository.findByIdAndDeletedAtIsNull(batchId)
                 .orElseThrow(() -> new RuntimeException("Batch not found with id " + batchId));
 
-        // Ambil peserta batch INI saja
         List<EmployeeBatch> participants = employeeBatchRepository.findByBatch_IdAndDeletedAtIsNull(batchId);
         if (onlyStatus != null) {
             participants = participants.stream()
                     .filter(p -> onlyStatus.equals(p.getStatus()))
-                    .toList();
+                    .collect(Collectors.toList());
         }
-
-        if (participants.isEmpty()) {
-            log.info("ℹ️ Tidak ada peserta aktif untuk batch {}", batch.getBatchName());
+        if (participants.isEmpty())
             return 0;
-        }
 
-        // Hindari duplikasi kirim per employee
-        Set<Long> sentEmployees = new LinkedHashSet<>();
+        // hindari double-send bila ada duplikasi employee
+        final Set<Long> uniqueEmployeeIds = new LinkedHashSet<Long>();
         int sent = 0;
 
         for (EmployeeBatch eb : participants) {
-            if (eb.getBatch() == null || !Objects.equals(eb.getBatch().getId(), batchId))
-                continue; // safety
-            Employee emp = eb.getEmployee();
-            if (emp == null || emp.getEmail() == null || emp.getEmail().isBlank())
+            final Employee emp = eb.getEmployee();
+            if (emp == null || isBlank(emp.getEmail()))
                 continue;
-            if (!sentEmployees.add(emp.getId()))
-                continue; // sudah dikirim
+            if (!uniqueEmployeeIds.add(emp.getId()))
+                continue;
 
             sendBatchNotification(emp, batch);
             sent++;
         }
-
-        log.info("📬 Notifikasi batch '{}' (ID={}) terkirim ke {} peserta", batch.getBatchName(), batchId, sent);
         return sent;
     }
 
     /**
-     * Kirim notifikasi batch dengan DETAIL lengkap (format HTML) untuk 1 peserta.
+     * Kirim notifikasi batch untuk 1 peserta, menggunakan template
+     * BATCH_NOTIFICATION + extras.
      */
     public void sendBatchNotification(Employee employee, Batch batch) {
-        try {
-            if (employee == null || employee.getEmail() == null || employee.getEmail().isBlank())
-                return;
-            if (batch == null || batch.getCertificationRule() == null)
-                return;
+        if (employee == null || isBlank(employee.getEmail()))
+            return;
+        if (batch == null)
+            return;
 
-            String certFullName = buildCertificationFullName(batch.getCertificationRule());
-            String subject = buildBatchEmailSubject(batch, certFullName);
-            String body = buildBatchEmailBody(batch, certFullName, employee);
+        final Map<String, Object> extras = new LinkedHashMap<String, Object>();
+        extras.put("{{namaBatch}}", batch.getBatchName());
+        extras.put("{{mulaiTanggal}}", batch.getStartDate());
+        extras.put("{{jenisBatch}}", mapJenisBatch(batch.getType())); // training / sertifikasi / refreshment
 
-            sendNotification(
-                    employee.getId(),
-                    employee.getEmail(),
-                    subject,
-                    body,
-                    Notification.Type.BATCH_NOTIFICATION,
-                    "Batch",
-                    batch.getId());
+        final String subject = templateService.generateTitle(
+                NotificationTemplate.Code.BATCH_NOTIFICATION, employee, extras);
+        final String bodyPlain = templateService.generateMessage(
+                NotificationTemplate.Code.BATCH_NOTIFICATION, employee, extras);
 
-            log.info("✅ Notifikasi batch '{}' dikirim ke {}", batch.getBatchName(), employee.getEmail());
-            TimeUnit.MILLISECONDS.sleep(300);
+        // Build HTML bold
+        Map<String, String> vars = buildCommonVars(employee);
+        vars.put("{{namaBatch}}", Objects.toString(extras.get("{{namaBatch}}"), "-"));
+        vars.put("{{mulaiTanggal}}", formatDateId((LocalDate) extras.get("{{mulaiTanggal}}")));
+        vars.put("{{jenisBatch}}", Objects.toString(extras.get("{{jenisBatch}}"), "-"));
 
-        } catch (Exception e) {
-            log.error("❌ Gagal kirim notifikasi batch ke {}: {}", employee != null ? employee.getEmail() : "null",
-                    e.getMessage(), e);
-        }
+        final String bodyHtml = buildHtmlWithBold(bodyPlain, vars);
+
+        sendNotification(
+                employee.getId(),
+                employee.getEmail(),
+                subject,
+                bodyPlain,
+                bodyHtml,
+                Notification.Type.BATCH_NOTIFICATION,
+                "Batch",
+                batch.getId());
     }
 
-    // ================== UTIL ==================
+    // =========================================================================
+    // PUBLIC API UNTUK CONTROLLER / UI
+    // =========================================================================
     public List<Notification> getUserNotifications(Long userId) {
-        return notificationRepository.findByUserIdOrderByCreatedAtDesc(userId);
+        final List<Notification> list = notificationRepository.findByUserIdOrderByCreatedAtDesc(userId);
+        return list != null ? list : Collections.<Notification>emptyList();
     }
 
     public void markAsRead(Long notificationId) {
-        notificationRepository.findById(notificationId).ifPresent(notif -> {
-            if (!notif.isRead()) {
-                notif.setRead(true);
-                notif.setReadAt(LocalDateTime.now());
-                notificationRepository.save(notif);
-                log.info("📬 Notifikasi {} ditandai sudah dibaca", notificationId);
+        notificationRepository.findById(notificationId).ifPresent(n -> {
+            if (!n.isRead()) {
+                n.setRead(true);
+                n.setReadAt(LocalDateTime.now());
+                notificationRepository.save(n);
             }
         });
     }
@@ -285,26 +332,47 @@ public class NotificationService {
     }
 
     public void testEmail(String to) {
-        log.info("📧 Kirim test email ke {}", to);
-        sendEmailAsync(
-                to,
-                "Test Email dari Mega Certification System",
-                """
-                        <p>Halo,</p>
-                        <p>Ini adalah email percobaan dari sistem sertifikasi Bank Mega.</p>
-                        <p>Kalau Anda menerima email ini, berarti konfigurasi SMTP sudah berfungsi dengan baik.</p>
-                        <p>Salam,<br><b>Divisi Learning & Development</b><br>Bank Mega</p>
-                        """);
+        if (isBlank(to))
+            return;
+        final String bodyPlain = "Halo,\n\nIni adalah email percobaan dari sistem sertifikasi Bank Mega.\n"
+                + "Kalau Anda menerima email ini, berarti konfigurasi SMTP sudah berfungsi dengan baik.\n\n"
+                + "Salam,\nDivisi Learning & Development\nBank Mega";
+
+        // biar konsisten, bold-kan nilai statis 'Bank Mega' saja sebagai contoh
+        Map<String, String> vars = new LinkedHashMap<>();
+        vars.put("{{dummy}}", ""); // no-op
+        final String bodyHtml = buildHtmlWithBold(bodyPlain, Map.of());
+
+        sendEmailAsync(to, "Test Email dari Mega Certification System", bodyHtml);
     }
 
-    // ================== PRIVATE HELPERS ==================
-    private static final DateTimeFormatter ID_DATE = DateTimeFormatter.ofPattern("d MMMM yyyy",
-            Locale.forLanguageTag("id-ID"));
+    // =========================================================================
+    // HELPERS
+    // =========================================================================
+    private String mapJenisBatch(Batch.BatchType type) {
+        if (type == null)
+            return "-";
+        switch (type) {
+            case CERTIFICATION:
+                return "Sertifikasi";
+            case TRAINING:
+                return "Training";
+            case REFRESHMENT:
+                return "Refreshment";
+            default:
+                return "-";
+        }
+    }
 
-    private String buildCertificationFullName(CertificationRule rule) {
+    private boolean isBlank(String s) {
+        return s == null || s.trim().isEmpty();
+    }
+
+    private String buildCertificationFullName(EmployeeCertification cert) {
+        final var rule = cert.getCertificationRule();
         if (rule == null)
             return "-";
-        String name = (rule.getCertification() != null ? rule.getCertification().getName() : "-");
+        String name = rule.getCertification() != null ? rule.getCertification().getName() : "-";
         if (rule.getCertificationLevel() != null)
             name += " - " + rule.getCertificationLevel().getName();
         if (rule.getSubField() != null)
@@ -312,61 +380,59 @@ public class NotificationService {
         return name;
     }
 
-    private String buildBatchEmailSubject(Batch batch, String certFullName) {
-        String type = batch.getType() != null ? batch.getType().name() : "BATCH";
-        String start = batch.getStartDate() != null ? batch.getStartDate().format(ID_DATE) : "-";
-        return "[%s] %s - %s (Mulai %s)".formatted(type, safe(batch.getBatchName()), safe(certFullName), start);
+    private Map<String, String> buildCommonVars(Employee emp) {
+        Map<String, String> m = new LinkedHashMap<>();
+        // key harus sama dengan yang dipakai di template ({{nama}}, {{sapaan}}, dst)
+        m.put("{{sapaan}}", computeSalutation(emp));
+        m.put("{{nama}}", emp != null ? nullSafe(emp.getName()) : "-");
+        return m;
     }
 
-    private String buildBatchEmailBody(Batch batch, String certFullName, Employee emp) {
-        String kode = (batch.getCertificationRule() != null && batch.getCertificationRule().getCertification() != null)
-                ? safe(batch.getCertificationRule().getCertification().getCode())
-                : "-";
-        String level = (batch.getCertificationRule() != null
-                && batch.getCertificationRule().getCertificationLevel() != null)
-                        ? safe(batch.getCertificationRule().getCertificationLevel().getName())
-                        : "-";
-        String sub = (batch.getCertificationRule() != null && batch.getCertificationRule().getSubField() != null)
-                ? safe(batch.getCertificationRule().getSubField().getName())
-                : "-";
-
-        String lembaga = (batch.getInstitution() != null) ? safe(batch.getInstitution().getName()) : "-";
-        String mulai = batch.getStartDate() != null ? batch.getStartDate().format(ID_DATE) : "-";
-        String selesai = batch.getEndDate() != null ? batch.getEndDate().format(ID_DATE) : "-";
-        String kuota = batch.getQuota() != null ? String.valueOf(batch.getQuota()) : "-";
-        String status = batch.getStatus() != null ? batch.getStatus().name() : "-";
-        String jenis = batch.getType() != null ? batch.getType().name() : "-";
-
-        return """
-                <p>%s %s,</p>
-                <p>Anda terdaftar pada <b>%s</b>: <b>%s</b>.</p>
-                <table style="border-collapse:collapse; font-size:14px;">
-                  <tr><td style="padding:2px 8px;">Sertifikasi</td><td>: %s</td></tr>
-                  <tr><td style="padding:2px 8px;">Kode</td><td>: %s</td></tr>
-                  <tr><td style="padding:2px 8px;">Level</td><td>: %s</td></tr>
-                  <tr><td style="padding:2px 8px;">Sub Bidang</td><td>: %s</td></tr>
-                  <tr><td style="padding:2px 8px;">Lembaga</td><td>: %s</td></tr>
-                  <tr><td style="padding:2px 8px;">Jadwal</td><td>: %s s/d %s</td></tr>
-                  <tr><td style="padding:2px 8px;">Kuota</td><td>: %s</td></tr>
-                  <tr><td style="padding:2px 8px;">Status Batch</td><td>: %s</td></tr>
-                </table>
-                <p>Mohon hadir sesuai jadwal. Terima kasih.</p>
-                """.formatted(getSapaan(emp), safe(emp != null ? emp.getName() : null),
-                jenis, safe(batch.getBatchName()),
-                safe(certFullName), kode, level, sub, lembaga, mulai, selesai, kuota, status);
+    private String computeSalutation(Employee emp) {
+        // Kalau ada field gender di entity, lo bisa refine:
+        // return "M".equalsIgnoreCase(emp.getGender()) ? "Bapak" : "Ibu";
+        return "Bapak/Ibu";
     }
 
-    private String getSapaan(Employee employee) {
-        if (employee == null || employee.getGender() == null || employee.getGender().isBlank())
-            return "Bapak/Ibu";
-        return switch (employee.getGender().trim().toUpperCase()) {
-            case "M" -> "Bapak";
-            case "F" -> "Ibu";
-            default -> "Bapak/Ibu";
-        };
+    private String nullSafe(Object o) {
+        return o == null ? "-" : o.toString();
     }
 
-    private String safe(String val) {
-        return (val != null && !val.isBlank()) ? val : "-";
+    private String formatDateId(LocalDate date) {
+        if (date == null)
+            return "-";
+        DateTimeFormatter fmt = DateTimeFormatter.ofPattern("d MMMM yyyy", Locale.forLanguageTag("id-ID"));
+        return date.format(fmt);
+    }
+
+    /**
+     * Escape HTML sederhana, lalu bold-kan setiap nilai variabel, lalu \n -> <br/>
+     * .
+     */
+    private String buildHtmlWithBold(String plain, Map<String, String> variables) {
+        String html = htmlEscape(Objects.toString(plain, ""));
+        // bold-kan tiap nilai variabel (setelah di-escape supaya aman)
+        for (Map.Entry<String, String> e : variables.entrySet()) {
+            String val = e.getValue();
+            if (isBlank(val))
+                continue;
+            String escapedVal = htmlEscape(val);
+            html = html.replace(escapedVal, "<b>" + escapedVal + "</b>");
+        }
+        // newline ke <br/>
+        html = html.replace("\r\n", "\n").replace("\n", "<br/>");
+        return html;
+    }
+
+    private String htmlEscape(String s) {
+        if (s == null)
+            return "";
+        String out = s;
+        out = out.replace("&", "&amp;");
+        out = out.replace("<", "&lt;");
+        out = out.replace(">", "&gt;");
+        out = out.replace("\"", "&quot;");
+        out = out.replace("'", "&#039;");
+        return out;
     }
 }

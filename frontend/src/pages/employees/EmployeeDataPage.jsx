@@ -271,17 +271,17 @@ export default function EmployeePage() {
                     <thead className="bg-base-200 text-xs">
                         <tr>
                             <th>No</th>
+                            <th>Aksi</th>
                             <th>NIP</th>
                             <th>Nama</th>
+                            <th>Status</th>
                             <th>Email</th>
                             <th>Gender</th>
                             <th>Regional</th>
                             <th>Division</th>
                             <th>Unit</th>
                             <th>Jabatan</th>
-                            <th>Status</th>
                             <th>SK Efektif</th>
-                            <th>Aksi</th>
                         </tr>
                     </thead>
                     <tbody className="text-xs">
@@ -301,18 +301,26 @@ export default function EmployeePage() {
                             rows.map((e, idx) => (
                                 <tr key={e.id}>
                                     <td>{startIdx + idx}</td>
+                                    <td className="flex gap-2">
+                                        <button
+                                            className="btn btn-xs btn-warning btn-soft border-warning"
+                                            onClick={() => setEditItem(e)}
+                                        >
+                                            Edit
+                                        </button>
+                                        <button
+                                            className="btn btn-xs btn-error btn-soft border-error"
+                                            onClick={() => setConfirm({ open: true, id: e.id })}
+                                        >
+                                            Hapus
+                                        </button>
+                                    </td>
                                     <td>{e.nip}</td>
                                     <td>
                                         <Link to={`/employee/${e.id}`} className="hover:text-secondary underline">
                                             {e.name}
                                         </Link>
                                     </td>
-                                    <td>{e.email}</td>
-                                    <td>{e.gender}</td>
-                                    <td>{e.regionalName || "-"}</td>
-                                    <td>{e.divisionName || "-"}</td>
-                                    <td>{e.unitName || "-"}</td>
-                                    <td>{e.jobName || "-"}</td>
                                     <td>
                                         <span
                                             className={`badge badge-sm text-white ${
@@ -328,6 +336,12 @@ export default function EmployeePage() {
                                             {e.status}
                                         </span>
                                     </td>
+                                    <td>{e.email}</td>
+                                    <td>{e.gender}</td>
+                                    <td>{e.regionalName || "-"}</td>
+                                    <td>{e.divisionName || "-"}</td>
+                                    <td>{e.unitName || "-"}</td>
+                                    <td>{e.jobName || "-"}</td>
                                     <td>
                                         {e.effectiveDate
                                             ? new Date(e.effectiveDate)
@@ -339,20 +353,6 @@ export default function EmployeePage() {
                                                   .replace(/\./g, "")
                                                   .replace(/(\b[a-z])/g, (x) => x.toUpperCase())
                                             : "-"}
-                                    </td>
-                                    <td className="flex gap-2">
-                                        <button
-                                            className="btn btn-xs btn-warning btn-soft border-warning"
-                                            onClick={() => setEditItem(e)}
-                                        >
-                                            Edit
-                                        </button>
-                                        <button
-                                            className="btn btn-xs btn-error btn-soft border-error"
-                                            onClick={() => setConfirm({ open: true, id: e.id })}
-                                        >
-                                            Hapus
-                                        </button>
                                     </td>
                                 </tr>
                             ))

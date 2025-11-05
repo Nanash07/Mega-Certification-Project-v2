@@ -1,5 +1,6 @@
 package com.bankmega.certification.controller;
 
+import com.bankmega.certification.entity.EmployeeBatch;
 import com.bankmega.certification.entity.Notification;
 import com.bankmega.certification.service.NotificationService;
 import lombok.RequiredArgsConstructor;
@@ -35,5 +36,15 @@ public class NotificationController {
     public ResponseEntity<String> testEmail(@RequestParam String email) {
         notificationService.testEmail(email);
         return ResponseEntity.ok("Email test terkirim ke " + email);
+    }
+
+    // 🔹 Kirim notifikasi ke peserta dalam 1 batch (optional
+    // ?status=REGISTERED/ATTENDED/PASSED/FAILED)
+    @PostMapping("/batches/{batchId}/send")
+    public ResponseEntity<?> sendBatchNotifications(
+            @PathVariable Long batchId,
+            @RequestParam(required = false) EmployeeBatch.Status status) {
+        int sent = notificationService.notifyParticipantsByBatch(batchId, status);
+        return ResponseEntity.ok().body(java.util.Map.of("sent", sent));
     }
 }

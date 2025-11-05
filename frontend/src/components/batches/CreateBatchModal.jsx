@@ -155,6 +155,21 @@ export default function CreateBatchModal({ open, onClose, onSaved }) {
                         </p>
                     </div>
 
+                    {/* Status */}
+                    <div>
+                        <label className="block mb-1">Status</label>
+                        <select
+                            value={form.status}
+                            onChange={(e) => setForm({ ...form, status: e.target.value })}
+                            className="select select-bordered w-full"
+                        >
+                            <option value="PLANNED">Planned</option>
+                            <option value="ONGOING">Ongoing</option>
+                            <option value="FINISHED">Finished</option>
+                            <option value="CANCELED">Canceled</option>
+                        </select>
+                    </div>
+
                     {/* Tanggal Mulai */}
                     <div>
                         <label className="block mb-1">Tanggal Mulai</label>
@@ -175,21 +190,6 @@ export default function CreateBatchModal({ open, onClose, onSaved }) {
                             onChange={(e) => setForm({ ...form, endDate: e.target.value })}
                             className="input input-bordered w-full"
                         />
-                    </div>
-
-                    {/* Status */}
-                    <div>
-                        <label className="block mb-1">Status</label>
-                        <select
-                            value={form.status}
-                            onChange={(e) => setForm({ ...form, status: e.target.value })}
-                            className="select select-bordered w-full"
-                        >
-                            <option value="PLANNED">Planned</option>
-                            <option value="ONGOING">Ongoing</option>
-                            <option value="FINISHED">Finished</option>
-                            <option value="CANCELED">Canceled</option>
-                        </select>
                     </div>
                 </div>
 

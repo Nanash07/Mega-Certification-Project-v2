@@ -41,8 +41,14 @@ public interface EmployeeCertificationRepository extends
         })
         List<EmployeeCertification> findByReminderDateAndDeletedAtIsNull(LocalDate reminderDate);
 
-        // 🔹 Ambil sertifikasi expired
-        List<EmployeeCertification> findByStatusAndValidUntilBeforeAndDeletedAtIsNull(
-                        EmployeeCertification.Status status,
-                        LocalDate date);
+        // EXP: sertifikat yang sudah kadaluarsa SAMPAI HARI INI (<= today) + eager
+        // fetch
+        @EntityGraph(attributePaths = {
+                        "employee",
+                        "certificationRule",
+                        "certificationRule.certification",
+                        "certificationRule.certificationLevel",
+                        "certificationRule.subField"
+        })
+        List<EmployeeCertification> findByValidUntilLessThanEqualAndDeletedAtIsNull(LocalDate date);
 }

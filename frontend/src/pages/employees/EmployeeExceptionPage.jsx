@@ -287,6 +287,7 @@ export default function EmployeeExceptionPage() {
                     <thead className="bg-base-200 text-xs">
                         <tr>
                             <th>No</th>
+                            <th>Aksi</th>
                             <th>NIP</th>
                             <th>Nama Pegawai</th>
                             <th>Jabatan</th>
@@ -296,7 +297,6 @@ export default function EmployeeExceptionPage() {
                             <th>Notes</th>
                             <th>Status</th>
                             <th>Updated At</th>
-                            <th>Aksi</th>
                         </tr>
                     </thead>
                     <tbody className="text-xs">
@@ -316,6 +316,33 @@ export default function EmployeeExceptionPage() {
                             rows.map((r, idx) => (
                                 <tr key={r.id}>
                                     <td>{startIdx + idx}</td>
+                                    <td className="space-x-1">
+                                        <button
+                                            className={`btn btn-xs ${
+                                                r.isActive
+                                                    ? "btn-secondary border-secondary btn-soft"
+                                                    : "btn-success border-success btn-soft"
+                                            }`}
+                                            onClick={() => onToggle(r.id)}
+                                        >
+                                            {r.isActive ? "Nonaktifkan" : "Aktifkan"}
+                                        </button>
+                                        <button
+                                            className="btn btn-xs border-warning btn-soft btn-warning"
+                                            onClick={() => {
+                                                setSelectedRow(r);
+                                                setShowEditModal(true);
+                                            }}
+                                        >
+                                            Edit
+                                        </button>
+                                        <button
+                                            className="btn btn-xs border-error btn-soft btn-error"
+                                            onClick={() => setConfirm({ open: true, id: r.id })}
+                                        >
+                                            Hapus
+                                        </button>
+                                    </td>
                                     <td>{r.nip}</td>
 
                                     {/* 🔹 Nama Pegawai bisa diklik ke detail */}
@@ -354,33 +381,6 @@ export default function EmployeeExceptionPage() {
                                                   minute: "2-digit",
                                               })
                                             : "-"}
-                                    </td>
-                                    <td className="space-x-1">
-                                        <button
-                                            className={`btn btn-xs ${
-                                                r.isActive
-                                                    ? "btn-secondary border-secondary btn-soft"
-                                                    : "btn-success border-success btn-soft"
-                                            }`}
-                                            onClick={() => onToggle(r.id)}
-                                        >
-                                            {r.isActive ? "Nonaktifkan" : "Aktifkan"}
-                                        </button>
-                                        <button
-                                            className="btn btn-xs border-warning btn-soft btn-warning"
-                                            onClick={() => {
-                                                setSelectedRow(r);
-                                                setShowEditModal(true);
-                                            }}
-                                        >
-                                            Edit
-                                        </button>
-                                        <button
-                                            className="btn btn-xs border-error btn-soft btn-error"
-                                            onClick={() => setConfirm({ open: true, id: r.id })}
-                                        >
-                                            Hapus
-                                        </button>
                                     </td>
                                 </tr>
                             ))

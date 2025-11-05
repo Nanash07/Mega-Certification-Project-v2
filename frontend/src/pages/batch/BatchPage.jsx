@@ -182,6 +182,7 @@ export default function BatchPage() {
                     <thead className="bg-base-200 text-xs">
                         <tr>
                             <th>No</th>
+                            <th>Aksi</th>
                             <th>Nama Batch</th>
                             <th>Sertifikasi</th>
                             <th>Lembaga</th>
@@ -191,7 +192,6 @@ export default function BatchPage() {
                             <th>Total Peserta</th>
                             <th>Total Lulus</th>
                             <th>Status</th>
-                            <th>Aksi</th>
                         </tr>
                     </thead>
                     <tbody className="text-xs">
@@ -211,6 +211,20 @@ export default function BatchPage() {
                             rows.map((b, idx) => (
                                 <tr key={b.id}>
                                     <td>{startIdx + idx}</td>
+                                    <td className="flex gap-2">
+                                        <button
+                                            className="btn btn-xs btn-warning btn-soft border-warning"
+                                            onClick={() => setEditItem(b)}
+                                        >
+                                            Edit
+                                        </button>
+                                        <button
+                                            className="btn btn-xs btn-error btn-soft border-error"
+                                            onClick={() => setConfirmDelete({ open: true, id: b.id })}
+                                        >
+                                            Hapus
+                                        </button>
+                                    </td>
                                     <td>
                                         <Link to={`/batch/${b.id}`} className="underline hover:text-secondary">
                                             {b.batchName}
@@ -240,20 +254,6 @@ export default function BatchPage() {
                                         >
                                             {b.status}
                                         </span>
-                                    </td>
-                                    <td className="flex gap-2">
-                                        <button
-                                            className="btn btn-xs btn-warning btn-soft border-warning"
-                                            onClick={() => setEditItem(b)}
-                                        >
-                                            Edit
-                                        </button>
-                                        <button
-                                            className="btn btn-xs btn-error btn-soft border-error"
-                                            onClick={() => setConfirmDelete({ open: true, id: b.id })}
-                                        >
-                                            Hapus
-                                        </button>
                                     </td>
                                 </tr>
                             ))

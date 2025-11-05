@@ -8,18 +8,18 @@ import java.util.List;
 
 public interface PicCertificationScopeRepository extends JpaRepository<PicCertificationScope, Long> {
 
-    // 🔹 Ambil semua scope PIC berdasarkan User
+    // Ambil semua scope PIC berdasarkan User
     List<PicCertificationScope> findByUser(User user);
 
-    // 🔹 Hapus semua scope berdasarkan User
+    // Hapus semua scope berdasarkan User
     void deleteByUser(User user);
 
-    // 🔹 Ambil scope PIC by userId (buat validasi)
+    // Ambil scope PIC by userId (buat validasi)
     List<PicCertificationScope> findByUser_Id(Long userId);
 
-    // 🔹 Ambil certificationId yang boleh di-manage PIC
+    // Ambil certificationId yang boleh di-manage PIC
     List<PicCertificationScope> findDistinctByUser_Id(Long userId);
 
-    // 🔹 Ambil certificationCode yang boleh di-manage PIC
+    // Ambil certificationCode yang boleh di-manage PIC
     List<PicCertificationScope> findByUser_IdAndCertification_CodeIgnoreCase(Long userId, String code);
 }

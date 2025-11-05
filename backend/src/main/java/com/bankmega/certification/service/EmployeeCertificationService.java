@@ -88,17 +88,35 @@ public class EmployeeCertificationService {
     }
 
     // ================== Helpers ==================
+    /**
+     * Hitung validFrom/validUntil/reminderDate. Fallback ke rule kalau snapshot
+     * null.
+     */
     private void updateValidity(EmployeeCertification ec) {
+        // Fallback ke rule current kalau snapshot null (kasus record hasil batch)
+        Integer validityMonths = ec.getRuleValidityMonths();
+        if (validityMonths == null && ec.getCertificationRule() != null) {
+            validityMonths = ec.getCertificationRule().getValidityMonths();
+            ec.setRuleValidityMonths(validityMonths);
+        }
+        Integer reminderMonths = ec.getRuleReminderMonths();
+        if (reminderMonths == null && ec.getCertificationRule() != null) {
+            reminderMonths = ec.getCertificationRule().getReminderMonths();
+            ec.setRuleReminderMonths(reminderMonths);
+        }
+
         if (ec.getCertDate() != null) {
             ec.setValidFrom(ec.getCertDate());
 
-            if (ec.getRuleValidityMonths() != null) {
-                ec.setValidUntil(ec.getCertDate().plusMonths(ec.getRuleValidityMonths()));
+            if (validityMonths != null) {
+                ec.setValidUntil(ec.getCertDate().plusMonths(validityMonths));
             } else {
+                // non-expiring / lifetime
                 ec.setValidUntil(null);
             }
-            if (ec.getRuleReminderMonths() != null && ec.getValidUntil() != null) {
-                ec.setReminderDate(ec.getValidUntil().minusMonths(ec.getRuleReminderMonths()));
+
+            if (ec.getValidUntil() != null && reminderMonths != null) {
+                ec.setReminderDate(ec.getValidUntil().minusMonths(reminderMonths));
             } else {
                 ec.setReminderDate(null);
             }
@@ -109,24 +127,36 @@ public class EmployeeCertificationService {
         }
     }
 
+    /** Tentukan status berdasarkan kelengkapan dokumen dan validity. */
     private void updateStatus(EmployeeCertification ec) {
-        // Kalau sudah INVALID (mis. resign/soft delete), jangan auto naik status
+        // Jangan auto-ubah kalau sudah INVALID
         if (ec.getStatus() == EmployeeCertification.Status.INVALID) {
             return;
         }
 
         LocalDate today = LocalDate.now();
 
-        // Dokumen belum lengkap
+        // Dokumen belum lengkap => PENDING
         if (ec.getCertNumber() == null || ec.getCertNumber().isBlank()
                 || ec.getFileUrl() == null || ec.getFileUrl().isBlank()) {
             ec.setStatus(EmployeeCertification.Status.PENDING);
             return;
         }
 
-        if (ec.getValidUntil() == null) {
+        // Belum ada tanggal sertifikat => NOT_YET_CERTIFIED
+        if (ec.getCertDate() == null) {
             ec.setStatus(EmployeeCertification.Status.NOT_YET_CERTIFIED);
-        } else if (today.isAfter(ec.getValidUntil())) {
+            return;
+        }
+
+        // Non-expiring (validUntil null) => ACTIVE
+        if (ec.getValidUntil() == null) {
+            ec.setStatus(EmployeeCertification.Status.ACTIVE);
+            return;
+        }
+
+        // Ada masa berlaku
+        if (today.isAfter(ec.getValidUntil())) {
             ec.setStatus(EmployeeCertification.Status.EXPIRED);
         } else if (ec.getReminderDate() != null && !today.isBefore(ec.getReminderDate())) {
             ec.setStatus(EmployeeCertification.Status.DUE);
@@ -186,7 +216,8 @@ public class EmployeeCertificationService {
                 .jobPositionTitle(employee.getJobPosition() != null
                         ? employee.getJobPosition().getName()
                         : null)
-                .ruleValidityMonths(rule.getValidityMonths()) // snapshot
+                // snapshot nilai rule saat create
+                .ruleValidityMonths(rule.getValidityMonths())
                 .ruleReminderMonths(rule.getReminderMonths())
                 .createdAt(Instant.now())
                 .updatedAt(Instant.now())
@@ -216,6 +247,7 @@ public class EmployeeCertificationService {
             CertificationRule rule = ruleRepo.findById(req.getCertificationRuleId())
                     .orElseThrow(() -> new RuntimeException("Certification Rule not found"));
             ec.setCertificationRule(rule);
+            // refresh snapshot saat ganti rule
             ec.setRuleValidityMonths(rule.getValidityMonths());
             ec.setRuleReminderMonths(rule.getReminderMonths());
         }
@@ -275,7 +307,8 @@ public class EmployeeCertificationService {
         }
 
         ec.setUpdatedAt(Instant.now());
-        updateStatus(ec);
+        updateValidity(ec); // ⬅️ penting: hitung ulang validity (kasus batch snapshot null)
+        updateStatus(ec); // ⬅️ tentukan status setelah validity benar
 
         EmployeeCertification saved = repo.save(ec);
         historyService.snapshot(saved, actionType);
@@ -351,10 +384,7 @@ public class EmployeeCertificationService {
     // 🔥 Bulk ops optimized (chunked + only-changed writes)
     // =========================================================
 
-    /**
-     * Invalidasi semua sertifikat milik pegawai-pegawai (mis. saat RESIGN).
-     * Chunked biar hemat memori; hanya update kalau status bukan INVALID.
-     */
+    /** INVALID semua sertifikat milik pegawai-pegawai (mis. resign). */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public int bulkInvalidateByEmployeeIds(List<Long> employeeIds) {
         if (employeeIds == null || employeeIds.isEmpty())
@@ -388,10 +418,7 @@ public class EmployeeCertificationService {
         return total;
     }
 
-    /**
-     * Opsi saat rehire: INVALID -> PENDING (kalau kebijakan bisnis mau reset).
-     * Chunked + recompute setelah di-set PENDING.
-     */
+    /** Opsi rehire: INVALID -> PENDING. */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public int markInvalidToPendingForEmployeeIds(List<Long> employeeIds) {
         if (employeeIds == null || employeeIds.isEmpty())
@@ -427,10 +454,7 @@ public class EmployeeCertificationService {
         return total;
     }
 
-    /**
-     * Recompute status untuk sertifikat milik pegawai-pegawai tertentu.
-     * Chunked + write hanya saat status berubah.
-     */
+    /** Recompute status utk pegawai-pegawai tertentu. */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public int recomputeStatusesForEmployeeIds(List<Long> employeeIds) {
         if (employeeIds == null || employeeIds.isEmpty())
