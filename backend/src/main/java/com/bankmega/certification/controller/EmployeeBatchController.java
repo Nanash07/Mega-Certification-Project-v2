@@ -31,8 +31,13 @@ public class EmployeeBatchController {
             @PathVariable Long batchId,
             @RequestParam(required = false) String search,
             @RequestParam(required = false) EmployeeBatch.Status status,
+            @RequestParam(required = false) String regional, // ✅ NEW
+            @RequestParam(required = false) String division, // ✅ NEW
+            @RequestParam(required = false) String unit, // ✅ NEW
+            @RequestParam(required = false, name = "job") String job, // ✅ NEW
             Pageable pageable) {
-        return ResponseEntity.ok(service.search(batchId, search, status, pageable));
+        return ResponseEntity.ok(
+                service.search(batchId, search, status, regional, division, unit, job, pageable));
     }
 
     // Search global (optional)
@@ -41,8 +46,13 @@ public class EmployeeBatchController {
             @RequestParam(required = false) Long batchId,
             @RequestParam(required = false) String search,
             @RequestParam(required = false) EmployeeBatch.Status status,
+            @RequestParam(required = false) String regional, // ✅ NEW
+            @RequestParam(required = false) String division, // ✅ NEW
+            @RequestParam(required = false) String unit, // ✅ NEW
+            @RequestParam(required = false, name = "job") String job, // ✅ NEW
             Pageable pageable) {
-        return ResponseEntity.ok(service.search(batchId, search, status, pageable));
+        return ResponseEntity.ok(
+                service.search(batchId, search, status, regional, division, unit, job, pageable));
     }
 
     // Tambah peserta single (auto-restore jika soft-deleted)

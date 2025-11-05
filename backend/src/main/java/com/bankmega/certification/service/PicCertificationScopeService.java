@@ -47,26 +47,23 @@ public class PicCertificationScopeService {
                 User user = userRepo.findById(userId)
                                 .orElseThrow(() -> new NotFoundException("User not found: " + userId));
 
-                // ambil scope lama
                 List<PicCertificationScope> existing = scopeRepo.findByUser_Id(user.getId());
                 Set<Long> existingIds = existing.stream()
                                 .map(s -> s.getCertification().getId())
                                 .collect(Collectors.toSet());
 
-                // ambil scope baru dari request
                 Set<Long> newIds = new HashSet<>(req.getCertificationIds());
 
-                // kalau sama persis → skip update
                 if (existingIds.equals(newIds)) {
                         return mapUserToResponse(user);
                 }
 
-                // hapus scope yg sudah tidak ada di request
+                // remove yang tidak ada di request
                 existing.stream()
                                 .filter(s -> !newIds.contains(s.getCertification().getId()))
                                 .forEach(scopeRepo::delete);
 
-                // tambahkan scope baru
+                // tambah yang baru
                 newIds.stream()
                                 .filter(id -> !existingIds.contains(id))
                                 .forEach(certId -> {
@@ -82,7 +79,6 @@ public class PicCertificationScopeService {
                 return mapUserToResponse(user);
         }
 
-        // Mapper User + Scope → DTO
         private PicCertificationScopeResponse mapUserToResponse(User user) {
                 var certs = scopeRepo.findByUser_Id(user.getId()).stream()
                                 .map(s -> PicCertificationScopeResponse.ScopeDto.builder()

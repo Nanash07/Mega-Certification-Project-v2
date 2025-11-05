@@ -65,16 +65,19 @@ public class JdbcDashboardRepository implements DashboardRepository {
             add(p, "subFieldId", f.getSubFieldId());
             cond.add(alias + ".sub_field_id = :subFieldId");
         }
-        // 🔒 GUARD SCOPE PIC: batasi ke daftar yg diizinkan.
-        // Jika list dinyatakan (non-null) tapi kosong → nolkan hasil.
+
+        // ✅ GUARD SCOPE PIC (WAJIB): batasi ke daftar yg diizinkan
         if (f.getAllowedCertificationIds() != null) {
-            if (f.getAllowedCertificationIds().isEmpty()) {
+            List<Long> allowed = f.getAllowedCertificationIds();
+            if (allowed.isEmpty()) {
+                // kalau sudah di-set kosong/sentinel → hasil harus nihil
                 cond.add("1=0");
             } else {
-                add(p, "allowedCertIds", f.getAllowedCertificationIds());
+                add(p, "allowedCertIds", allowed);
                 cond.add(alias + ".certification_id IN (:allowedCertIds)");
             }
         }
+
         return cond.isEmpty() ? "" : " AND " + String.join(" AND ", cond);
     }
 
@@ -115,13 +118,11 @@ public class JdbcDashboardRepository implements DashboardRepository {
 
         String sql = """
                 WITH latest_ec AS (
-                  -- status TERBARU per (employee, rule)
                   SELECT DISTINCT ON (ec.employee_id, ec.certification_rule_id)
-                         ec.employee_id, ec.certification_rule_id, ec.status, ec.valid_until,
-                         COALESCE(ec.updated_at, ec.created_at) AS ts
+                         ec.employee_id, ec.certification_rule_id, ec.status
                   FROM employee_certifications ec
                   WHERE ec.deleted_at IS NULL
-                  ORDER BY ec.employee_id, ec.certification_rule_id, ts DESC
+                  ORDER BY ec.employee_id, ec.certification_rule_id, COALESCE(ec.updated_at, ec.created_at) DESC
                 ),
                 scoped_emp AS (
                   SELECT e.id
@@ -130,7 +131,6 @@ public class JdbcDashboardRepository implements DashboardRepository {
                   %s
                 ),
                 scoped_elg AS (
-                  -- eligibility aktif dalam scope filter
                   SELECT elg.employee_id, elg.certification_rule_id
                   FROM employee_eligibilities elg
                   JOIN scoped_emp se ON se.id = elg.employee_id
@@ -140,7 +140,6 @@ public class JdbcDashboardRepository implements DashboardRepository {
                   %s
                 ),
                 joined AS (
-                  -- gabungkan status terbaru utk hitung TTF / NOT_YET
                   SELECT elg.employee_id, elg.certification_rule_id, lec.status
                   FROM scoped_elg elg
                   LEFT JOIN latest_ec lec
@@ -148,17 +147,13 @@ public class JdbcDashboardRepository implements DashboardRepository {
                    AND lec.certification_rule_id = elg.certification_rule_id
                 )
                 SELECT
-                  -- 🔒 pegawai dihitung hanya yang punya eligibility dalam scope
-                  (SELECT COUNT(DISTINCT employee_id) FROM scoped_elg) AS employee_count,
+                  (SELECT COUNT(*) FROM scoped_emp) AS employee_count,
                   (SELECT COUNT(*) FROM scoped_elg) AS eligible_population,
 
-                  -- TTF (yang ACTIVE atau DUE)
                   COUNT(CASE WHEN j.status IN ('ACTIVE','DUE') THEN 1 END) AS certified_count,
 
-                  -- NOT_YET (belum punya record atau explicit NOT_YET_CERTIFIED)
                   COUNT(CASE WHEN j.status IS NULL OR j.status = 'NOT_YET_CERTIFIED' THEN 1 END) AS not_yet_count,
 
-                  -- DUE & EXPIRED dari status enum sertifikasi pegawai
                   (SELECT COUNT(*)
                      FROM latest_ec lec
                      JOIN scoped_emp se ON se.id = lec.employee_id
@@ -177,7 +172,6 @@ public class JdbcDashboardRepository implements DashboardRepository {
                       AND lec.status = 'EXPIRED'
                   ) AS expired_count,
 
-                  -- Batch ONGOING (ikut rule filter)
                   (SELECT COUNT(*)
                      FROM batches b
                      JOIN certification_rules cr ON cr.id = b.certification_rule_id

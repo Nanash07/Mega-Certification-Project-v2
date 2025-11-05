@@ -20,6 +20,12 @@ public class EmployeeBatchResponse {
     private String employeeNip;
     private String employeeName;
 
+    // ✅ NEW: struktur organisasi & jabatan
+    private String employeeJobName;
+    private String employeeDivisionName;
+    private String employeeRegionalName;
+    private String employeeUnitName;
+
     // 🔹 Data batch
     private Long batchId;
     private String batchName;

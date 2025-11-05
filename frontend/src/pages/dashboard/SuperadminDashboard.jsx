@@ -34,19 +34,19 @@ import {
 const toDate = (d) => (d ? new Date(d) : null);
 const fmtID = (d) => (d ? new Date(d).toLocaleDateString("id-ID") : "-");
 const daysBetween = (a, b) => Math.ceil((a - b) / (1000 * 60 * 60 * 24));
+const toNum = (v) => Number(v ?? 0) || 0;
 
 function getDeadline(row) {
     return toDate(row?.dueDate) || toDate(row?.validUntil) || toDate(row?.reminderDate) || null;
 }
 
-/** KODE-{level}-SUBCODE (tanpa 'L'); dukung camelCase/snake_case; fallback ke row.rule */
+/** KODE-{level}-SUBCODE; fallback ke row.rule */
 function getRuleCode(row) {
     const pre = row?.ruleCode ?? row?.rule_code;
     if (pre && String(pre).trim() !== "") return pre;
 
     const code = row?.certificationCode ?? row?.certification?.code ?? row?.certification_code ?? row?.code ?? "";
 
-    // CERTIFICATION LEVEL (bukan rule level)
     const level =
         row?.certificationLevelLevel ??
         row?.certificationLevel?.level ??
@@ -84,7 +84,7 @@ function buildQueryFromFilters(f) {
     return params.toString();
 }
 
-/* ========= Select: menu di portal (tanpa z-index custom) ========= */
+/* ========= Select helper ========= */
 function SelectTop(props) {
     return (
         <Select
@@ -101,7 +101,7 @@ function MiniCard({ label, value, sub, onClick, tip }) {
         <div className="tooltip tooltip-top w-full" data-tip={tip || label} title={tip || label}>
             <button
                 onClick={onClick}
-                className="rounded-2xl border border-base-200 bg-base-100 p-3 w-full text-left transition hover:shadow cursor-pointer"
+                className="rounded-2xl border border-base-200 bg-base-100 p-3 w-full text-left transition hover:shadow cursor-pointer min-h-[88px]"
             >
                 <div className="text-[11px] opacity-70">{label}</div>
                 <div className="text-xl font-bold">{value ?? 0}</div>
@@ -116,31 +116,64 @@ function toOptions(data, labelPicker) {
     return arr.filter(Boolean).map((x) => ({ value: x.id, label: labelPicker(x), raw: x }));
 }
 
-/** Bar kuota */
-function QuotaBar({ filled = 0, quota = 0 }) {
-    const f = Number(filled) || 0;
-    const q = Number(quota) || 0;
-    const pct = q > 0 ? Math.min(100, Math.round((f * 100) / q)) : 0;
-    const isFull = q > 0 && f >= q;
+/** ======= QuotaBar ======= */
+function QuotaBar({ filled = 0, quota = 0, className }) {
+    const f = Math.max(0, Number(filled) || 0);
+    const q = Math.max(0, Number(quota) || 0);
 
-    if (q <= 0) return <div className="text-[10px] opacity-70">Terisi: {f} (tanpa kuota)</div>;
+    if (q === 0) {
+        return <div className={`text-[10px] opacity-70 ${className || ""}`}>Terisi: {f} (tanpa kuota)</div>;
+    }
+
+    const pct = Math.min(100, Math.round((f / q) * 100));
+    const isFull = f >= q;
+    const label = `${f}/${q} (${pct}%)`;
+
+    const barColor = isFull ? "bg-success" : "bg-warning";
 
     return (
-        <div className="tooltip tooltip-top w-full" data-tip={`${f}/${q} (${pct}%)`} title={`${f}/${q} (${pct}%)`}>
+        <div
+            className={`tooltip tooltip-top w-full ${className || ""}`}
+            data-tip={label}
+            title={label}
+            aria-label={`Kuota ${label}`}
+        >
             <div className="relative w-full h-3 rounded-full bg-base-200 overflow-hidden">
-                <div className={`h-full ${isFull ? "bg-success" : "bg-warning"}`} style={{ width: `${pct}%` }} />
-                <div className="absolute inset-0 flex items-center justify-center text-[10px] font-medium text-white">
-                    {f}/{q} ({pct}%)
+                {pct > 0 && (
+                    <div
+                        className={`absolute left-0 top-0 h-full rounded-full ${barColor}`}
+                        style={{ width: `${pct}%` }}
+                    />
+                )}
+                <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="text-[10px] font-medium text-base-content/80">{label}</span>
                 </div>
             </div>
         </div>
     );
 }
 
+/** Hitung "terisi" untuk progress bar ONGOING: onrun + passed + failed (fallback aman) */
+function getFilledForBar(b) {
+    const onrun = toNum(b.onrun ?? b.registeredOrAttended);
+    const passed = toNum(b.totalPassed ?? b.passed);
+    const failedExplicit = toNum(b.totalFailed ?? b.failed);
+    const totalKnown = toNum(b.totalParticipants ?? b.participants);
+    const failed = failedExplicit > 0 ? failedExplicit : Math.max(totalKnown - passed - onrun, 0);
+
+    const granular = onrun + passed + failed;
+    if (granular > 0) return granular;
+
+    if (totalKnown > 0) return totalKnown;
+    if (toNum(b.registeredOrAttended) > 0) return toNum(b.registeredOrAttended);
+    if (onrun > 0) return onrun;
+    return 0;
+}
+
 export default function SuperadminDashboard() {
     const navigate = useNavigate();
 
-    // ===== org filters
+    // ===== filter organisasi
     const [divisionSel, setDivisionSel] = useState(null);
     const [regionalSel, setRegionalSel] = useState(null);
     const [unitSel, setUnitSel] = useState(null);
@@ -148,7 +181,7 @@ export default function SuperadminDashboard() {
     const [regionalOptions, setRegionalOptions] = useState([]);
     const [unitOptions, setUnitOptions] = useState([]);
 
-    // ===== certification filters
+    // ===== filter sertifikasi
     const [certSel, setCertSel] = useState(null);
     const [levelSel, setLevelSel] = useState(null);
     const [subSel, setSubSel] = useState(null);
@@ -161,20 +194,29 @@ export default function SuperadminDashboard() {
     const [kpi, setKpi] = useState(null);
     const [computedAt, setComputedAt] = useState(null);
 
-    // ===== alerts
+    // ===== peringatan
     const [dueList, setDueList] = useState([]);
     const [expiredList, setExpiredList] = useState([]);
     const [loadingAlert, setLoadingAlert] = useState(true);
 
-    // ===== batches
+    // ===== batch ONGOING
     const [batches, setBatches] = useState([]);
     const [batchPage, setBatchPage] = useState(0);
     const [batchHasMore, setBatchHasMore] = useState(true);
     const [loadingBatch, setLoadingBatch] = useState(false);
 
-    // ===== monthly
+    // ===== batch FINISHED
+    const [finishedBatches, setFinishedBatches] = useState([]);
+    const [finishedPage, setFinishedPage] = useState(0);
+    const [finishedHasMore, setFinishedHasMore] = useState(true);
+    const [loadingFinished, setLoadingFinished] = useState(false);
+
+    // ===== bulanan
     const nowYear = new Date().getFullYear();
-    const yearOptions = Array.from({ length: 6 }).map((_, i) => ({ value: nowYear - i, label: String(nowYear - i) }));
+    const yearOptions = Array.from({ length: 6 }).map((_, i) => ({
+        value: nowYear - i,
+        label: String(nowYear - i),
+    }));
     const [year, setYear] = useState(yearOptions[0]);
     const [monthly, setMonthly] = useState(MONTHS.map((label, i) => ({ month: i + 1, label, count: 0 })));
 
@@ -183,7 +225,7 @@ export default function SuperadminDashboard() {
         (async () => {
             try {
                 const { data } = await api.get("/divisions", { params: { page: 0, size: 1000, sort: "name,asc" } });
-                setDivisionOptions(toOptions(data, (d) => d?.name || d?.code || `Division #${d?.id}`));
+                setDivisionOptions(toOptions(data, (d) => d?.name || d?.code || `Divisi #${d?.id}`));
             } catch {
                 setDivisionOptions([]);
             }
@@ -212,7 +254,7 @@ export default function SuperadminDashboard() {
                 .then((arr) =>
                     setLevelOptions(
                         (arr ?? []).map((l) => ({
-                            value: l.id ?? l.level, // BE expects levelId
+                            value: l.id ?? l.level,
                             label: `${l.level ?? l.name ?? l}`,
                         }))
                     )
@@ -281,6 +323,28 @@ export default function SuperadminDashboard() {
         }
     }
 
+    async function loadFinishedBatches(reset = false) {
+        if (loadingFinished) return;
+        setLoadingFinished(true);
+        try {
+            const page = reset ? 0 : finishedPage;
+            const { data } = await api.get("/batches/paged", {
+                params: {
+                    status: "FINISHED",
+                    page,
+                    size: 10,
+                    sort: "endDate,desc",
+                },
+            });
+            const content = Array.isArray(data?.content) ? data.content : [];
+            setFinishedBatches((prev) => (reset ? content : [...prev, ...content]));
+            setFinishedHasMore(page + 1 < (data?.totalPages ?? 0));
+            setFinishedPage(page + 1);
+        } finally {
+            setLoadingFinished(false);
+        }
+    }
+
     async function loadMonthly() {
         const data = await fetchMonthlyCertificationTrend({
             ...params(),
@@ -294,10 +358,19 @@ export default function SuperadminDashboard() {
         (async () => {
             await loadSummaryAndKpi();
             await loadPriority();
+
+            // ONGOING
             setBatchPage(0);
             setBatches([]);
             setBatchHasMore(true);
             await loadBatches(true);
+
+            // FINISHED
+            setFinishedPage(0);
+            setFinishedBatches([]);
+            setFinishedHasMore(true);
+            await loadFinishedBatches(true);
+
             await loadMonthly();
         })();
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -322,12 +395,12 @@ export default function SuperadminDashboard() {
     const pieData = useMemo(
         () => [
             { name: "Tersertifikasi", value: real.active },
-            { name: "Tidak bersertif", value: real.nonActive },
+            { name: "Tidak bersertifikat", value: real.nonActive },
         ],
         [real]
     );
 
-    // Cards config (klik -> navigate)
+    // Kartu ringkas
     const cardConfigs = useMemo(() => {
         const q = buildQueryFromFilters(currentFilters());
         return [
@@ -335,46 +408,46 @@ export default function SuperadminDashboard() {
                 key: "employees",
                 label: "Jumlah Pegawai",
                 value: summary?.employees?.active,
-                tip: "Pegawai aktif",
+                tip: "Jumlah pegawai",
                 href: `/employee/data${q ? `?${q}` : ""}`,
             },
             {
-                key: "ttf",
-                label: "TTF Sertifikasi (eligibility)",
+                key: "tersretifikasi",
+                label: "Tersertifikasi",
                 value: Number(summary?.certifications?.active ?? 0),
                 sub:
                     eligibleTotal > 0
                         ? `${((Number(summary?.certifications?.active ?? 0) / eligibleTotal) * 100).toFixed(1)}%`
                         : undefined,
-                tip: "TTF (ACTIVE+DUE)",
+                tip: "Tersertifikasi",
                 href: `/employee/eligibility${q ? `?${q}` : ""}`,
             },
             {
                 key: "due",
-                label: "Due",
+                label: "Jatuh Tempo",
                 value: summary?.certifications?.due,
                 tip: "Akan jatuh tempo",
                 href: `/employee/certification${q ? `?${q}&status=DUE` : "?status=DUE"}`,
             },
             {
                 key: "expired",
-                label: "Expired",
+                label: "Kadaluarsa",
                 value: summary?.certifications?.expired,
                 tip: "Sudah kadaluarsa",
                 href: `/employee/certification${q ? `?${q}&status=EXPIRED` : "?status=EXPIRED"}`,
             },
             {
                 key: "notyet",
-                label: "Not Yet",
+                label: "Belum Bersertifikat",
                 value: kpi?.notYetCertified ?? 0,
-                tip: "Belum sertif",
+                tip: "Belum bersertifikat",
                 href: `/employee/certification${q ? `?${q}&status=NOT_YET_CERTIFIED` : "?status=NOT_YET_CERTIFIED"}`,
             },
             {
                 key: "batches",
-                label: "Batch Ongoing",
+                label: "Batch Berjalan",
                 value: summary?.batches?.ongoing ?? summary?.batchesOngoing ?? summary?.batchesCount ?? 0,
-                tip: "Batch berjalan",
+                tip: "Batch yang sedang berjalan",
                 href: `/batch${q ? `?${q}&status=ONGOING` : "?status=ONGOING"}`,
             },
         ];
@@ -383,7 +456,7 @@ export default function SuperadminDashboard() {
     /* ========= render ========= */
     return (
         <div className="p-4 md:p-6 space-y-6">
-            {/* Title */}
+            {/* Judul */}
             <div>
                 <h1 className="text-2xl md:text-3xl font-bold">Superadmin Dashboard</h1>
                 <p className="text-sm opacity-70">
@@ -391,7 +464,7 @@ export default function SuperadminDashboard() {
                 </p>
             </div>
 
-            {/* Filters */}
+            {/* Filter */}
             <div className="grid grid-cols-1 md:grid-cols-6 gap-2">
                 <div className="tooltip tooltip-top" data-tip="Regional" title="Regional">
                     <SelectTop
@@ -404,13 +477,13 @@ export default function SuperadminDashboard() {
                         isSearchable
                     />
                 </div>
-                <div className="tooltip tooltip-top" data-tip="Division" title="Division">
+                <div className="tooltip tooltip-top" data-tip="Divisi" title="Divisi">
                     <SelectTop
                         className="w-full"
                         options={divisionOptions}
                         value={divisionSel}
                         onChange={setDivisionSel}
-                        placeholder="Division"
+                        placeholder="Divisi"
                         isClearable
                         isSearchable
                     />
@@ -437,13 +510,13 @@ export default function SuperadminDashboard() {
                         isSearchable
                     />
                 </div>
-                <div className="tooltip tooltip-top" data-tip="Level" title="Level">
+                <div className="tooltip tooltip-top" data-tip="Jenjang" title="Jenjang">
                     <SelectTop
                         className="w-full"
                         options={levelOptions}
                         value={levelSel}
                         onChange={setLevelSel}
-                        placeholder="Level"
+                        placeholder="Jenjang"
                         isClearable
                         isSearchable
                     />
@@ -461,12 +534,12 @@ export default function SuperadminDashboard() {
                 </div>
             </div>
 
-            {/* Summary cards */}
+            {/* Kartu ringkas */}
             <div className="grid grid-cols-2 md:grid-cols-6 gap-3 md:gap-4">
                 {!summary
                     ? Array.from({ length: 6 }).map((_, i) => (
                           <div key={i} className="card bg-base-100 border rounded-2xl shadow-sm">
-                              <div className="card-body p-4">
+                              <div className="card-body p-4 min-h-[88px] justify-center">
                                   <div className="skeleton h-3 w-24 mb-3"></div>
                                   <div className="skeleton h-6 w-20"></div>
                               </div>
@@ -489,10 +562,6 @@ export default function SuperadminDashboard() {
                 {/* Realisasi */}
                 <div className="card bg-base-100 border rounded-2xl shadow-sm">
                     <div className="card-body p-4 md:p-5">
-                        <div className="flex items-center justify-between gap-2">
-                            <h2 className="card-title text-base md:text-lg">Realisasi</h2>
-                        </div>
-
                         {!kpi ? (
                             <div className="skeleton h-56 w-full rounded-xl" />
                         ) : (
@@ -501,16 +570,18 @@ export default function SuperadminDashboard() {
                                     <ResponsiveContainer width="100%" height="100%">
                                         <PieChart>
                                             <Pie
-                                                data={pieData}
+                                                data={[
+                                                    { name: "Tersertifikasi", value: real.active },
+                                                    { name: "Tidak bersertifikat", value: real.nonActive },
+                                                ]}
                                                 dataKey="value"
                                                 nameKey="name"
                                                 innerRadius={55}
                                                 outerRadius={85}
                                                 label
                                             >
-                                                {pieData.map((_, i) => (
-                                                    <Cell key={i} fill={i === 0 ? "#16a34a" : "#ef4444"} />
-                                                ))}
+                                                <Cell fill="#16a34a" />
+                                                <Cell fill="#ef4444" />
                                             </Pie>
                                             <ReTooltip />
                                         </PieChart>
@@ -533,7 +604,7 @@ export default function SuperadminDashboard() {
                                             className="inline-block w-3 h-3 rounded-sm"
                                             style={{ background: "#ef4444" }}
                                         />
-                                        <span>Tidak bersertif</span>
+                                        <span>Tidak bersertifikat</span>
                                         <span className="font-semibold ml-auto">{real.nonActive}</span>
                                     </div>
                                     <div className="pt-2 text-xs opacity-70">Total populasi: {real.total}</div>
@@ -571,13 +642,13 @@ export default function SuperadminDashboard() {
                 </div>
             </div>
 
-            {/* Batches & Priority */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {/* Batches */}
-                <div className="card bg-base-100 border rounded-2xl shadow-sm lg:col-span-1">
+            {/* ====== 3 kolom: Berjalan | Selesai | Due+Kadaluarsa ====== */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                {/* Kolom 1 - ONGOING (pakai judul) */}
+                <div className="card bg-base-100 border rounded-2xl shadow-sm">
                     <div className="card-body p-4 md:p-5">
                         <div className="flex items-center justify-between">
-                            <h2 className="card-title text-base md:text-lg">Batch Berjalan (ONGOING)</h2>
+                            <h2 className="card-title text-base md:text-lg">Batch Berjalan</h2>
                         </div>
 
                         <div className="max-h-96 overflow-auto pr-1">
@@ -588,16 +659,22 @@ export default function SuperadminDashboard() {
                                     ))}
                                 </div>
                             ) : batches.length === 0 ? (
-                                <div className="text-sm opacity-70">Tidak ada batch ONGOING.</div>
+                                <div className="text-sm opacity-70">Tidak ada batch berjalan.</div>
                             ) : (
                                 <ul className="menu w-full">
                                     {batches.map((b) => {
-                                        const quota = Number(b.quota ?? 0);
-                                        const onrun = Number(b.onrun ?? b.registeredOrAttended ?? b.participants ?? 0);
-                                        const passed = Number(b.passed ?? 0);
-                                        const failed = Number(b.failed ?? 0);
-                                        const filled = onrun + passed + failed;
+                                        const quota = toNum(b.quota);
+                                        const filled = getFilledForBar(b);
                                         const chip = getRuleCode(b);
+
+                                        const passed = toNum(b.totalPassed ?? b.passed);
+                                        const total = toNum(
+                                            b.totalParticipants ?? b.participants ?? b.registeredOrAttended ?? b.onrun
+                                        );
+                                        const failedExplicit = toNum(b.totalFailed ?? b.failed);
+                                        const onrun = toNum(b.onrun ?? b.registeredOrAttended);
+                                        const failed =
+                                            failedExplicit > 0 ? failedExplicit : Math.max(total - passed - onrun, 0);
 
                                         return (
                                             <li key={b.id} className="!p-0">
@@ -617,6 +694,11 @@ export default function SuperadminDashboard() {
                                                         <div className="mt-1">
                                                             <QuotaBar filled={filled} quota={quota} />
                                                         </div>
+                                                        <div className="mt-1 text-[11px] opacity-70">
+                                                            Lulus: <span className="font-medium">{passed}</span> •
+                                                            Gagal: <span className="font-medium">{failed}</span> •
+                                                            Peserta: <span className="font-medium">{total}</span>
+                                                        </div>
                                                     </div>
                                                 </button>
                                             </li>
@@ -633,22 +715,95 @@ export default function SuperadminDashboard() {
                                     onClick={() => loadBatches(false)}
                                     disabled={loadingBatch}
                                 >
-                                    {loadingBatch ? "Loading..." : "Load more"}
+                                    {loadingBatch ? "Memuat..." : "Muat lebih banyak"}
                                 </button>
                             </div>
                         )}
                     </div>
                 </div>
 
-                {/* Right column: Due & Expired */}
+                {/* Kolom 2 - FINISHED (pakai judul) */}
+                <div className="card bg-base-100 border rounded-2xl shadow-sm">
+                    <div className="card-body p-4 md:p-5">
+                        <div className="flex items-center justify-between">
+                            <h2 className="card-title text-base md:text-lg">Batch Selesai</h2>
+                        </div>
+
+                        <div className="max-h-96 overflow-auto pr-1">
+                            {finishedBatches.length === 0 && loadingFinished ? (
+                                <div className="space-y-2">
+                                    {Array.from({ length: 4 }).map((_, i) => (
+                                        <div key={i} className="skeleton h-14 w-full rounded-xl" />
+                                    ))}
+                                </div>
+                            ) : finishedBatches.length === 0 ? (
+                                <div className="text-sm opacity-70">Belum ada batch selesai.</div>
+                            ) : (
+                                <ul className="menu w-full">
+                                    {finishedBatches.map((b) => {
+                                        const quota = toNum(b.quota);
+                                        const passed = toNum(b.totalPassed ?? b.passed);
+                                        const total = toNum(b.totalParticipants);
+                                        const failed = Math.max(total - passed, 0);
+                                        const filled = passed + failed;
+                                        const chip = getRuleCode(b);
+
+                                        return (
+                                            <li key={b.id} className="!p-0">
+                                                <button
+                                                    className="w-full text-left hover:bg-base-2 00 rounded-xl p-2"
+                                                    onClick={() => navigate(`/batch/${b.id}`)}
+                                                >
+                                                    <div className="min-w-0">
+                                                        <div className="font-medium truncate text-sm">
+                                                            {b.name || b.batchName}
+                                                        </div>
+                                                        <div className="text-[11px] opacity-70 truncate">
+                                                            {chip && chip !== "-" ? chip : b.type || "-"} •{" "}
+                                                            {b.startDate} – {b.endDate}
+                                                            {b.institutionName ? ` • ${b.institutionName}` : ""}
+                                                        </div>
+                                                        <div className="mt-1">
+                                                            <QuotaBar filled={filled} quota={quota} />
+                                                        </div>
+                                                        <div className="mt-1 text-[11px] opacity-70">
+                                                            Lulus: <span className="font-medium">{passed}</span> •
+                                                            Gagal: <span className="font-medium">{failed}</span> •
+                                                            Peserta: <span className="font-medium">{total}</span>
+                                                        </div>
+                                                    </div>
+                                                </button>
+                                            </li>
+                                        );
+                                    })}
+                                </ul>
+                            )}
+                        </div>
+
+                        {finishedHasMore && (
+                            <div className="pt-3">
+                                <button
+                                    className="btn btn-sm w-full"
+                                    onClick={() => loadFinishedBatches(false)}
+                                    disabled={loadingFinished}
+                                >
+                                    {loadingFinished ? "Memuat..." : "Muat lebih banyak"}
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* Kolom 3 - Due (atas) + Kadaluarsa (bawah) */}
                 <div className="flex flex-col gap-4">
-                    {/* DUE CARD */}
+                    {/* Due */}
                     <div className="card bg-base-100 border rounded-2xl shadow-sm">
                         <div className="card-body p-4 md:p-5">
                             <div className="flex items-center justify-between">
-                                <h2 className="card-title text-base md:text-lg text-amber-600">Due (Top 10)</h2>
+                                <h2 className="card-title text-base md:text-lg text-amber-600">
+                                    Jatuh Tempo (10 Teratas)
+                                </h2>
                             </div>
-
                             <div className="overflow-auto max-h-96">
                                 <table className="table table-xs md:table-sm">
                                     <thead>
@@ -683,7 +838,6 @@ export default function SuperadminDashboard() {
                                                     <tr
                                                         key={idx}
                                                         className="hover cursor-pointer"
-                                                        title="Buka detail"
                                                         onClick={(e) => {
                                                             e.preventDefault();
                                                             e.stopPropagation();
@@ -709,13 +863,14 @@ export default function SuperadminDashboard() {
                         </div>
                     </div>
 
-                    {/* EXPIRED CARD */}
+                    {/* Kadaluarsa */}
                     <div className="card bg-base-100 border rounded-2xl shadow-sm">
                         <div className="card-body p-4 md:p-5">
                             <div className="flex items-center justify-between">
-                                <h2 className="card-title text-base md:text-lg text-red-600">Expired (Top 10)</h2>
+                                <h2 className="card-title text-base md:text-lg text-red-600">
+                                    Kadaluarsa (10 Teratas)
+                                </h2>
                             </div>
-
                             <div className="overflow-auto max-h-96">
                                 <table className="table table-xs md:table-sm">
                                     <thead>
@@ -748,7 +903,6 @@ export default function SuperadminDashboard() {
                                                     <tr
                                                         key={idx}
                                                         className="hover cursor-pointer"
-                                                        title="Buka detail"
                                                         onClick={(e) => {
                                                             e.preventDefault();
                                                             e.stopPropagation();
@@ -772,6 +926,7 @@ export default function SuperadminDashboard() {
                     </div>
                 </div>
             </div>
+            {/* end 3 kolom */}
         </div>
     );
 }

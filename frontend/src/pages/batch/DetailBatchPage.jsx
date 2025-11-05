@@ -1,9 +1,9 @@
-// src/pages/batches/DetailBatchPage.jsx
 import { useEffect, useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import {
     fetchEmployeeBatchesPaged,
+    fetchEmployeeBatches, // untuk build opsi filter lengkap
     updateEmployeeBatchStatus,
     deleteEmployeeFromBatch,
     retryEmployeeBatch,
@@ -20,6 +20,7 @@ export default function DetailBatchPage() {
 
     const [batch, setBatch] = useState(null);
     const [participants, setParticipants] = useState([]);
+    const [allParticipants, setAllParticipants] = useState([]); // sumber opsi filter
     const [loading, setLoading] = useState(false);
 
     // pagination
@@ -35,6 +36,10 @@ export default function DetailBatchPage() {
     // filters (table)
     const [filterEmployee, setFilterEmployee] = useState(null);
     const [filterStatus, setFilterStatus] = useState(null);
+    const [filterRegional, setFilterRegional] = useState(null);
+    const [filterDivision, setFilterDivision] = useState(null);
+    const [filterUnit, setFilterUnit] = useState(null);
+    const [filterJob, setFilterJob] = useState(null);
 
     // kirim email
     const [sendingEmails, setSendingEmails] = useState(false);
@@ -56,8 +61,12 @@ export default function DetailBatchPage() {
                     batchId: id,
                     page: page - 1,
                     size: rowsPerPage,
-                    search: filterEmployee ? filterEmployee.label : null,
-                    status: filterStatus ? filterStatus.value : null,
+                    search: filterEmployee?.value ?? null, // NIP
+                    status: filterStatus?.value ?? null,
+                    regional: filterRegional?.value ?? null,
+                    division: filterDivision?.value ?? null,
+                    unit: filterUnit?.value ?? null,
+                    job: filterJob?.value ?? null,
                 }),
             ]);
             setBatch(batchData);
@@ -71,10 +80,24 @@ export default function DetailBatchPage() {
         }
     }
 
+    // load paged data saat param berubah
     useEffect(() => {
         loadData();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [id, page, rowsPerPage, filterEmployee, filterStatus]);
+    }, [id, page, rowsPerPage, filterEmployee, filterStatus, filterRegional, filterDivision, filterUnit, filterJob]);
+
+    // load SEMUA peserta utk build opsi filter (sekali saat batch id berubah)
+    useEffect(() => {
+        async function loadAll() {
+            try {
+                const arr = await fetchEmployeeBatches(id);
+                setAllParticipants(arr || []);
+            } catch {
+                // no-op
+            }
+        }
+        if (id) loadAll();
+    }, [id]);
 
     // ================== HANDLERS ==================
     async function handleUpdateStatus(pid, status) {
@@ -91,7 +114,7 @@ export default function DetailBatchPage() {
         try {
             await deleteEmployeeFromBatch(pid);
             toast.success("Peserta dihapus");
-            loadData(); // reload biar quota & total peserta update
+            loadData();
         } catch (e) {
             toast.error(e?.response?.data?.message || "Gagal hapus peserta");
         } finally {
@@ -109,7 +132,7 @@ export default function DetailBatchPage() {
         }
     }
 
-    // Kirim email (tanpa confirm, dipanggil dari modal)
+    // Kirim email
     async function doSendEmails() {
         try {
             if (!batch) return;
@@ -128,21 +151,44 @@ export default function DetailBatchPage() {
     // ================== FILTER OPTIONS ==================
     const employeeOptions = useMemo(
         () =>
-            participants.map((p) => ({
-                value: p.id,
-                label: `${p.employeeNip} - ${p.employeeName}`,
+            (allParticipants.length ? allParticipants : participants).map((p) => ({
+                // kirim NIP ke BE
+                value: p.employeeNip,
+                // label informatif
+                label: `${p.employeeNip} - ${p.employeeName}${p.employeeJobName ? ` (${p.employeeJobName})` : ""}`,
             })),
-        [participants]
+        [allParticipants, participants]
     );
+
+    const buildOptions = (arr) =>
+        Array.from(new Set(arr.filter(Boolean)))
+            .sort()
+            .map((name) => ({ value: name, label: name }));
+
+    const regionalOptions = useMemo(
+        () => buildOptions(allParticipants.map((p) => p.employeeRegionalName)),
+        [allParticipants]
+    );
+    const divisionOptions = useMemo(
+        () => buildOptions(allParticipants.map((p) => p.employeeDivisionName)),
+        [allParticipants]
+    );
+    const unitOptions = useMemo(() => buildOptions(allParticipants.map((p) => p.employeeUnitName)), [allParticipants]);
+    const jobOptions = useMemo(() => buildOptions(allParticipants.map((p) => p.employeeJobName)), [allParticipants]);
 
     function resetFilter() {
         setFilterEmployee(null);
         setFilterStatus(null);
+        setFilterRegional(null);
+        setFilterDivision(null);
+        setFilterUnit(null);
+        setFilterJob(null);
         setPage(1);
         toast.success("Filter direset");
     }
 
     const startIdx = totalElements === 0 ? 0 : (page - 1) * rowsPerPage + 1;
+    const TABLE_COLSPAN = 9;
 
     // ================== RENDER ==================
     return (
@@ -216,61 +262,116 @@ export default function DetailBatchPage() {
                     </div>
                 </div>
             )}
-
-            {/* Filters + Actions */}
-            <div className="mb-4 space-y-3">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 text-xs">
-                    <Select
-                        options={employeeOptions}
-                        value={filterEmployee}
-                        onChange={setFilterEmployee}
-                        placeholder="Filter Nama/NIP"
-                        isClearable
-                    />
-                    <Select
-                        options={statusOptions}
-                        value={filterStatus}
-                        onChange={setFilterStatus}
-                        placeholder="Filter Status"
-                        isClearable
-                    />
-                    <div className="col-span-1">
-                        <button className="btn btn-accent btn-soft border-accent btn-sm w-full" onClick={resetFilter}>
-                            Clear Filter
-                        </button>
-                    </div>
-                    <div className="col-span-1"></div>
-                    <div className="col-span-1">
-                        <button
-                            className="btn btn-primary btn-sm w-full flex items-center gap-1"
-                            onClick={() => setOpenAdd(true)}
-                        >
-                            <Plus className="w-4 h-4" />
-                            Tambah Peserta
-                        </button>
-                    </div>
-                    <div className="col-span-1">
-                        <button
-                            className="btn btn-success btn-sm w-full flex items-center gap-1 disabled:opacity-60"
-                            onClick={() => setConfirmSend(true)}
-                            disabled={sendingEmails || !batch}
-                        >
-                            <Send className="w-4 h-4" />
-                            Kirim Email ke Peserta
-                        </button>
-                    </div>
+            {/* Actions (match ukuran filter: 6 kolom, tiap item col-span-1) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-6 gap-3 items-center">
+                {/* kolom 1 */}
+                <div className="col-span-1">
+                    <button
+                        className="btn btn-primary btn-sm w-full flex items-center gap-1"
+                        onClick={() => setOpenAdd(true)}
+                    >
+                        <Plus className="w-4 h-4" />
+                        Tambah Peserta
+                    </button>
                 </div>
+
+                {/* kolom 2 */}
+                <div className="col-span-1">
+                    <button
+                        className="btn btn-success btn-sm w-full flex items-center gap-1 disabled:opacity-60"
+                        onClick={() => setConfirmSend(true)}
+                        disabled={sendingEmails || !batch}
+                    >
+                        <Send className="w-4 h-4" />
+                        Kirim Email ke Peserta
+                    </button>
+                </div>
+
+                {/* kolom 6 (kolom 3–5 kosong otomatis) */}
+                <div className="col-span-1 xl:col-start-6">
+                    <button className="btn btn-accent btn-soft border-accent btn-sm w-full" onClick={resetFilter}>
+                        Clear Filter
+                    </button>
+                </div>
+            </div>
+
+            {/* Filters Row (Clear Filter sebaris dengan filter) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-6 gap-3 text-xs items-end">
+                <Select
+                    options={employeeOptions}
+                    value={filterEmployee}
+                    onChange={(opt) => {
+                        setFilterEmployee(opt);
+                        setPage(1);
+                    }}
+                    placeholder="Filter Nama/NIP"
+                    isClearable
+                />
+                <Select
+                    options={statusOptions}
+                    value={filterStatus}
+                    onChange={(opt) => {
+                        setFilterStatus(opt);
+                        setPage(1);
+                    }}
+                    placeholder="Filter Status"
+                    isClearable
+                />
+                <Select
+                    options={regionalOptions}
+                    value={filterRegional}
+                    onChange={(opt) => {
+                        setFilterRegional(opt);
+                        setPage(1);
+                    }}
+                    placeholder="Filter Regional"
+                    isClearable
+                />
+                <Select
+                    options={divisionOptions}
+                    value={filterDivision}
+                    onChange={(opt) => {
+                        setFilterDivision(opt);
+                        setPage(1);
+                    }}
+                    placeholder="Filter Division"
+                    isClearable
+                />
+                <Select
+                    options={unitOptions}
+                    value={filterUnit}
+                    onChange={(opt) => {
+                        setFilterUnit(opt);
+                        setPage(1);
+                    }}
+                    placeholder="Filter Unit"
+                    isClearable
+                />
+                <Select
+                    options={jobOptions}
+                    value={filterJob}
+                    onChange={(opt) => {
+                        setFilterJob(opt);
+                        setPage(1);
+                    }}
+                    placeholder="Filter Job Position"
+                    isClearable
+                />
             </div>
 
             {/* Participants Table */}
             <div className="card bg-base-100 shadow border border-gray-200">
-                <div className="card-body p-0">
+                <div className="card-body p-0 overflow-x-auto">
                     <table className="table table-zebra text-sm">
                         <thead className="bg-base-200">
                             <tr>
                                 <th>No</th>
                                 <th>NIP</th>
                                 <th>Nama</th>
+                                <th>Regional</th>
+                                <th>Divisi</th>
+                                <th>Unit</th>
+                                <th>Jabatan</th>
                                 <th>Status</th>
                                 <th className="text-center">Aksi</th>
                             </tr>
@@ -278,13 +379,13 @@ export default function DetailBatchPage() {
                         <tbody>
                             {loading ? (
                                 <tr>
-                                    <td colSpan={5} className="text-center py-10">
+                                    <td colSpan={TABLE_COLSPAN} className="text-center py-10">
                                         <span className="loading loading-dots loading-md" />
                                     </td>
                                 </tr>
                             ) : participants.length === 0 ? (
                                 <tr>
-                                    <td colSpan={5} className="text-center text-gray-400 py-10">
+                                    <td colSpan={TABLE_COLSPAN} className="text-center text-gray-400 py-10">
                                         Tidak ada peserta
                                     </td>
                                 </tr>
@@ -294,6 +395,10 @@ export default function DetailBatchPage() {
                                         <td>{startIdx + idx}</td>
                                         <td>{p.employeeNip}</td>
                                         <td>{p.employeeName}</td>
+                                        <td>{p.employeeRegionalName ?? "-"}</td>
+                                        <td>{p.employeeDivisionName ?? "-"}</td>
+                                        <td>{p.employeeUnitName ?? "-"}</td>
+                                        <td>{p.employeeJobName ?? "-"}</td>
                                         <td>
                                             <span
                                                 className={`badge badge-sm text-white ${

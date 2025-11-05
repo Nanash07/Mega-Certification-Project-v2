@@ -1,4 +1,3 @@
-// src/main/java/com/bankmega/certification/repository/EmployeeBatchRepository.java
 package com.bankmega.certification.repository;
 
 import com.bankmega.certification.entity.Batch;
@@ -11,6 +10,7 @@ import java.util.Optional;
 
 public interface EmployeeBatchRepository
         extends JpaRepository<EmployeeBatch, Long>, JpaSpecificationExecutor<EmployeeBatch> {
+
     List<EmployeeBatch> findByBatch_IdAndDeletedAtIsNull(Long batchId);
 
     Optional<EmployeeBatch> findByIdAndDeletedAtIsNull(Long id);

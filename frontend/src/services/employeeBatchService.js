@@ -1,4 +1,3 @@
-// src/services/employeeBatchService.js
 import api from "./api";
 
 const BASE = "/employee-batches";
@@ -15,11 +14,25 @@ export async function fetchEmployeeBatches(batchId) {
 }
 
 // Get peserta by batch (with paging → return page object)
-export async function fetchEmployeeBatchesPaged({ batchId, page = 0, size = 10, search, status }) {
+export async function fetchEmployeeBatchesPaged({
+    batchId,
+    page = 0,
+    size = 10,
+    search,
+    status,
+    regional, // NEW
+    division, // NEW
+    unit, // NEW
+    job, // NEW
+}) {
     try {
         const params = { page, size };
         if (search) params.search = search;
         if (status) params.status = status;
+        if (regional) params.regional = regional; // NEW
+        if (division) params.division = division; // NEW
+        if (unit) params.unit = unit; // NEW
+        if (job) params.job = job; // NEW
 
         const { data } = await api.get(`${BASE}/batch/${batchId}/paged`, { params });
         return data; // { content, totalPages, totalElements, ... }
@@ -29,7 +42,7 @@ export async function fetchEmployeeBatchesPaged({ batchId, page = 0, size = 10, 
     }
 }
 
-// Tambah peserta (single) - auto restore jika soft-deleted (handled by BE)
+// Tambah peserta (single)
 export async function addEmployeeToBatch(batchId, employeeId) {
     try {
         const { data } = await api.post(`${BASE}/batch/${batchId}/employee/${employeeId}`);
@@ -40,7 +53,7 @@ export async function addEmployeeToBatch(batchId, employeeId) {
     }
 }
 
-// Tambah peserta (bulk) - auto restore jika soft-deleted (handled by BE)
+// Tambah peserta (bulk)
 export async function addEmployeesToBatchBulk(batchId, employeeIds) {
     try {
         const { data } = await api.post(`${BASE}/batch/${batchId}/employees/bulk`, employeeIds);
@@ -75,7 +88,7 @@ export async function retryEmployeeBatch(id) {
     }
 }
 
-// Delete peserta (hanya boleh REGISTERED - enforced by BE)
+// Delete peserta
 export async function deleteEmployeeFromBatch(id) {
     try {
         await api.delete(`${BASE}/${id}`);

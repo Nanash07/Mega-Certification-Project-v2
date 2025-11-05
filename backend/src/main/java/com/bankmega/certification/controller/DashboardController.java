@@ -3,7 +3,6 @@ package com.bankmega.certification.controller;
 import com.bankmega.certification.dto.dashboard.*;
 import com.bankmega.certification.entity.PicCertificationScope;
 import com.bankmega.certification.repository.PicCertificationScopeRepository;
-import com.bankmega.certification.repository.UserRepository;
 import com.bankmega.certification.service.DashboardService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
@@ -23,7 +22,6 @@ public class DashboardController {
 
     private final DashboardService svc;
     private final PicCertificationScopeRepository scopeRepo;
-    private final UserRepository userRepo;
 
     /* ================= helpers ================= */
 
@@ -40,18 +38,15 @@ public class DashboardController {
                 .build();
     }
 
-    /** true kalau authority mengandung ROLE_PIC / PIC (lebih toleran) */
+    /** true kalau authority mengandung ROLE_PIC / PIC */
     private boolean isPic(Authentication auth) {
         return auth != null && auth.getAuthorities().stream().anyMatch(a -> {
-            String r = String.valueOf(a.getAuthority()).toUpperCase();
-            return r.equals("PIC") || r.equals("ROLE_PIC") || r.contains("PIC");
+            String r = a.getAuthority();
+            return "PIC".equalsIgnoreCase(r) || "ROLE_PIC".equalsIgnoreCase(r);
         });
     }
 
-    /**
-     * ambil userId dari principal (mendukung CustomUserDetails#getId; fallback
-     * username -> repo)
-     */
+    /** ambil userId dari principal (mendukung CustomUserDetails#getId) */
     private Long extractUserId(Authentication auth, Long injectedUserId) {
         if (injectedUserId != null)
             return injectedUserId;
@@ -59,7 +54,6 @@ public class DashboardController {
             return null;
 
         Object principal = auth.getPrincipal();
-        // coba panggil getId() via refleksi kalau ada
         try {
             Method m = principal.getClass().getMethod("getId");
             Object v = m.invoke(principal);
@@ -67,17 +61,6 @@ public class DashboardController {
                 return ((Number) v).longValue();
         } catch (Exception ignore) {
             /* fallthrough */ }
-
-        // fallback: cari dari username
-        try {
-            String uname = auth.getName();
-            if (uname != null && !"anonymousUser".equalsIgnoreCase(uname)) {
-                return userRepo.findByUsername(uname).map(u -> u.getId()).orElse(null);
-            }
-        } catch (Exception ignore) {
-            /* fallthrough */ }
-
-        // fallback tidak ada: biarkan null
         return null;
     }
 
@@ -88,9 +71,9 @@ public class DashboardController {
 
         Long uid = extractUserId(auth, userIdFromPrincipal);
         if (uid == null) {
-            // tidak bisa identifikasi user; amankan dengan scope kosong (akan jadi 1=0 di
-            // repo)
-            f.setAllowedCertificationIds(Collections.emptyList());
+            // tidak bisa identifikasi user; amankan: hasil harus kosong
+            f.setAllowedCertificationIds(List.of(-1L));
+            f.setCertificationId(null);
             return f;
         }
 
@@ -99,10 +82,16 @@ public class DashboardController {
                 .map(c -> c.getId())
                 .collect(Collectors.toList());
 
+        // kalau scope kosong → sentinel -1 supaya query menghasilkan nol baris
+        if (allowed == null || allowed.isEmpty()) {
+            f.setAllowedCertificationIds(List.of(-1L));
+            f.setCertificationId(null);
+            return f;
+        }
+
         f.setAllowedCertificationIds(allowed);
 
-        // Kalau client sengaja set certificationId yang tidak termasuk scope →
-        // kosongkan
+        // Kalau client set certificationId yang tidak termasuk scope → kosongkan
         if (f.getCertificationId() != null && !allowed.contains(f.getCertificationId())) {
             f.setCertificationId(null);
         }
@@ -120,8 +109,7 @@ public class DashboardController {
             @RequestParam(required = false) Long levelId,
             @RequestParam(required = false) Long subFieldId,
             Authentication auth,
-            @AuthenticationPrincipal(expression = "id") Long userId // optional, kalau principal punya getId()
-    ) {
+            @AuthenticationPrincipal(expression = "id") Long userId) {
         DashboardFilters f = toFilters(regionalId, divisionId, unitId, certificationId, levelId, subFieldId, null);
         f = applyPicScope(f, auth, userId);
         return svc.getSummary(f);
@@ -179,13 +167,14 @@ public class DashboardController {
             @AuthenticationPrincipal(expression = "id") Long userId) {
         FiltersResponse res = svc.getFilters();
 
-        // batasi daftar sertifikasi di response untuk PIC
+        // Batasi daftar sertifikasi di response untuk PIC
         if (isPic(auth)) {
             Long uid = extractUserId(auth, userId);
             if (uid != null) {
                 List<Long> allowed = scopeRepo.findByUser_Id(uid).stream()
                         .map(s -> s.getCertification().getId())
                         .toList();
+                // kalau kosong → kosongkan (FE akan menampilkan banner)
                 res.setCertifications(
                         res.getCertifications().stream()
                                 .filter(c -> allowed.contains(c.getId()))

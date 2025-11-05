@@ -29,13 +29,27 @@ public class EmployeeBatchService {
 
     // ================== MAPPER ==================
     private EmployeeBatchResponse toResponse(EmployeeBatch eb) {
+        Employee emp = eb.getEmployee();
+
+        JobPosition jp = (emp != null) ? emp.getJobPosition() : null;
+        Division div = (emp != null) ? emp.getDivision() : null;
+        Regional reg = (emp != null) ? emp.getRegional() : null;
+        Unit unit = (emp != null) ? emp.getUnit() : null;
+
         return EmployeeBatchResponse.builder()
                 .id(eb.getId())
-                .employeeId(eb.getEmployee().getId())
-                .employeeNip(eb.getEmployee().getNip())
-                .employeeName(eb.getEmployee().getName())
-                .batchId(eb.getBatch().getId())
-                .batchName(eb.getBatch().getBatchName())
+                .employeeId(emp != null ? emp.getId() : null)
+                .employeeNip(emp != null ? emp.getNip() : null)
+                .employeeName(emp != null ? emp.getName() : null)
+
+                // ✅ NEW: struktur org
+                .employeeJobName(jp != null ? jp.getName() : null)
+                .employeeDivisionName(div != null ? div.getName() : null)
+                .employeeRegionalName(reg != null ? reg.getName() : null)
+                .employeeUnitName(unit != null ? unit.getName() : null)
+
+                .batchId(eb.getBatch() != null ? eb.getBatch().getId() : null)
+                .batchName(eb.getBatch() != null ? eb.getBatch().getBatchName() : null)
                 .status(eb.getStatus())
                 .registrationDate(eb.getRegistrationDate())
                 .attendedAt(eb.getAttendedAt())
@@ -70,7 +84,11 @@ public class EmployeeBatchService {
     // ================== LIST ==================
     @Transactional(readOnly = true)
     public List<EmployeeBatchResponse> getByBatch(Long batchId) {
-        return repo.findByBatch_IdAndDeletedAtIsNull(batchId)
+        Specification<EmployeeBatch> spec = EmployeeBatchSpecification.notDeleted()
+                .and(EmployeeBatchSpecification.byBatch(batchId))
+                .and(EmployeeBatchSpecification.withOrgFetch()); // ✅ hindari N+1
+
+        return repo.findAll(spec, Sort.by(Sort.Order.asc("employee.nip")))
                 .stream()
                 .map(this::toResponse)
                 .toList();
@@ -82,11 +100,21 @@ public class EmployeeBatchService {
             Long batchId,
             String search,
             EmployeeBatch.Status status,
+            String regional, // ✅ NEW
+            String division, // ✅ NEW
+            String unit, // ✅ NEW
+            String job, // ✅ NEW
             Pageable pageable) {
+
         Specification<EmployeeBatch> spec = EmployeeBatchSpecification.notDeleted()
                 .and(EmployeeBatchSpecification.byBatch(batchId))
                 .and(EmployeeBatchSpecification.byStatus(status))
-                .and(EmployeeBatchSpecification.bySearch(search));
+                .and(EmployeeBatchSpecification.bySearch(search))
+                .and(EmployeeBatchSpecification.byRegionalName(regional)) // ✅
+                .and(EmployeeBatchSpecification.byDivisionName(division)) // ✅
+                .and(EmployeeBatchSpecification.byUnitName(unit)) // ✅
+                .and(EmployeeBatchSpecification.byJobName(job)) // ✅
+                .and(EmployeeBatchSpecification.withOrgFetch()); // ✅ anti N+1
 
         if (pageable.getSort().isUnsorted()) {
             pageable = PageRequest.of(
@@ -115,7 +143,6 @@ public class EmployeeBatchService {
         return repo.findByBatch_IdAndEmployee_Id(batchId, employeeId)
                 .map(eb -> {
                     if (eb.getDeletedAt() == null) {
-                        // sudah aktif
                         throw new IllegalStateException("Peserta sudah ada di batch ini");
                     }
                     // 🔁 restore
@@ -162,7 +189,6 @@ public class EmployeeBatchService {
             Employee emp = employeeRepo.findByIdAndDeletedAtIsNull(empId)
                     .orElseThrow(() -> new NotFoundException("Employee not found"));
 
-            // cek termasuk soft-deleted
             var existingOpt = repo.findByBatch_IdAndEmployee_Id(batchId, empId);
             if (existingOpt.isPresent()) {
                 EmployeeBatch eb = existingOpt.get();
@@ -261,7 +287,7 @@ public class EmployeeBatchService {
         eb.setAttendedAt(null);
         eb.setResultDate(null);
         eb.setScore(null);
-        // eb.setNotes(null); // opsional: reset catatan
+        // eb.setNotes(null); // opsional
         eb.setUpdatedAt(Instant.now());
 
         return toResponse(repo.save(eb));
@@ -279,7 +305,6 @@ public class EmployeeBatchService {
                 .orElse(null);
 
         boolean isNew = false;
-        // Pakai tanggal hasil terbaru sebagai certDate
         LocalDate passDate = eb.getResultDate() != null ? eb.getResultDate() : LocalDate.now();
 
         if (ec == null) {
@@ -290,7 +315,6 @@ public class EmployeeBatchService {
                     .certDate(passDate)
                     .processType(EmployeeCertification.ProcessType.SERTIFIKASI)
                     .status(EmployeeCertification.Status.PENDING)
-                    // snapshot rule saat create
                     .ruleValidityMonths(rule != null ? rule.getValidityMonths() : null)
                     .ruleReminderMonths(rule != null ? rule.getReminderMonths() : null)
                     .createdAt(Instant.now())
@@ -298,14 +322,12 @@ public class EmployeeBatchService {
                     .build();
             isNew = true;
         } else {
-            // update attempt terbaru
             ec.setCertDate(passDate);
             ec.setUpdatedAt(Instant.now());
             ec.setStatus((ec.getCertNumber() == null || ec.getCertNumber().isBlank())
                     ? EmployeeCertification.Status.PENDING
                     : EmployeeCertification.Status.ACTIVE);
 
-            // pastikan snapshot ada
             if (ec.getRuleValidityMonths() == null && rule != null) {
                 ec.setRuleValidityMonths(rule.getValidityMonths());
             }
@@ -314,7 +336,6 @@ public class EmployeeBatchService {
             }
         }
 
-        // Hitung validity + reminder (lifetime kalau validity null)
         if (ec.getCertDate() != null) {
             ec.setValidFrom(ec.getCertDate());
 
@@ -326,7 +347,7 @@ public class EmployeeBatchService {
             if (v != null) {
                 ec.setValidUntil(ec.getCertDate().plusMonths(v));
             } else {
-                ec.setValidUntil(null); // non-expiring
+                ec.setValidUntil(null);
             }
 
             if (ec.getValidUntil() != null && r != null) {

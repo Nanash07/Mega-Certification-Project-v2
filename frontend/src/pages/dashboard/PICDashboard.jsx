@@ -1,3 +1,4 @@
+// src/pages/dashboard/PicDashboard.jsx
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Select from "react-select";
@@ -37,6 +38,7 @@ function getRuleCode(row) {
     if (pre && String(pre).trim() !== "") return pre;
 
     const code = row?.certificationCode ?? row?.certification?.code ?? row?.certification_code ?? row?.code ?? "";
+
     const level =
         row?.certificationLevelLevel ??
         row?.certificationLevel?.level ??
@@ -45,6 +47,7 @@ function getRuleCode(row) {
         null;
 
     const sub = row?.subFieldCode ?? row?.subfieldCode ?? row?.sub_field_code ?? row?.subField?.code ?? "";
+
     const parts = [code || null, level != null ? String(level) : null, sub || null].filter(Boolean);
     if (parts.length) return parts.join("-");
     if (row?.rule && String(row.rule).trim() !== "") return row.rule;
@@ -55,12 +58,44 @@ function getDeadline(row) {
     return toDate(row?.dueDate) || toDate(row?.validUntil) || toDate(row?.reminderDate) || null;
 }
 
-/* ===== small components (sama gaya superadmin) ===== */
+/** Path ke halaman yang ADA di Sidebar */
+function getPriorityPath(row) {
+    const nip = row?.nip || "";
+    const rule = getRuleCode(row);
+    if (row?.eligibilityId) {
+        return `/employee/eligibility?nip=${encodeURIComponent(nip)}&rule=${encodeURIComponent(rule)}`;
+    }
+    return `/employee/certification?nip=${encodeURIComponent(nip)}&rule=${encodeURIComponent(rule)}`;
+}
+
+/** Build query string dari filter */
+function buildQueryFromFilters(f) {
+    const params = new URLSearchParams();
+    if (f.regionalId) params.set("regionalId", f.regionalId);
+    if (f.divisionId) params.set("divisionId", f.divisionId);
+    if (f.unitId) params.set("unitId", f.unitId);
+    if (f.certificationId) params.set("certificationId", f.certificationId);
+    if (f.levelId) params.set("levelId", f.levelId);
+    if (f.subFieldId) params.set("subFieldId", f.subFieldId);
+    return params.toString();
+}
+
+/* React-Select helper biar menu gak ketutup */
+function SelectTop(props) {
+    return (
+        <Select
+            {...props}
+            menuPortalTarget={typeof document !== "undefined" ? document.body : null}
+            menuPosition="fixed"
+        />
+    );
+}
+
+/* ===== small components (tooltip & size sama Superadmin) ===== */
 function MiniCard({ label, value, sub, onClick, tip }) {
     return (
-        <div className="w-full">
+        <div className="tooltip tooltip-top w-full" data-tip={tip || label} title={tip || label}>
             <button
-                title={tip || label}
                 onClick={onClick}
                 className="rounded-2xl border border-base-200 bg-base-100 p-3 w-full text-left transition hover:shadow cursor-pointer min-h-[88px]"
             >
@@ -72,20 +107,35 @@ function MiniCard({ label, value, sub, onClick, tip }) {
     );
 }
 
-function QuotaBar({ filled = 0, quota = 0 }) {
-    const f = Number(filled) || 0;
-    const q = Number(quota) || 0;
-    const pct = q > 0 ? Math.min(100, Math.round((f * 100) / q)) : 0;
-    const isFull = q > 0 && f >= q;
+/** QuotaBar: teks gelap tunggal, tooltip DaisyUI */
+function QuotaBar({ filled = 0, quota = 0, className }) {
+    const f = Math.max(0, Number(filled) || 0);
+    const q = Math.max(0, Number(quota) || 0);
 
-    if (q <= 0) return <div className="text-[10px] opacity-70">Terisi: {f} (tanpa kuota)</div>;
+    if (q === 0) {
+        return <div className={`text-[10px] opacity-70 ${className || ""}`}>Terisi: {f} (tanpa kuota)</div>;
+    }
+
+    const pct = Math.min(100, Math.round((f / q) * 100));
+    const isFull = f >= q;
+    const label = `${f}/${q} (${pct}%)`;
 
     return (
-        <div title={`${f}/${q} (${pct}%)`}>
+        <div
+            className={`tooltip tooltip-top w-full ${className || ""}`}
+            data-tip={label}
+            title={label}
+            aria-label={`Kuota ${label}`}
+        >
             <div className="relative w-full h-3 rounded-full bg-base-200 overflow-hidden">
-                <div className={`h-full ${isFull ? "bg-success" : "bg-warning"}`} style={{ width: `${pct}%` }} />
-                <div className="absolute inset-0 flex items-center justify-center text-[10px] font-medium text-white">
-                    {f}/{q} ({pct}%)
+                {pct > 0 && (
+                    <div
+                        className={`absolute left-0 top-0 h-full rounded-full ${isFull ? "bg-success" : "bg-warning"}`}
+                        style={{ width: `${pct}%` }}
+                    />
+                )}
+                <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="text-[10px] font-medium text-base-content/80">{label}</span>
                 </div>
             </div>
         </div>
@@ -116,7 +166,7 @@ export default function PicDashboard() {
     })();
     const userId = userRaw?.id ?? userRaw?.userId ?? userRaw?.uid ?? window.__USER?.id ?? null;
 
-    // ===== 6 filters =====
+    // ===== 6 filter =====
     const [regionalSel, setRegionalSel] = useState(null);
     const [divisionSel, setDivisionSel] = useState(null);
     const [unitSel, setUnitSel] = useState(null);
@@ -135,7 +185,7 @@ export default function PicDashboard() {
     // scope ready flag → cegah request tanpa certificationId
     const [scopeReady, setScopeReady] = useState(false);
 
-    // ===== summary/kpi/priority =====
+    // ===== ringkasan/kpi/prioritas =====
     const [summary, setSummary] = useState(null);
     const [kpi, setKpi] = useState(null);
     const [computedAt, setComputedAt] = useState(null);
@@ -144,13 +194,13 @@ export default function PicDashboard() {
     const [expiredList, setExpiredList] = useState([]);
     const [loadingAlert, setLoadingAlert] = useState(true);
 
-    // ===== batches =====
+    // ===== batch =====
     const [batches, setBatches] = useState([]);
     const [batchPage, setBatchPage] = useState(0);
     const [batchHasMore, setBatchHasMore] = useState(true);
     const [loadingBatch, setLoadingBatch] = useState(false);
 
-    // ===== monthly =====
+    // ===== bulanan =====
     const nowYear = new Date().getFullYear();
     const yearOptions = Array.from({ length: 6 }).map((_, i) => ({ value: nowYear - i, label: String(nowYear - i) }));
     const [year, setYear] = useState(yearOptions[0]);
@@ -167,7 +217,7 @@ export default function PicDashboard() {
             }
             try {
                 const { data } = await api.get("/divisions", { params: { page: 0, size: 1000, sort: "name,asc" } });
-                setDivisionOptions(toOptions(data, (d) => d?.name || d?.code || `Division #${d?.id}`));
+                setDivisionOptions(toOptions(data, (d) => d?.name || d?.code || `Divisi #${d?.id}`));
             } catch {
                 setDivisionOptions([]);
             }
@@ -184,11 +234,10 @@ export default function PicDashboard() {
                     const scope = await fetchPicScope(userId);
                     const opts = (scope?.certifications || []).map((s) => ({
                         value: s.certificationId,
-                        label: s.certificationCode || `CERT-${s.certificationId}`,
+                        label: s.certificationCode || `SERT-${s.certificationId}`,
                         raw: s,
                     }));
                     setCertOptions(opts);
-                    // default = paling depan (kalau ada)
                     if (!certSel && opts.length > 0) setCertSel(opts[0]);
                 } else {
                     setCertOptions([]);
@@ -196,7 +245,6 @@ export default function PicDashboard() {
             } catch {
                 setCertOptions([]);
             } finally {
-                // scope dianggap ready meski kosong (BE akan limit dengan scope)
                 setScopeReady(true);
             }
 
@@ -222,17 +270,19 @@ export default function PicDashboard() {
 
     /* ===== helpers ===== */
     const params = () => {
-        // hard-guard: kalau ada scope options tapi belum ada certSel, pakai opsi[0]
+        // pastikan selalu ada certificationId dari scope PIC
         const certIdFallback = certSel?.value ?? (certOptions.length > 0 ? certOptions[0].value : undefined);
         return {
             regionalId: regionalSel?.value,
             divisionId: divisionSel?.value,
             unitId: unitSel?.value,
-            certificationId: certIdFallback, // kunci pembatas
+            certificationId: certIdFallback,
             levelId: levelSel?.value,
             subFieldId: subSel?.value,
         };
     };
+
+    const currentFilters = params;
 
     async function loadSummaryAndKpi() {
         const agg = await fetchDashboardAggregate({ ...params(), sections: "summary,kpi" });
@@ -282,10 +332,9 @@ export default function PicDashboard() {
         setMonthly(data);
     }
 
-    // ⛔️ Jangan fetch sebelum scope PIC siap (agar tidak “kebuka” ke semua sertifikat)
+    // ⛔️ Jangan fetch sebelum scope PIC siap (biar data tetap terbatas sesuai scope)
     useEffect(() => {
         if (!scopeReady) return;
-        // kalau ada opsi scope tapi belum ada certSel, tunda sampai certSel kebentuk
         if (certOptions.length > 0 && !certSel) return;
 
         (async () => {
@@ -316,109 +365,169 @@ export default function PicDashboard() {
         return { active: activeOnly, nonActive, total, pct };
     }, [kpi]);
 
+    const pieData = useMemo(
+        () => [
+            { name: "Tersertifikasi", value: real.active },
+            { name: "Tidak bersertifikat", value: real.nonActive },
+        ],
+        [real]
+    );
+
+    // ======= Kartu ringkas (SAMA dengan Superadmin, plus link navigate) =======
+    const cardConfigs = useMemo(() => {
+        const q = buildQueryFromFilters(currentFilters());
+        return [
+            {
+                key: "employees",
+                label: "Jumlah Pegawai",
+                value: summary?.employees?.active,
+                tip: "Jumlah pegawai",
+                href: `/employee/data${q ? `?${q}` : ""}`,
+            },
+            {
+                key: "certified",
+                label: "Tersertifikasi",
+                value: Number(summary?.certifications?.active ?? 0),
+                sub:
+                    eligibleTotal > 0
+                        ? `${((Number(summary?.certifications?.active ?? 0) / eligibleTotal) * 100).toFixed(1)}%`
+                        : undefined,
+                tip: "Tersertifikasi",
+                href: `/employee/eligibility${q ? `?${q}` : ""}`,
+            },
+            {
+                key: "due",
+                label: "Jatuh Tempo",
+                value: summary?.certifications?.due,
+                tip: "Akan jatuh tempo",
+                href: `/employee/certification${q ? `?${q}&status=DUE` : "?status=DUE"}`,
+            },
+            {
+                key: "expired",
+                label: "Kadaluarsa",
+                value: summary?.certifications?.expired,
+                tip: "Sudah kadaluarsa",
+                href: `/employee/certification${q ? `?${q}&status=EXPIRED` : "?status=EXPIRED"}`,
+            },
+            {
+                key: "notyet",
+                label: "Belum Bersertifikat",
+                value: kpi?.notYetCertified ?? 0,
+                tip: "Belum bersertifikat",
+                href: `/employee/certification${q ? `?${q}&status=NOT_YET_CERTIFIED` : "?status=NOT_YET_CERTIFIED"}`,
+            },
+            {
+                key: "batches",
+                label: "Batch Berjalan",
+                value: summary?.batches?.ongoing ?? summary?.batchesOngoing ?? summary?.batchesCount ?? 0,
+                tip: "Batch yang sedang berjalan",
+                href: `/batch${q ? `?${q}&status=ONGOING` : "?status=ONGOING"}`,
+            },
+        ];
+    }, [summary, kpi, regionalSel, divisionSel, unitSel, certSel, levelSel, subSel, eligibleTotal]);
+
     /* ===== UI ===== */
     return (
         <div className="p-4 md:p-6 space-y-6">
-            {/* Title */}
+            {/* Judul */}
             <div>
-                <h1 className="text-2xl md:text-3xl font-bold">PIC Dashboard</h1>
+                <h1 className="text-2xl md:text-3xl font-bold">Dashboard PIC</h1>
                 <p className="text-sm opacity-70">
-                    Snapshot PIC{computedAt ? ` • ${new Date(computedAt).toLocaleString("id-ID")}` : ""}
+                    Ringkasan PIC{computedAt ? ` • ${new Date(computedAt).toLocaleString("id-ID")}` : ""}
                 </p>
             </div>
 
-            {/* Filters: 6 kolom persis */}
+            {/* Filter: 6 kolom + tooltip ala Superadmin */}
             <div className="grid grid-cols-1 md:grid-cols-6 gap-2">
-                <Select
-                    className="w-full"
-                    options={regionalOptions}
-                    value={regionalSel}
-                    onChange={setRegionalSel}
-                    placeholder="Regional"
-                    isClearable
-                    isSearchable
-                />
-                <Select
-                    className="w-full"
-                    options={divisionOptions}
-                    value={divisionSel}
-                    onChange={setDivisionSel}
-                    placeholder="Division"
-                    isClearable
-                    isSearchable
-                />
-                <Select
-                    className="w-full"
-                    options={unitOptions}
-                    value={unitSel}
-                    onChange={setUnitSel}
-                    placeholder="Unit"
-                    isClearable
-                    isSearchable
-                />
-                <Select
-                    className="w-full"
-                    options={certOptions}
-                    value={certSel}
-                    onChange={setCertSel}
-                    placeholder="Sertifikat (scope PIC)"
-                    isClearable={false}
-                    isSearchable
-                />
-                <Select
-                    className="w-full"
-                    options={levelOptions}
-                    value={levelSel}
-                    onChange={setLevelSel}
-                    placeholder="Level"
-                    isClearable
-                    isSearchable
-                />
-                <Select
-                    className="w-full"
-                    options={subFieldOptions}
-                    value={subSel}
-                    onChange={setSubSel}
-                    placeholder="Sub Bidang"
-                    isClearable
-                    isSearchable
-                />
+                <div className="tooltip tooltip-top" data-tip="Regional" title="Regional">
+                    <SelectTop
+                        className="w-full"
+                        options={regionalOptions}
+                        value={regionalSel}
+                        onChange={setRegionalSel}
+                        placeholder="Regional"
+                        isClearable
+                        isSearchable
+                    />
+                </div>
+                <div className="tooltip tooltip-top" data-tip="Divisi" title="Divisi">
+                    <SelectTop
+                        className="w-full"
+                        options={divisionOptions}
+                        value={divisionSel}
+                        onChange={setDivisionSel}
+                        placeholder="Divisi"
+                        isClearable
+                        isSearchable
+                    />
+                </div>
+                <div className="tooltip tooltip-top" data-tip="Unit" title="Unit">
+                    <SelectTop
+                        className="w-full"
+                        options={unitOptions}
+                        value={unitSel}
+                        onChange={setUnitSel}
+                        placeholder="Unit"
+                        isClearable
+                        isSearchable
+                    />
+                </div>
+                <div className="tooltip tooltip-top" data-tip="Sertifikat" title="Sertifikat">
+                    <SelectTop
+                        className="w-full"
+                        options={certOptions}
+                        value={certSel}
+                        onChange={setCertSel}
+                        placeholder="Sertifikat"
+                        isClearable={false}
+                        isSearchable
+                    />
+                </div>
+                <div className="tooltip tooltip-top" data-tip="Jenjang" title="Jenjang">
+                    <SelectTop
+                        className="w-full"
+                        options={levelOptions}
+                        value={levelSel}
+                        onChange={setLevelSel}
+                        placeholder="Jenjang"
+                        isClearable
+                        isSearchable
+                    />
+                </div>
+                <div className="tooltip tooltip-top" data-tip="Sub Bidang" title="Sub Bidang">
+                    <SelectTop
+                        className="w-full"
+                        options={subFieldOptions}
+                        value={subSel}
+                        onChange={setSubSel}
+                        placeholder="Sub Bidang"
+                        isClearable
+                        isSearchable
+                    />
+                </div>
             </div>
 
-            {/* Summary cards */}
+            {/* Summary cards (ukuran & konten sama) */}
             <div className="grid grid-cols-2 md:grid-cols-6 gap-3 md:gap-4">
                 {!summary
                     ? Array.from({ length: 6 }).map((_, i) => (
                           <div key={i} className="card bg-base-100 border rounded-2xl shadow-sm">
-                              <div className="card-body p-4">
+                              <div className="card-body p-4 min-h-[88px] justify-center">
                                   <div className="skeleton h-3 w-24 mb-3"></div>
                                   <div className="skeleton h-6 w-20"></div>
                               </div>
                           </div>
                       ))
-                    : [
-                          { label: "Jumlah Pegawai", value: summary.employees?.active, tip: "Pegawai aktif" },
-                          {
-                              label: "TTF Sertifikasi (eligibility)",
-                              value: Number(summary.certifications?.active ?? 0),
-                              sub:
-                                  eligibleTotal > 0
-                                      ? `${(
-                                            (Number(summary.certifications?.active ?? 0) / eligibleTotal) *
-                                            100
-                                        ).toFixed(1)}%`
-                                      : undefined,
-                              tip: "TTF (ACTIVE+DUE)",
-                          },
-                          { label: "Due", value: summary.certifications?.due, tip: "Akan jatuh tempo" },
-                          { label: "Expired", value: summary.certifications?.expired, tip: "Kadaluarsa" },
-                          { label: "Not Yet", value: kpi?.notYetCertified ?? 0, tip: "Belum sertif" },
-                          {
-                              label: "Batch Ongoing",
-                              value: summary.batches?.ongoing ?? summary.batchesOngoing ?? summary.batchesCount ?? 0,
-                              tip: "Batch berjalan",
-                          },
-                      ].map((c, i) => <MiniCard key={i} {...c} />)}
+                    : cardConfigs.map((c) => (
+                          <MiniCard
+                              key={c.key}
+                              label={c.label}
+                              value={c.value}
+                              sub={c.sub}
+                              tip={c.tip}
+                              onClick={() => navigate(c.href)}
+                          />
+                      ))}
             </div>
 
             {/* Realisasi & Bulanan */}
@@ -438,18 +547,16 @@ export default function PicDashboard() {
                                     <ResponsiveContainer width="100%" height="100%">
                                         <PieChart>
                                             <Pie
-                                                data={[
-                                                    { name: "Tersertifikasi", value: real.active },
-                                                    { name: "Tidak bersertif", value: real.nonActive },
-                                                ]}
+                                                data={pieData}
                                                 dataKey="value"
                                                 nameKey="name"
                                                 innerRadius={55}
                                                 outerRadius={85}
                                                 label
                                             >
-                                                <Cell fill="#16a34a" />
-                                                <Cell fill="#ef4444" />
+                                                {pieData.map((_, i) => (
+                                                    <Cell key={i} fill={i === 0 ? "#16a34a" : "#ef4444"} />
+                                                ))}
                                             </Pie>
                                             <ReTooltip />
                                         </PieChart>
@@ -472,7 +579,7 @@ export default function PicDashboard() {
                                             className="inline-block w-3 h-3 rounded-sm"
                                             style={{ background: "#ef4444" }}
                                         />
-                                        <span>Tidak bersertif</span>
+                                        <span>Tidak bersertifikat</span>
                                         <span className="font-semibold ml-auto">{real.nonActive}</span>
                                     </div>
                                     <div className="pt-2 text-xs opacity-70">Total populasi: {real.total}</div>
@@ -488,7 +595,7 @@ export default function PicDashboard() {
                         <div className="flex items-center justify-between gap-2">
                             <h2 className="card-title text-base md:text-lg">Total Sertifikasi / Bulan</h2>
                             <div className="min-w-[120px]">
-                                <Select options={yearOptions} value={year} onChange={setYear} placeholder="Tahun" />
+                                <SelectTop options={yearOptions} value={year} onChange={setYear} placeholder="Tahun" />
                             </div>
                         </div>
                         <div className="h-64">
@@ -510,13 +617,13 @@ export default function PicDashboard() {
                 </div>
             </div>
 
-            {/* Batches & Priority */}
+            {/* Batch & Prioritas */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {/* Batches */}
+                {/* Batch Berjalan */}
                 <div className="card bg-base-100 border rounded-2xl shadow-sm lg:col-span-1">
                     <div className="card-body p-4 md:p-5">
                         <div className="flex items-center justify-between">
-                            <h2 className="card-title text-base md:text-lg">Batch Berjalan (ONGOING)</h2>
+                            <h2 className="card-title text-base md:text-lg">Batch Berjalan</h2>
                         </div>
 
                         <div className="max-h-96 overflow-auto pr-1">
@@ -527,7 +634,7 @@ export default function PicDashboard() {
                                     ))}
                                 </div>
                             ) : batches.length === 0 ? (
-                                <div className="text-sm opacity-70">Tidak ada batch ONGOING.</div>
+                                <div className="text-sm opacity-70">Tidak ada batch berjalan.</div>
                             ) : (
                                 <ul className="menu w-full">
                                     {batches.map((b) => {
@@ -542,7 +649,7 @@ export default function PicDashboard() {
                                             <li key={b.id} className="!p-0">
                                                 <button
                                                     className="w-full text-left hover:bg-base-200 rounded-xl p-2"
-                                                    title="Lihat batch"
+                                                    title="Buka detail batch"
                                                     onClick={() => navigate(`/batch/${b.id}`)}
                                                 >
                                                     <div className="min-w-0">
@@ -573,20 +680,22 @@ export default function PicDashboard() {
                                     onClick={() => loadBatches(false)}
                                     disabled={loadingBatch}
                                 >
-                                    {loadingBatch ? "Loading..." : "Load more"}
+                                    {loadingBatch ? "Memuat..." : "Muat lebih banyak"}
                                 </button>
                             </div>
                         )}
                     </div>
                 </div>
 
-                {/* DUE & EXPIRED */}
+                {/* Jatuh Tempo & Kadaluarsa */}
                 <div className="flex flex-col gap-4">
-                    {/* DUE */}
+                    {/* Jatuh Tempo */}
                     <div className="card bg-base-100 border rounded-2xl shadow-sm">
                         <div className="card-body p-4 md:p-5">
                             <div className="flex items-center justify-between">
-                                <h2 className="card-title text-base md:text-lg text-amber-600">Due (Top 10)</h2>
+                                <h2 className="card-title text-base md:text-lg text-amber-600">
+                                    Jatuh Tempo (10 Teratas)
+                                </h2>
                             </div>
                             <div className="overflow-auto max-h-96">
                                 <table className="table table-xs md:table-sm">
@@ -619,7 +728,16 @@ export default function PicDashboard() {
                                                 const deadline = getDeadline(x);
                                                 const sisa = deadline ? daysBetween(deadline, new Date()) : null;
                                                 return (
-                                                    <tr key={idx} className="hover cursor-pointer" title="Lihat detail">
+                                                    <tr
+                                                        key={idx}
+                                                        className="hover cursor-pointer"
+                                                        title="Buka detail"
+                                                        onClick={(e) => {
+                                                            e.preventDefault();
+                                                            e.stopPropagation();
+                                                            navigate(getPriorityPath(x));
+                                                        }}
+                                                    >
                                                         <td className="whitespace-nowrap">{x.nip}</td>
                                                         <td className="whitespace-nowrap">
                                                             {x.employeeName ?? x.name}
@@ -639,11 +757,13 @@ export default function PicDashboard() {
                         </div>
                     </div>
 
-                    {/* EXPIRED */}
+                    {/* Kadaluarsa */}
                     <div className="card bg-base-100 border rounded-2xl shadow-sm">
                         <div className="card-body p-4 md:p-5">
                             <div className="flex items-center justify-between">
-                                <h2 className="card-title text-base md:text-lg text-red-600">Expired (Top 10)</h2>
+                                <h2 className="card-title text-base md:text-lg text-red-600">
+                                    Kadaluarsa (10 Teratas)
+                                </h2>
                             </div>
                             <div className="overflow-auto max-h-96">
                                 <table className="table table-xs md:table-sm">
@@ -674,7 +794,16 @@ export default function PicDashboard() {
                                             expiredList.map((x, idx) => {
                                                 const deadline = getDeadline(x);
                                                 return (
-                                                    <tr key={idx} className="hover cursor-pointer" title="Lihat detail">
+                                                    <tr
+                                                        key={idx}
+                                                        className="hover cursor-pointer"
+                                                        title="Buka detail"
+                                                        onClick={(e) => {
+                                                            e.preventDefault();
+                                                            e.stopPropagation();
+                                                            navigate(getPriorityPath(x));
+                                                        }}
+                                                    >
                                                         <td className="whitespace-nowrap">{x.nip}</td>
                                                         <td className="whitespace-nowrap">
                                                             {x.employeeName ?? x.name}
