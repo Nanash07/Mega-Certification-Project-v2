@@ -562,6 +562,7 @@ export default function SuperadminDashboard() {
                 {/* Realisasi */}
                 <div className="card bg-base-100 border rounded-2xl shadow-sm">
                     <div className="card-body p-4 md:p-5">
+                        <h2 className="card-title text-base md:text-lg">Realisasi</h2>
                         {!kpi ? (
                             <div className="skeleton h-56 w-full rounded-xl" />
                         ) : (
