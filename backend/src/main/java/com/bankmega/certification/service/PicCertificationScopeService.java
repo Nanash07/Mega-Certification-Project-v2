@@ -13,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -81,6 +82,10 @@ public class PicCertificationScopeService {
 
         private PicCertificationScopeResponse mapUserToResponse(User user) {
                 var certs = scopeRepo.findByUser_Id(user.getId()).stream()
+                                .sorted(Comparator.comparing(scope -> {
+                                        var cert = scope.getCertification();
+                                        return cert != null && cert.getCode() != null ? cert.getCode() : "";
+                                }, String.CASE_INSENSITIVE_ORDER))
                                 .map(s -> PicCertificationScopeResponse.ScopeDto.builder()
                                                 .certificationId(s.getCertification().getId())
                                                 .certificationCode(s.getCertification().getCode())

@@ -10,6 +10,7 @@ import {
     fetchMonthlyCertificationTrend,
     MONTHS,
 } from "../../services/dashboardService";
+import { formatShortIdDate, formatShortIdDateTime } from "../../utils/date";
 
 import { fetchCertifications } from "../../services/certificationService";
 import { fetchCertificationLevels } from "../../services/certificationLevelService";
@@ -32,7 +33,7 @@ import {
 
 /* ========= utils ========= */
 const toDate = (d) => (d ? new Date(d) : null);
-const fmtID = (d) => (d ? new Date(d).toLocaleDateString("id-ID") : "-");
+const fmtID = (d) => formatShortIdDate(d);
 const daysBetween = (a, b) => Math.ceil((a - b) / (1000 * 60 * 60 * 24));
 const toNum = (v) => Number(v ?? 0) || 0;
 
@@ -460,7 +461,7 @@ export default function SuperadminDashboard() {
             <div>
                 <h1 className="text-2xl md:text-3xl font-bold">Superadmin Dashboard</h1>
                 <p className="text-sm opacity-70">
-                    Snapshot sistem{computedAt ? ` • ${new Date(computedAt).toLocaleString("id-ID")}` : ""}
+                    Snapshot sistem{computedAt ? ` • ${formatShortIdDateTime(computedAt)}` : ""}
                 </p>
             </div>
 

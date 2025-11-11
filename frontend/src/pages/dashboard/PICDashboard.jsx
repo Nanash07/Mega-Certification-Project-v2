@@ -14,6 +14,8 @@ import { fetchRegionals } from "../../services/regionalService";
 import { fetchUnits } from "../../services/unitService";
 import { fetchCertificationLevels } from "../../services/certificationLevelService";
 import { fetchSubFields } from "../../services/subFieldService";
+import { fetchMyPicScope } from "../../services/picScopeService";
+import { formatShortIdDate, formatShortIdDateTime } from "../../utils/date";
 
 import {
     PieChart,
@@ -30,7 +32,7 @@ import {
 
 /* ===== utils ===== */
 const toDate = (d) => (d ? new Date(d) : null);
-const fmtID = (d) => (d ? new Date(d).toLocaleDateString("id-ID") : "-");
+const fmtID = (d) => formatShortIdDate(d);
 const daysBetween = (a, b) => Math.ceil((a - b) / (1000 * 60 * 60 * 24));
 
 function getRuleCode(row) {
@@ -142,12 +144,6 @@ function QuotaBar({ filled = 0, quota = 0, className }) {
     );
 }
 
-/* ===== API helper: scope PIC ===== */
-async function fetchPicScope(userId) {
-    const { data } = await api.get(`/pic-scope/${userId}`);
-    return data; // { userId, certifications: [{ certificationId, certificationCode }, ...] }
-}
-
 function toOptions(data, labelPicker) {
     const arr = Array.isArray(data?.content) ? data.content : Array.isArray(data) ? data : [];
     return arr.filter(Boolean).map((x) => ({ value: x.id, label: labelPicker(x), raw: x }));
@@ -155,16 +151,6 @@ function toOptions(data, labelPicker) {
 
 export default function PicDashboard() {
     const navigate = useNavigate();
-
-    // ambil userId dari sesi kamu
-    const userRaw = (() => {
-        try {
-            return JSON.parse(localStorage.getItem("user") || "{}");
-        } catch {
-            return {};
-        }
-    })();
-    const userId = userRaw?.id ?? userRaw?.userId ?? userRaw?.uid ?? window.__USER?.id ?? null;
 
     // ===== 6 filter =====
     const [regionalSel, setRegionalSel] = useState(null);
@@ -228,26 +214,31 @@ export default function PicDashboard() {
                 setUnitOptions([]);
             }
 
-            // ----- scope PIC → opsi sertifikat & default -----
+            // ----- scope PIC: opsi sertifikat & default -----
             try {
-                if (userId) {
-                    const scope = await fetchPicScope(userId);
-                    const opts = (scope?.certifications || []).map((s) => ({
-                        value: s.certificationId,
-                        label: s.certificationCode || `SERT-${s.certificationId}`,
-                        raw: s,
-                    }));
-                    setCertOptions(opts);
-                    if (!certSel && opts.length > 0) setCertSel(opts[0]);
+                const scope = await fetchMyPicScope();
+                const opts = (scope?.certifications || []).map((s) => ({
+                    value: s.certificationId,
+                    label: s.certificationCode || `SERT-${s.certificationId}`,
+                    raw: s,
+                }));
+                setCertOptions(opts);
+                if (opts.length === 0) {
+                    setCertSel(null);
                 } else {
-                    setCertOptions([]);
+                    setCertSel((prev) => {
+                        if (prev && opts.some((opt) => opt.value === prev.value)) {
+                            return prev;
+                        }
+                        return opts[0];
+                    });
                 }
             } catch {
                 setCertOptions([]);
+                setCertSel(null);
             } finally {
                 setScopeReady(true);
             }
-
             // level & sub-bidang
             fetchCertificationLevels()
                 .then((arr) =>
@@ -266,7 +257,7 @@ export default function PicDashboard() {
                 .catch(() => {});
         })();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [userId]);
+    }, []);
 
     /* ===== helpers ===== */
     const params = () => {
@@ -433,7 +424,7 @@ export default function PicDashboard() {
             <div>
                 <h1 className="text-2xl md:text-3xl font-bold">Dashboard PIC</h1>
                 <p className="text-sm opacity-70">
-                    Ringkasan PIC{computedAt ? ` • ${new Date(computedAt).toLocaleString("id-ID")}` : ""}
+                    Ringkasan PIC{computedAt ? ` • ${formatShortIdDateTime(computedAt)}` : ""}
                 </p>
             </div>
 
