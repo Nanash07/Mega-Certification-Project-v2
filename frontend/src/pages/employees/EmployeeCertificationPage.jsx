@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import Select from "react-select";
 import AsyncSelect from "react-select/async";
+import { Plus, History as HistoryIcon, Eraser, Pencil, Trash2, Upload, Eye } from "lucide-react";
+
 import Pagination from "../../components/common/Pagination";
 
 import { fetchCertifications, deleteCertification } from "../../services/employeeCertificationService";
@@ -15,23 +16,25 @@ import EditEmployeeCertificationModal from "../../components/employee-certificat
 import UploadEmployeeCertificationModal from "../../components/employee-certifications/UploadEmployeeCertificationModal";
 import ViewEmployeeCertificationModal from "../../components/employee-certifications/ViewEmployeeCertificationModal";
 
-export default function EmployeeCertificationPage() {
-    const navigate = useNavigate();
+const TABLE_COLS = 15; // No + Aksi + 13 kolom lain
 
+export default function EmployeeCertificationPage() {
     const [rows, setRows] = useState([]);
     const [loading, setLoading] = useState(false);
+
     // Pagination
     const [page, setPage] = useState(1);
     const [rowsPerPage, setRowsPerPage] = useState(10);
     const [totalPages, setTotalPages] = useState(0);
     const [totalElements, setTotalElements] = useState(0);
 
-    // Filters
+    // Filter options
     const [institutionOptions, setInstitutionOptions] = useState([]);
     const [certCodeOptions, setCertCodeOptions] = useState([]);
     const [levelOptions, setLevelOptions] = useState([]);
     const [subFieldOptions, setSubFieldOptions] = useState([]);
 
+    // Filters
     const [filterEmployee, setFilterEmployee] = useState(null);
     const [filterCertCode, setFilterCertCode] = useState([]);
     const [filterLevel, setFilterLevel] = useState([]);
@@ -43,10 +46,67 @@ export default function EmployeeCertificationPage() {
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [editData, setEditData] = useState(null);
     const [uploadData, setUploadData] = useState(null);
-    const [confirm, setConfirm] = useState({ open: false, id: null });
     const [viewData, setViewData] = useState(null);
+    const [confirm, setConfirm] = useState({ open: false, id: null });
 
-    // Load data
+    const statusBadgeClass = useMemo(
+        () => ({
+            PENDING: "badge-info",
+            ACTIVE: "badge-success",
+            DUE: "badge-warning",
+            EXPIRED: "badge-error",
+            INVALID: "badge-secondary",
+            NOT_YET_CERTIFIED: "badge-secondary",
+        }),
+        []
+    );
+
+    function formatStatusLabel(status) {
+        if (!status) return "-";
+        switch (status) {
+            case "PENDING":
+                return "Pending Upload";
+            case "ACTIVE":
+                return "Active";
+            case "DUE":
+                return "Due";
+            case "EXPIRED":
+                return "Expired";
+            case "INVALID":
+                return "Tidak Valid";
+            case "NOT_YET_CERTIFIED":
+                return "Belum Sertifikasi";
+            default: {
+                const s = status.toString().toLowerCase();
+                return s.charAt(0).toUpperCase() + s.slice(1);
+            }
+        }
+    }
+
+    function formatDate(value) {
+        if (!value) return "-";
+        const d = new Date(value);
+        if (isNaN(d.getTime())) return "-";
+        return d.toLocaleDateString("id-ID", {
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+        });
+    }
+
+    function formatDateTime(value) {
+        if (!value) return "-";
+        const d = new Date(value);
+        if (isNaN(d.getTime())) return "-";
+        return d.toLocaleString("id-ID", {
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+        });
+    }
+
     async function load() {
         setLoading(true);
         try {
@@ -65,14 +125,14 @@ export default function EmployeeCertificationPage() {
             setRows(res.content || []);
             setTotalPages(res.totalPages || 1);
             setTotalElements(res.totalElements || 0);
-        } catch {
+        } catch (err) {
+            console.error("load error:", err);
             toast.error("Gagal memuat sertifikasi pegawai");
         } finally {
             setLoading(false);
         }
     }
 
-    // Load filter options
     async function loadFilters() {
         try {
             const [rules, insts] = await Promise.all([fetchCertificationRules(), fetchInstitutions()]);
@@ -83,7 +143,7 @@ export default function EmployeeCertificationPage() {
 
             const levelOpts = [...new Set(rules.map((r) => r.certificationLevelLevel).filter(Boolean))]
                 .sort((a, b) => a - b)
-                .map((lvl) => ({ value: lvl, label: lvl }));
+                .map((lvl) => ({ value: lvl, label: String(lvl) }));
 
             const subFieldOpts = [...new Set(rules.map((r) => r.subFieldCode).filter(Boolean))]
                 .sort()
@@ -93,16 +153,16 @@ export default function EmployeeCertificationPage() {
             setLevelOptions(levelOpts);
             setSubFieldOptions(subFieldOpts);
             setInstitutionOptions(insts.map((i) => ({ value: i.id, label: i.name })));
-        } catch {
+        } catch (err) {
+            console.error("loadFilters error:", err);
             toast.error("Gagal memuat filter");
         }
     }
 
-    // Async search employees
     const loadEmployees = async (inputValue) => {
         try {
             const res = await searchEmployees({ search: inputValue, page: 0, size: 20 });
-            return res.content.map((e) => ({
+            return (res.content || []).map((e) => ({
                 value: e.id,
                 label: `${e.nip} - ${e.name}`,
             }));
@@ -112,10 +172,11 @@ export default function EmployeeCertificationPage() {
     };
 
     async function onDelete(id) {
+        if (!id) return;
         try {
             await deleteCertification(id);
             toast.success("Sertifikasi pegawai dihapus");
-            load();
+            await load();
         } catch {
             toast.error("Gagal hapus sertifikasi");
         }
@@ -123,6 +184,7 @@ export default function EmployeeCertificationPage() {
 
     useEffect(() => {
         load();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [
         page,
         rowsPerPage,
@@ -135,6 +197,10 @@ export default function EmployeeCertificationPage() {
     ]);
 
     useEffect(() => {
+        setPage(1);
+    }, [filterEmployee, filterCertCode, filterLevel, filterSubField, filterInstitution, filterStatus]);
+
+    useEffect(() => {
         loadFilters();
     }, []);
 
@@ -144,45 +210,61 @@ export default function EmployeeCertificationPage() {
         <div>
             {/* Toolbar */}
             <div className="mb-4 space-y-3">
+                {/* Row tombol (bukan filter) */}
                 <div className="grid grid-cols-1 lg:grid-cols-6 gap-3">
-                    <div className="col-span-3"></div>
+                    <div className="col-span-1">
+                        <div className="tooltip w-full" data-tip="Tambah sertifikat baru">
+                            <button
+                                type="button"
+                                className="btn btn-sm btn-primary w-full"
+                                onClick={() => setShowCreateModal(true)}
+                            >
+                                <Plus className="w-4 h-4" />
+                                <span>Tambah Sertifikat</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div className="col-span-3" />
 
                     <div className="col-span-1">
-                        <button className="btn btn-sm btn-secondary w-full" onClick={() => setShowCreateModal(true)}>
-                            Tambah Sertifikat
-                        </button>
+                        <div className="tooltip w-full" data-tip="Lihat histori perubahan sertifikat">
+                            <button
+                                type="button"
+                                className="btn btn-sm btn-accent w-full"
+                                onClick={() => (window.location.href = "/employee/certification/histories")}
+                            >
+                                <HistoryIcon className="w-4 h-4" />
+                                <span>Histori</span>
+                            </button>
+                        </div>
                     </div>
 
                     <div className="col-span-1">
-                        <button
-                            className="btn btn-sm btn-accent w-full"
-                            onClick={() => navigate("/employee/certification/histories")}
-                        >
-                            Histori
-                        </button>
-                    </div>
-
-                    <div className="col-span-1">
-                        <button
-                            className="btn btn-sm btn-accent btn-soft border-accent w-full"
-                            onClick={() => {
-                                setFilterEmployee(null);
-                                setFilterCertCode([]);
-                                setFilterLevel([]);
-                                setFilterSubField([]);
-                                setFilterInstitution([]);
-                                setFilterStatus([]);
-                                setPage(1);
-                                toast.success("Clear filter berhasil");
-                            }}
-                        >
-                            Clear Filter
-                        </button>
+                        <div className="tooltip w-full" data-tip="Reset semua filter">
+                            <button
+                                type="button"
+                                className="btn btn-sm btn-accent btn-soft border-accent w-full"
+                                onClick={() => {
+                                    setFilterEmployee(null);
+                                    setFilterCertCode([]);
+                                    setFilterLevel([]);
+                                    setFilterSubField([]);
+                                    setFilterInstitution([]);
+                                    setFilterStatus([]);
+                                    setPage(1);
+                                    toast.success("Clear filter berhasil");
+                                }}
+                            >
+                                <Eraser className="w-4 h-4" />
+                                <span>Clear Filter</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
 
-                {/* Filters */}
+                {/* Row filter: 1 baris semua filter */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 text-xs">
+                    {/* 1. Pegawai */}
                     <AsyncSelect
                         cacheOptions
                         defaultOptions
@@ -193,6 +275,7 @@ export default function EmployeeCertificationPage() {
                         isClearable
                     />
 
+                    {/* 2. Cert Code */}
                     <Select
                         isMulti
                         options={certCodeOptions}
@@ -201,6 +284,7 @@ export default function EmployeeCertificationPage() {
                         placeholder="Filter Cert Code"
                     />
 
+                    {/* 3. Jenjang */}
                     <Select
                         isMulti
                         options={levelOptions}
@@ -209,6 +293,7 @@ export default function EmployeeCertificationPage() {
                         placeholder="Filter Jenjang"
                     />
 
+                    {/* 4. Sub Field */}
                     <Select
                         isMulti
                         options={subFieldOptions}
@@ -217,6 +302,7 @@ export default function EmployeeCertificationPage() {
                         placeholder="Filter Sub Field"
                     />
 
+                    {/* 5. Lembaga */}
                     <Select
                         isMulti
                         options={institutionOptions}
@@ -225,6 +311,7 @@ export default function EmployeeCertificationPage() {
                         placeholder="Filter Lembaga"
                     />
 
+                    {/* 6. Status */}
                     <Select
                         isMulti
                         options={[
@@ -233,6 +320,7 @@ export default function EmployeeCertificationPage() {
                             { value: "DUE", label: "Due" },
                             { value: "EXPIRED", label: "Expired" },
                             { value: "INVALID", label: "Invalid" },
+                            { value: "NOT_YET_CERTIFIED", label: "Belum Sertifikasi" },
                         ]}
                         value={filterStatus}
                         onChange={setFilterStatus}
@@ -251,6 +339,7 @@ export default function EmployeeCertificationPage() {
                             <th>NIP</th>
                             <th>Nama Pegawai</th>
                             <th>Jabatan</th>
+                            <th>Status</th>
                             <th>Cert Code</th>
                             <th>Jenjang</th>
                             <th>Sub Bidang</th>
@@ -258,21 +347,20 @@ export default function EmployeeCertificationPage() {
                             <th>Tanggal Sertifikat</th>
                             <th>Tanggal Kadaluarsa</th>
                             <th>Reminder</th>
-                            <th>Status</th>
                             <th>Lembaga</th>
                             <th>Updated At</th>
                         </tr>
                     </thead>
-                    <tbody className="text-xs whitespace-nowrap">
+                    <tbody className="text-xs">
                         {loading ? (
                             <tr>
-                                <td colSpan={15} className="text-center py-10">
+                                <td colSpan={TABLE_COLS} className="text-center py-10">
                                     <span className="loading loading-dots loading-md" />
                                 </td>
                             </tr>
                         ) : rows.length === 0 ? (
                             <tr>
-                                <td colSpan={15} className="text-center text-gray-400 py-10">
+                                <td colSpan={TABLE_COLS} className="text-center text-gray-400 py-10">
                                     Tidak ada data
                                 </td>
                             </tr>
@@ -280,104 +368,84 @@ export default function EmployeeCertificationPage() {
                             rows.map((r, idx) => (
                                 <tr key={r.id}>
                                     <td>{startIdx + idx}</td>
-                                    {/* 🔹 Kolom aksi (hapus tombol "Lihat") */}
-                                    <td className="whitespace-nowrap space-x-1">
-                                        <button
-                                            className="btn btn-xs border-warning btn-soft btn-warning"
-                                            onClick={() => setEditData(r)}
-                                        >
-                                            Edit
-                                        </button>
-                                        <button
-                                            className="btn btn-xs border-error btn-soft btn-error"
-                                            onClick={() => setConfirm({ open: true, id: r.id })}
-                                        >
-                                            Hapus
-                                        </button>
-                                        {r.status === "PENDING" && (
-                                            <button
-                                                className="btn btn-xs border-info btn-soft btn-info"
-                                                onClick={() => setUploadData(r)}
-                                            >
-                                                Upload
-                                            </button>
-                                        )}
-                                    </td>
-                                    <td>{r.nip}</td>
 
-                                    {/* 🔹 Nama Pegawai jadi link ke halaman detail */}
+                                    {/* Aksi */}
                                     <td>
-                                        <a
-                                            href={`/employee/${r.employeeId}`}
-                                            className="hover:text-secondary underline"
-                                        >
-                                            {r.employeeName}
-                                        </a>
+                                        <div className="flex gap-2">
+                                            <div className="tooltip" data-tip="Lihat detail sertifikat">
+                                                <button
+                                                    className="btn btn-xs btn-info btn-soft border-info"
+                                                    type="button"
+                                                    onClick={() => setViewData(r)}
+                                                    title="Lihat sertifikat"
+                                                >
+                                                    <Eye className="w-4 h-4" />
+                                                </button>
+                                            </div>
+
+                                            <div className="tooltip" data-tip="Edit data sertifikat">
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-xs btn-warning btn-soft border-warning"
+                                                    onClick={() => setEditData(r)}
+                                                    title="Edit sertifikat"
+                                                >
+                                                    <Pencil className="w-4 h-4" />
+                                                </button>
+                                            </div>
+
+                                            <div className="tooltip" data-tip="Hapus sertifikat">
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-xs btn-error btn-soft border-error"
+                                                    onClick={() => setConfirm({ open: true, id: r.id })}
+                                                    title="Hapus sertifikat"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            </div>
+
+                                            {r.status === "PENDING" && (
+                                                <div className="tooltip" data-tip="Upload file sertifikat">
+                                                    <button
+                                                        type="button"
+                                                        className="btn btn-xs btn-success btn-soft border-success"
+                                                        onClick={() => setUploadData(r)}
+                                                        title="Upload sertifikat"
+                                                    >
+                                                        <Upload className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
                                     </td>
 
+                                    <td>{r.nip}</td>
+                                    <td>{r.employeeName}</td>
                                     <td>{r.jobPositionTitle || "-"}</td>
+
+                                    {/* Status di sini (setelah jabatan) */}
+                                    <td>
+                                        <div className="tooltip" data-tip={formatStatusLabel(r.status)}>
+                                            <span
+                                                className={`badge badge-sm text-white whitespace-nowrap ${
+                                                    statusBadgeClass[r.status] || "badge-secondary"
+                                                }`}
+                                            >
+                                                {formatStatusLabel(r.status)}
+                                            </span>
+                                        </div>
+                                    </td>
+
                                     <td>{r.certificationCode}</td>
                                     <td>{r.certificationLevelLevel || "-"}</td>
                                     <td>{r.subFieldCode || "-"}</td>
                                     <td>{r.certNumber || "-"}</td>
-                                    <td>
-                                        {r.certDate
-                                            ? new Date(r.certDate).toLocaleDateString("id-ID", {
-                                                  day: "2-digit",
-                                                  month: "short",
-                                                  year: "numeric",
-                                              })
-                                            : "-"}
-                                    </td>
-                                    <td>
-                                        {r.validUntil
-                                            ? new Date(r.validUntil).toLocaleDateString("id-ID", {
-                                                  day: "2-digit",
-                                                  month: "short",
-                                                  year: "numeric",
-                                              })
-                                            : "-"}
-                                    </td>
-                                    <td>
-                                        {r.reminderDate
-                                            ? new Date(r.reminderDate).toLocaleDateString("id-ID", {
-                                                  day: "2-digit",
-                                                  month: "short",
-                                                  year: "numeric",
-                                              })
-                                            : "-"}
-                                    </td>
-                                    <td>
-                                        <span
-                                            className={`badge badge-sm text-white ${
-                                                r.status === "PENDING"
-                                                    ? "badge-info"
-                                                    : r.status === "ACTIVE"
-                                                    ? "badge-success"
-                                                    : r.status === "DUE"
-                                                    ? "badge-warning"
-                                                    : r.status === "EXPIRED"
-                                                    ? "badge-error"
-                                                    : r.status === "INVALID"
-                                                    ? "badge-secondary"
-                                                    : "badge-neutral"
-                                            }`}
-                                        >
-                                            {r.status}
-                                        </span>
-                                    </td>
+                                    <td>{formatDate(r.certDate)}</td>
+                                    <td>{formatDate(r.validUntil)}</td>
+                                    <td>{formatDate(r.reminderDate)}</td>
                                     <td>{r.institutionName || "-"}</td>
-                                    <td>
-                                        {r.updatedAt
-                                            ? new Date(r.updatedAt).toLocaleDateString("id-ID", {
-                                                  day: "2-digit",
-                                                  month: "short",
-                                                  year: "numeric",
-                                                  hour: "2-digit",
-                                                  minute: "2-digit",
-                                              })
-                                            : "-"}
-                                    </td>
+                                    <td>{formatDateTime(r.updatedAt)}</td>
                                 </tr>
                             ))
                         )}

@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import Select from "react-select";
+import { Download, Upload, History as HistoryIcon, Pencil, Trash2, Eraser, ChevronDown } from "lucide-react";
+
 import Pagination from "../../components/common/Pagination";
 import {
     fetchJobCertificationMappingsPaged,
@@ -15,6 +17,8 @@ import { fetchAllJobPositions } from "../../services/jobPositionService";
 import EditJobCertificationMappingModal from "../../components/job-certification-mapping/EditJobCertificationMappingModal";
 import { downloadJobCertTemplate } from "../../services/jobCertificationImportService";
 import ImportJobCertificationMappingModal from "../../components/job-certification-mapping/ImportJobCertificationMappingModal";
+
+const TABLE_COLS = 8;
 
 export default function JobCertificationMappingPage() {
     const navigate = useNavigate();
@@ -45,7 +49,63 @@ export default function JobCertificationMappingPage() {
     const [confirm, setConfirm] = useState({ open: false, id: null });
     const [openImport, setOpenImport] = useState(false);
 
-    // Load data
+    // Floating status menu: { row, x, y } | null
+    const [statusMenu, setStatusMenu] = useState(null);
+
+    // 🔹 Helper tanggal + jam
+    function formatDateTime(value) {
+        if (!value) return "-";
+        const d = new Date(value);
+        if (isNaN(d.getTime())) return "-";
+        return d.toLocaleString("id-ID", {
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+        });
+    }
+
+    // 🔹 Style status untuk ACTIVE / INACTIVE (isActive boolean)
+    function getStatusStyle(isActive) {
+        if (isActive) {
+            return {
+                label: "Aktif",
+                badgeCls: "badge-success",
+                btnCls: "btn-success",
+            };
+        }
+        return {
+            label: "Nonaktif",
+            badgeCls: "badge-secondary",
+            btnCls: "btn-secondary",
+        };
+    }
+
+    // 🔹 Badge status: bisa diklik buat buka menu pilihan
+    function renderStatusBadge(row) {
+        const { label, badgeCls } = getStatusStyle(row.isActive);
+
+        return (
+            <button
+                type="button"
+                className={`badge badge-sm whitespace-nowrap cursor-pointer flex items-center gap-1 ${badgeCls} text-white`}
+                onClick={(e) => {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    setStatusMenu({
+                        row,
+                        x: rect.left,
+                        y: rect.bottom + 4,
+                    });
+                }}
+            >
+                <span>{label}</span>
+                <ChevronDown className="w-3 h-3" />
+            </button>
+        );
+    }
+
+    // 🔹 Load data
     async function load() {
         setLoading(true);
         try {
@@ -70,7 +130,7 @@ export default function JobCertificationMappingPage() {
         }
     }
 
-    // Load filter options
+    // 🔹 Load filter options
     async function loadFilters() {
         try {
             const [jobs, certs, levels, subs] = await Promise.all([
@@ -92,6 +152,7 @@ export default function JobCertificationMappingPage() {
 
     useEffect(() => {
         load();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [page, rowsPerPage, filterJob, filterCert, filterLevel, filterSub, filterStatus]);
 
     useEffect(() => {
@@ -109,40 +170,64 @@ export default function JobCertificationMappingPage() {
         toast.success("Filter berhasil direset");
     }
 
+    // 🔹 Ubah status via badge (pakai toggle API)
+    async function handleChangeStatus(row, desiredActive) {
+        if (row.isActive === desiredActive) {
+            return;
+        }
+        try {
+            await toggleJobCertificationMapping(row.id);
+            await load();
+            toast.success(desiredActive ? "Mapping diaktifkan" : "Mapping dinonaktifkan");
+        } catch {
+            toast.error("Gagal mengubah status mapping");
+        }
+    }
+
     const startIdx = totalElements === 0 ? 0 : (page - 1) * rowsPerPage + 1;
 
     return (
         <div>
             {/* Toolbar */}
             <div className="mb-4 space-y-3">
-                {/* 🔹 Row 1: Tombol Aksi */}
+                {/* Row 1: Tombol Aksi */}
                 <div className="grid grid-cols-1 lg:grid-cols-6 gap-3">
-                    <div className="col-span-3"></div>
-
-                    <div className="col-span-1">
-                        <button className="btn btn-warning btn-sm w-full" onClick={downloadJobCertTemplate}>
-                            Download Template
-                        </button>
-                    </div>
-
-                    <div className="col-span-1">
-                        <button className="btn btn-success btn-sm w-full" onClick={() => setOpenImport(true)}>
-                            Import Excel
-                        </button>
-                    </div>
-
-                    {/* 🔹 Tombol Histori */}
                     <div className="col-span-1">
                         <button
+                            type="button"
+                            className="btn btn-success btn-sm w-full"
+                            onClick={() => setOpenImport(true)}
+                        >
+                            <Upload className="w-4 h-4" />
+                            <span>Import Excel</span>
+                        </button>
+                    </div>
+                    <div className="col-span-1">
+                        <button
+                            type="button"
+                            className="btn btn-secondary btn-sm w-full"
+                            onClick={downloadJobCertTemplate}
+                        >
+                            <Download className="w-4 h-4" />
+                            <span>Download Template</span>
+                        </button>
+                    </div>
+
+                    <div className="col-span-3" />
+
+                    <div className="col-span-1">
+                        <button
+                            type="button"
                             className="btn btn-accent btn-sm w-full"
                             onClick={() => navigate("/mapping/job-certification/histories")}
                         >
-                            Histori
+                            <HistoryIcon className="w-4 h-4" />
+                            <span>Histori</span>
                         </button>
                     </div>
                 </div>
 
-                {/* 🔹 Row 2: Filters + Clear Filter */}
+                {/* Row 2: Filters + Clear Filter */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 text-xs items-end">
                     <Select
                         isMulti
@@ -182,8 +267,13 @@ export default function JobCertificationMappingPage() {
                         onChange={setFilterStatus}
                         placeholder="Status"
                     />
-                    <button className="btn btn-accent btn-soft border-accent btn-sm w-full" onClick={resetFilter}>
-                        Clear Filter
+                    <button
+                        type="button"
+                        className="btn btn-accent btn-soft border-accent btn-sm w-full"
+                        onClick={resetFilter}
+                    >
+                        <Eraser className="w-4 h-4" />
+                        <span>Clear Filter</span>
                     </button>
                 </div>
             </div>
@@ -191,7 +281,7 @@ export default function JobCertificationMappingPage() {
             {/* Table */}
             <div className="overflow-x-auto rounded-xl border border-gray-200 shadow bg-base-100">
                 <table className="table table-zebra">
-                    <thead className="bg-base-200 text-xs">
+                    <thead className="bg-base-200 text-xs whitespace-nowrap">
                         <tr>
                             <th>No</th>
                             <th>Aksi</th>
@@ -203,16 +293,16 @@ export default function JobCertificationMappingPage() {
                             <th>Updated At</th>
                         </tr>
                     </thead>
-                    <tbody className="text-xs">
+                    <tbody className="text-xs whitespace-nowrap">
                         {loading ? (
                             <tr>
-                                <td colSpan={8} className="text-center py-10">
+                                <td colSpan={TABLE_COLS} className="text-center py-10">
                                     <span className="loading loading-dots loading-md" />
                                 </td>
                             </tr>
                         ) : rows.length === 0 ? (
                             <tr>
-                                <td colSpan={8} className="text-center text-gray-400 py-10">
+                                <td colSpan={TABLE_COLS} className="text-center text-gray-400 py-10">
                                     Tidak ada data
                                 </td>
                             </tr>
@@ -220,56 +310,34 @@ export default function JobCertificationMappingPage() {
                             rows.map((r, idx) => (
                                 <tr key={r.id}>
                                     <td>{startIdx + idx}</td>
+
+                                    {/* Aksi: cuma edit + delete (icon) */}
                                     <td className="space-x-1">
                                         <button
-                                            className={`btn btn-xs ${
-                                                r.isActive
-                                                    ? "btn-secondary border-secondary btn-soft"
-                                                    : "btn-success border-success btn-soft"
-                                            }`}
-                                            onClick={() => toggleJobCertificationMapping(r.id).then(load)}
-                                        >
-                                            {r.isActive ? "Nonaktifkan" : "Aktifkan"}
-                                        </button>
-                                        <button
+                                            type="button"
                                             className="btn btn-xs border-warning btn-soft btn-warning"
                                             onClick={() => setEditItem(r)}
+                                            title="Edit mapping"
                                         >
-                                            Edit
+                                            <Pencil className="w-3 h-3" />
                                         </button>
+
                                         <button
+                                            type="button"
                                             className="btn btn-xs border-error btn-soft btn-error"
                                             onClick={() => setConfirm({ open: true, id: r.id })}
+                                            title="Hapus mapping"
                                         >
-                                            Delete
+                                            <Trash2 className="w-3 h-3" />
                                         </button>
                                     </td>
+
                                     <td>{r.jobName}</td>
                                     <td>{r.certificationCode}</td>
                                     <td>{r.certificationLevelLevel || "-"}</td>
                                     <td>{r.subFieldCode || "-"}</td>
-                                    <td>
-                                        {r.isActive ? (
-                                            <span className="badge badge-success border-success badge-sm text-slate-50">
-                                                Aktif
-                                            </span>
-                                        ) : (
-                                            <span className="badge badge-secondary border-secondary badge-sm text-slate-50">
-                                                Nonaktif
-                                            </span>
-                                        )}
-                                    </td>
-                                    <td>
-                                        {r.updatedAt
-                                            ? new Date(r.updatedAt).toLocaleDateString("id-ID", {
-                                                  day: "2-digit",
-                                                  month: "short",
-                                                  year: "numeric",
-                                                  hour: "2-digit",
-                                                  minute: "2-digit",
-                                              })
-                                            : "-"}
-                                    </td>
+                                    <td>{renderStatusBadge(r)}</td>
+                                    <td>{formatDateTime(r.updatedAt)}</td>
                                 </tr>
                             ))
                         )}
@@ -300,6 +368,7 @@ export default function JobCertificationMappingPage() {
                     load();
                 }}
             />
+
             <ImportJobCertificationMappingModal
                 open={openImport}
                 onClose={() => setOpenImport(false)}
@@ -312,10 +381,11 @@ export default function JobCertificationMappingPage() {
                     <h3 className="font-bold text-lg">Hapus Mapping?</h3>
                     <p className="py-2">Mapping ini akan dinonaktifkan dari sistem.</p>
                     <div className="modal-action">
-                        <button className="btn" onClick={() => setConfirm({ open: false, id: null })}>
+                        <button type="button" className="btn" onClick={() => setConfirm({ open: false, id: null })}>
                             Batal
                         </button>
                         <button
+                            type="button"
                             className="btn btn-error"
                             onClick={() => {
                                 deleteJobCertificationMapping(confirm.id)
@@ -332,9 +402,44 @@ export default function JobCertificationMappingPage() {
                     </div>
                 </div>
                 <form method="dialog" className="modal-backdrop">
-                    <button>close</button>
+                    <button type="button" onClick={() => setConfirm({ open: false, id: null })}>
+                        close
+                    </button>
                 </form>
             </dialog>
+
+            {/* Floating status menu: Aktif / Nonaktif */}
+            {statusMenu && (
+                <div className="fixed inset-0 z-[999]" onClick={() => setStatusMenu(null)}>
+                    <div
+                        className="absolute"
+                        style={{ top: statusMenu.y, left: statusMenu.x }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="bg-base-100 shadow-xl rounded-2xl p-3 text-xs flex flex-col gap-2">
+                            {[
+                                { active: true, label: "Aktif" },
+                                { active: false, label: "Nonaktif" },
+                            ].map(({ active, label }) => {
+                                const { btnCls } = getStatusStyle(active);
+                                return (
+                                    <button
+                                        key={label}
+                                        type="button"
+                                        className={`btn btn-xs ${btnCls} text-white rounded-full w-full justify-center`}
+                                        onClick={async () => {
+                                            await handleChangeStatus(statusMenu.row, active);
+                                            setStatusMenu(null);
+                                        }}
+                                    >
+                                        {label}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

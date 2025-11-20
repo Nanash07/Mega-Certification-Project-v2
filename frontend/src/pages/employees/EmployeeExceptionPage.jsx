@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom"; // ✅ Tambahin ini
+import { Link } from "react-router-dom";
 import toast from "react-hot-toast";
 import Select from "react-select";
 import AsyncSelect from "react-select/async";
@@ -18,6 +18,7 @@ import { searchEmployees } from "../../services/employeeService";
 import CreateExceptionModal from "../../components/exceptions/CreateExceptionModal";
 import EditExceptionModal from "../../components/exceptions/EditExceptionModal";
 import ImportExceptionModal from "../../components/exceptions/ImportExceptionModal";
+import { Plus, Upload, Download, Eraser, Eye, Pencil, Trash2, ChevronDown } from "lucide-react";
 
 export default function EmployeeExceptionPage() {
     const [rows, setRows] = useState([]);
@@ -50,6 +51,9 @@ export default function EmployeeExceptionPage() {
     // Delete confirm modal state
     const [confirm, setConfirm] = useState({ open: false, id: null });
     const [selectedRow, setSelectedRow] = useState(null);
+
+    // 🔹 Floating status menu: { row, x, y }
+    const [statusMenu, setStatusMenu] = useState(null);
 
     // Load data
     async function load() {
@@ -87,10 +91,13 @@ export default function EmployeeExceptionPage() {
         }
     }
 
-    async function onToggle(id) {
+    // 🔹 Ubah status (masih pakai toggle di backend)
+    async function handleChangeStatus(row, targetActive) {
+        if (row.isActive === targetActive) return;
+
         try {
-            await toggleException(id);
-            toast.success("Status diubah");
+            await toggleException(row.id);
+            toast.success(`Status diubah ke ${targetActive ? "Active" : "Nonactive"}`);
             load();
         } catch {
             toast.error("Gagal ubah status");
@@ -145,6 +152,7 @@ export default function EmployeeExceptionPage() {
 
     useEffect(() => {
         load();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [page, rowsPerPage, filterEmployee, filterJob, filterCert, filterLevel, filterSub, filterStatus]);
 
     useEffect(() => {
@@ -157,33 +165,69 @@ export default function EmployeeExceptionPage() {
 
     const startIdx = totalElements === 0 ? 0 : (page - 1) * rowsPerPage + 1;
 
+    // 🔹 Badge status: trigger; menu-nya fixed di luar tabel
+    const renderStatusBadge = (row) => {
+        const isActive = row.isActive;
+        const label = isActive ? "Active" : "Nonactive";
+        const cls = isActive ? "badge-success border-success" : "badge-secondary border-secondary";
+
+        return (
+            <button
+                type="button"
+                className={`badge badge-sm whitespace-nowrap cursor-pointer flex items-center gap-1 ${cls} text-white`}
+                onClick={(e) => {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    setStatusMenu({
+                        row,
+                        x: rect.left,
+                        y: rect.bottom + 4, // sedikit di bawah badge
+                    });
+                }}
+            >
+                <span>{label}</span>
+                <ChevronDown className="w-3 h-3" />
+            </button>
+        );
+    };
+
     return (
         <div>
             <div className="space-y-3 mb-4">
                 {/* 🔸 Button Row */}
                 <div className="grid grid-cols-6 gap-3">
-                    <div className="lg:col-span-2"></div>
                     <div>
-                        <button className="btn btn-primary btn-sm w-full" onClick={() => setShowCreateModal(true)}>
-                            + Tambah
-                        </button>
-                    </div>
-
-                    <div>
-                        <button className="btn btn-success btn-sm w-full" onClick={() => setShowImportModal(true)}>
-                            Import Excel
-                        </button>
-                    </div>
-
-                    <div>
-                        <button className="btn btn-secondary btn-sm w-full" onClick={handleDownloadTemplate}>
-                            Download Template
+                        <button
+                            className="btn btn-primary btn-sm w-full flex items-center gap-1"
+                            onClick={() => setShowCreateModal(true)}
+                        >
+                            <Plus className="w-4 h-4" />
+                            Tambah
                         </button>
                     </div>
 
                     <div>
                         <button
-                            className="btn btn-accent btn-soft border-accent btn-sm w-full"
+                            className="btn btn-success btn-sm w-full flex items-center gap-1"
+                            onClick={() => setShowImportModal(true)}
+                        >
+                            <Upload className="w-4 h-4" />
+                            Import Excel
+                        </button>
+                    </div>
+
+                    <div>
+                        <button
+                            className="btn btn-secondary btn-sm w-full flex items-center gap-1"
+                            onClick={handleDownloadTemplate}
+                        >
+                            <Download className="w-4 h-4" />
+                            Download Template
+                        </button>
+                    </div>
+                    <div className="lg:col-span-2" />
+                    <div>
+                        <button
+                            className="btn btn-accent btn-soft border-accent btn-sm w-full flex items-center gap-1"
                             onClick={() => {
                                 setFilterEmployee(null);
                                 setFilterJob([]);
@@ -196,13 +240,14 @@ export default function EmployeeExceptionPage() {
                                 toast.success("Filter dibersihkan");
                             }}
                         >
+                            <Eraser className="w-4 h-4" />
                             Clear Filter
                         </button>
                     </div>
                 </div>
 
                 {/* 🔸 Filter Row */}
-                <div className="grid grid-cols-6 gap-3 items-end">
+                <div className="grid grid-cols-6 gap-3 items-end text-xs">
                     {/* Pegawai */}
                     <div className="col-span-1">
                         <AsyncSelect
@@ -269,8 +314,8 @@ export default function EmployeeExceptionPage() {
                         <Select
                             isMulti
                             options={[
-                                { value: true, label: "ACTIVE" },
-                                { value: false, label: "NONACTIVE" },
+                                { value: true, label: "Active" },
+                                { value: false, label: "Nonactive" },
                             ]}
                             value={filterStatus}
                             onChange={setFilterStatus}
@@ -316,69 +361,56 @@ export default function EmployeeExceptionPage() {
                             rows.map((r, idx) => (
                                 <tr key={r.id}>
                                     <td>{startIdx + idx}</td>
-                                    <td className="space-x-1">
-                                        <button
-                                            className={`btn btn-xs ${
-                                                r.isActive
-                                                    ? "btn-secondary border-secondary btn-soft"
-                                                    : "btn-success border-success btn-soft"
-                                            }`}
-                                            onClick={() => onToggle(r.id)}
-                                        >
-                                            {r.isActive ? "Nonaktifkan" : "Aktifkan"}
-                                        </button>
-                                        <button
-                                            className="btn btn-xs border-warning btn-soft btn-warning"
-                                            onClick={() => {
-                                                setSelectedRow(r);
-                                                setShowEditModal(true);
-                                            }}
-                                        >
-                                            Edit
-                                        </button>
-                                        <button
-                                            className="btn btn-xs border-error btn-soft btn-error"
-                                            onClick={() => setConfirm({ open: true, id: r.id })}
-                                        >
-                                            Hapus
-                                        </button>
+                                    <td>
+                                        <div className="flex gap-1">
+                                            {/* Detail Pegawai */}
+                                            <div className="tooltip" data-tip="Lihat detail pegawai">
+                                                <Link
+                                                    to={`/employee/${r.employeeId}`}
+                                                    className="btn btn-xs btn-info btn-soft border-info"
+                                                >
+                                                    <Eye className="w-3 h-3" />
+                                                </Link>
+                                            </div>
+
+                                            {/* Edit */}
+                                            <div className="tooltip" data-tip="Edit eligibility manual">
+                                                <button
+                                                    className="btn btn-xs btn-warning btn-soft border-warning"
+                                                    onClick={() => {
+                                                        setSelectedRow(r);
+                                                        setShowEditModal(true);
+                                                    }}
+                                                >
+                                                    <Pencil className="w-3 h-3" />
+                                                </button>
+                                            </div>
+
+                                            {/* Delete */}
+                                            <div className="tooltip" data-tip="Hapus eligibility manual">
+                                                <button
+                                                    className="btn btn-xs btn-error btn-soft border-error"
+                                                    onClick={() => setConfirm({ open: true, id: r.id })}
+                                                >
+                                                    <Trash2 className="w-3 h-3" />
+                                                </button>
+                                            </div>
+                                        </div>
                                     </td>
                                     <td>{r.nip}</td>
-
-                                    {/* 🔹 Nama Pegawai bisa diklik ke detail */}
-                                    <td>
-                                        <Link
-                                            to={`/employee/${r.employeeId}`}
-                                            className="hover:text-secondary underline"
-                                        >
-                                            {r.employeeName}
-                                        </Link>
-                                    </td>
-
+                                    <td>{r.employeeName}</td>
                                     <td>{r.jobPositionTitle}</td>
                                     <td>{r.certificationCode}</td>
                                     <td>{r.certificationLevelName || "-"}</td>
                                     <td>{r.subFieldCode || "-"}</td>
                                     <td>{r.notes || "-"}</td>
-                                    <td>
-                                        {r.isActive ? (
-                                            <span className="badge badge-success border-success badge-sm text-slate-50">
-                                                ACTIVE
-                                            </span>
-                                        ) : (
-                                            <span className="badge badge-secondary border-secondary badge-sm text-slate-50">
-                                                NONACTIVE
-                                            </span>
-                                        )}
-                                    </td>
-                                    <td>
+                                    <td>{renderStatusBadge(r)}</td>
+                                    <td className="whitespace-nowrap">
                                         {r.updatedAt
                                             ? new Date(r.updatedAt).toLocaleDateString("id-ID", {
                                                   day: "2-digit",
                                                   month: "short",
                                                   year: "numeric",
-                                                  hour: "2-digit",
-                                                  minute: "2-digit",
                                               })
                                             : "-"}
                                     </td>
@@ -454,6 +486,38 @@ export default function EmployeeExceptionPage() {
                         <button onClick={() => setConfirm({ open: false, id: null })}>close</button>
                     </form>
                 </dialog>
+            )}
+
+            {/* 🔹 Floating status menu (fixed, di atas semua layer, gak ngubah tabel) */}
+            {statusMenu && (
+                <div className="fixed inset-0 z-[999] flex" onClick={() => setStatusMenu(null)}>
+                    <div
+                        className="absolute"
+                        style={{ top: statusMenu.y, left: statusMenu.x }}
+                        onClick={(e) => e.stopPropagation()} // biar klik di dalam menu ga nutup overlay
+                    >
+                        <div className="bg-base-100 shadow-xl rounded-2xl p-3 text-xs flex flex-col gap-2">
+                            <button
+                                className="w-full px-4 py-1 rounded-full bg-success text-white hover:brightness-95"
+                                onClick={async () => {
+                                    await handleChangeStatus(statusMenu.row, true);
+                                    setStatusMenu(null);
+                                }}
+                            >
+                                Active
+                            </button>
+                            <button
+                                className="w-full px-4 py-1 rounded-full bg-secondary text-white hover:brightness-95"
+                                onClick={async () => {
+                                    await handleChangeStatus(statusMenu.row, false);
+                                    setStatusMenu(null);
+                                }}
+                            >
+                                Nonactive
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );

@@ -29,7 +29,6 @@ public class EmployeeResponse {
 
     private LocalDate effectiveDate;
     private String status;
-    private String photoUrl;
 
     private Instant createdAt;
     private Instant updatedAt;

@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import Select from "react-select";
+import { Plus, History as HistoryIcon, Eraser, Pencil, Trash2, ChevronDown } from "lucide-react";
+
 import Pagination from "../../components/common/Pagination";
 import {
     fetchCertificationRulesPaged,
@@ -14,13 +16,18 @@ import { fetchSubFields } from "../../services/subFieldService";
 import CreateCertificationRuleModal from "../../components/certification-rules/CreateCertificationRuleModal";
 import EditCertificationRuleModal from "../../components/certification-rules/EditCertificationRuleModal";
 
+const TABLE_COLS = 11;
+
 export default function CertificationRulePage() {
     const navigate = useNavigate();
     const [rows, setRows] = useState([]);
     const [loading, setLoading] = useState(false);
     const [openCreate, setOpenCreate] = useState(false);
     const [editItem, setEditItem] = useState(null);
-    const [confirm, setConfirm] = useState({ open: false, id: undefined });
+    const [confirm, setConfirm] = useState({ open: false, id: null });
+
+    // Floating status menu: { row, x, y } | null
+    const [statusMenu, setStatusMenu] = useState(null);
 
     // Pagination
     const [page, setPage] = useState(1);
@@ -41,7 +48,60 @@ export default function CertificationRulePage() {
         label: "Semua",
     });
 
-    // Load data
+    // 🔹 Helper tanggal + jam
+    function formatDateTime(value) {
+        if (!value) return "-";
+        const d = new Date(value);
+        if (isNaN(d.getTime())) return "-";
+        return d.toLocaleString("id-ID", {
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+        });
+    }
+
+    // 🔹 Style status (Aktif / Nonaktif)
+    function getStatusStyle(isActive) {
+        if (isActive) {
+            return {
+                label: "Aktif",
+                badgeCls: "badge-success",
+                btnCls: "btn-success",
+            };
+        }
+        return {
+            label: "Nonaktif",
+            badgeCls: "badge-secondary",
+            btnCls: "btn-secondary",
+        };
+    }
+
+    // 🔹 Badge status klik → floating menu
+    function renderStatusBadge(row) {
+        const { label, badgeCls } = getStatusStyle(row.isActive);
+
+        return (
+            <button
+                type="button"
+                className={`badge badge-sm whitespace-nowrap cursor-pointer flex items-center gap-1 ${badgeCls} text-white`}
+                onClick={(e) => {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    setStatusMenu({
+                        row,
+                        x: rect.left,
+                        y: rect.bottom + 4,
+                    });
+                }}
+            >
+                <span>{label}</span>
+                <ChevronDown className="w-3 h-3" />
+            </button>
+        );
+    }
+
+    // 🔹 Load data
     async function load() {
         setLoading(true);
         try {
@@ -85,12 +145,14 @@ export default function CertificationRulePage() {
 
     useEffect(() => {
         load();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [page, rowsPerPage, filterCert, filterLevel, filterSub, filterStatus]);
 
     useEffect(() => {
         loadFilters();
     }, []);
 
+    // 🔹 Delete
     async function onDelete(id) {
         try {
             await deleteCertificationRule(id);
@@ -101,6 +163,7 @@ export default function CertificationRulePage() {
         }
     }
 
+    // 🔹 Toggle status via API
     async function onToggle(id) {
         try {
             await toggleCertificationRule(id);
@@ -111,86 +174,116 @@ export default function CertificationRulePage() {
         }
     }
 
+    // 🔹 Handler dari floating menu
+    async function handleChangeStatus(row, desiredActive) {
+        if (row.isActive === desiredActive) {
+            return;
+        }
+        await onToggle(row.id);
+    }
+
+    // 🔹 Reset filter
+    function resetFilter() {
+        setFilterCert([]);
+        setFilterLevel([]);
+        setFilterSub([]);
+        setFilterStatus({ value: "all", label: "Semua" });
+        setPage(1);
+        toast.success("Filter berhasil direset");
+    }
+
     const startIdx = totalElements === 0 ? 0 : (page - 1) * rowsPerPage + 1;
 
     return (
         <div>
             {/* Toolbar Filter + Actions */}
-            <div className="mb-4 grid grid-cols-1 md:grid-cols-6 gap-3 items-end text-xs">
-                {/* Filter Sertifikasi */}
-                <div className="col-span-1">
-                    <Select
-                        options={certOptions}
-                        value={filterCert}
-                        onChange={setFilterCert}
-                        isClearable
-                        isMulti
-                        placeholder="Filter Sertifikasi"
-                    />
-                </div>
+            <div className="mb-4 space-y-3">
+                {/* Row 2: filters + clear */}
+                <div className="grid grid-cols-1 md:grid-cols-6 gap-3 items-end text-xs">
+                    {/* Filter Sertifikasi */}
+                    <div className="col-span-1">
+                        <Select
+                            options={certOptions}
+                            value={filterCert}
+                            onChange={setFilterCert}
+                            isClearable
+                            isMulti
+                            placeholder="Filter Sertifikasi"
+                        />
+                    </div>
 
-                {/* Filter Level */}
-                <div className="col-span-1">
-                    <Select
-                        options={levelOptions}
-                        value={filterLevel}
-                        onChange={setFilterLevel}
-                        isClearable
-                        isMulti
-                        placeholder="Filter Level"
-                    />
-                </div>
+                    {/* Filter Level */}
+                    <div className="col-span-1">
+                        <Select
+                            options={levelOptions}
+                            value={filterLevel}
+                            onChange={setFilterLevel}
+                            isClearable
+                            isMulti
+                            placeholder="Filter Level"
+                        />
+                    </div>
 
-                {/* Filter Sub Bidang */}
-                <div className="col-span-1">
-                    <Select
-                        options={subOptions}
-                        value={filterSub}
-                        onChange={setFilterSub}
-                        isClearable
-                        isMulti
-                        placeholder="Filter Sub Bidang"
-                    />
-                </div>
+                    {/* Filter Sub Bidang */}
+                    <div className="col-span-1">
+                        <Select
+                            options={subOptions}
+                            value={filterSub}
+                            onChange={setFilterSub}
+                            isClearable
+                            isMulti
+                            placeholder="Filter Sub Bidang"
+                        />
+                    </div>
 
-                {/* Filter Status */}
-                <div className="col-span-1">
-                    <Select
-                        options={[
-                            { value: "all", label: "Semua" },
-                            { value: "active", label: "Aktif" },
-                            { value: "inactive", label: "Nonaktif" },
-                        ]}
-                        value={filterStatus}
-                        onChange={setFilterStatus}
-                        placeholder="Status"
-                    />
-                </div>
+                    {/* Filter Status */}
+                    <div className="col-span-1">
+                        <Select
+                            options={[
+                                { value: "all", label: "Semua" },
+                                { value: "active", label: "Aktif" },
+                                { value: "inactive", label: "Nonaktif" },
+                            ]}
+                            value={filterStatus}
+                            onChange={setFilterStatus}
+                            placeholder="Status"
+                        />
+                    </div>
 
-                {/* Tombol Tambah Aturan */}
-                <div className="col-span-1 flex justify-end">
-                    <button className="btn btn-primary btn-sm w-full" onClick={() => setOpenCreate(true)}>
-                        + Tambah Aturan
-                    </button>
-                </div>
+                    <div className="col-span-1">
+                        <button
+                            type="button"
+                            className="btn btn-primary btn-sm w-full"
+                            onClick={() => setOpenCreate(true)}
+                        >
+                            <Plus className="w-4 h-4" />
+                            <span>Tambah Aturan</span>
+                        </button>
+                    </div>
 
-                {/* Tombol Histori Global */}
-                <div className="col-span-1 flex justify-end">
-                    <button
-                        className="btn btn-accent btn-sm w-full"
-                        onClick={() => navigate("/sertifikasi/aturan-sertifikat/histories")}
-                    >
-                        Histori
-                    </button>
+                    <div className="col-span-1">
+                        <button
+                            type="button"
+                            className="btn btn-accent btn-sm w-full"
+                            onClick={() => navigate("/sertifikasi/aturan-sertifikat/histories")}
+                        >
+                            <HistoryIcon className="w-4 h-4" />
+                            <span>Histori</span>
+                        </button>
+                    </div>
+
+                    {/* Spacer supaya grid tetap 6 kolom */}
+                    <div className="col-span-1 hidden md:block" />
                 </div>
             </div>
 
             {/* Table */}
             <div className="overflow-x-auto rounded-xl border border-gray-200 shadow bg-base-100">
                 <table className="table table-zebra">
-                    <thead className="bg-base-200 text-xs">
+                    <thead className="bg-base-200 text-xs whitespace-nowrap">
                         <tr>
                             <th>No</th>
+                            <th>Aksi</th>
                             <th>Sertifikasi</th>
                             <th>Jenjang</th>
                             <th>Sub Bidang</th>
@@ -200,19 +293,18 @@ export default function CertificationRulePage() {
                             <th>Wajib Setelah Masuk</th>
                             <th>Status</th>
                             <th>Updated At</th>
-                            <th>Aksi</th>
                         </tr>
                     </thead>
-                    <tbody className="text-xs">
+                    <tbody className="text-xs whitespace-nowrap">
                         {loading ? (
                             <tr>
-                                <td colSpan={11} className="text-center py-10">
+                                <td colSpan={TABLE_COLS} className="text-center py-10">
                                     <span className="loading loading-dots loading-md" />
                                 </td>
                             </tr>
                         ) : rows.length === 0 ? (
                             <tr>
-                                <td colSpan={11} className="text-center text-gray-400 py-10">
+                                <td colSpan={TABLE_COLS} className="text-center text-gray-400 py-10">
                                     Tidak ada data
                                 </td>
                             </tr>
@@ -220,6 +312,27 @@ export default function CertificationRulePage() {
                             rows.map((r, idx) => (
                                 <tr key={r.id}>
                                     <td>{startIdx + idx}</td>
+
+                                    {/* Aksi: edit + delete (icon) */}
+                                    <td className="space-x-1">
+                                        <button
+                                            type="button"
+                                            className="btn btn-xs btn-soft btn-warning border-warning"
+                                            onClick={() => setEditItem(r)}
+                                            title="Edit aturan"
+                                        >
+                                            <Pencil className="w-3 h-3" />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="btn btn-xs btn-soft btn-error border-error"
+                                            onClick={() => setConfirm({ open: true, id: r.id })}
+                                            title="Hapus aturan"
+                                        >
+                                            <Trash2 className="w-3 h-3" />
+                                        </button>
+                                    </td>
+
                                     <td>{r.certificationCode}</td>
                                     <td>{r.certificationLevelLevel || "-"}</td>
                                     <td>{r.subFieldCode || "-"}</td>
@@ -227,47 +340,8 @@ export default function CertificationRulePage() {
                                     <td>{r.reminderMonths} bulan</td>
                                     <td>{r.refreshmentTypeName || "-"}</td>
                                     <td>{r.wajibSetelahMasuk != null ? `${r.wajibSetelahMasuk} bulan` : "-"}</td>
-                                    <td>
-                                        {r.isActive ? (
-                                            <span className="badge badge-success badge-sm text-white">ACTIVE</span>
-                                        ) : (
-                                            <span className="badge badge-warning badge-sm text-white">NONACTIVE</span>
-                                        )}
-                                    </td>
-                                    <td>
-                                        {r.updatedAt
-                                            ? new Date(r.updatedAt).toLocaleDateString("id-ID", {
-                                                  day: "2-digit",
-                                                  month: "short",
-                                                  year: "numeric",
-                                              })
-                                            : "-"}
-                                    </td>
-                                    <td className="space-x-1 space-y-1">
-                                        {/* 🔹 Tombol Histori per baris dihapus */}
-                                        <button
-                                            className={`btn btn-xs ${
-                                                r.isActive
-                                                    ? "btn-warning btn-soft border-warning"
-                                                    : "btn-success btn-soft border-success"
-                                            }`}
-                                            onClick={() => onToggle(r.id)}
-                                        >
-                                            {r.isActive ? "Nonaktifkan" : "Aktifkan"}
-                                        </button>
-                                        <button
-                                            className="btn btn-xs btn-soft btn-warning border-warning"
-                                            onClick={() => setEditItem(r)}
-                                        >
-                                            Edit
-                                        </button>
-                                        <button
-                                            className="btn btn-xs btn-soft btn-error border-error"
-                                            onClick={() => setConfirm({ open: true, id: r.id })}
-                                        >
-                                            Delete
-                                        </button>
-                                    </td>
+                                    <td>{renderStatusBadge(r)}</td>
+                                    <td>{formatDateTime(r.updatedAt)}</td>
                                 </tr>
                             ))
                         )}
@@ -313,14 +387,16 @@ export default function CertificationRulePage() {
                     <h3 className="font-bold text-lg">Hapus Aturan Sertifikasi?</h3>
                     <p className="py-2">Data ini akan dinonaktifkan dari sistem.</p>
                     <div className="modal-action">
-                        <button className="btn" onClick={() => setConfirm({ open: false })}>
+                        <button type="button" className="btn" onClick={() => setConfirm({ open: false, id: null })}>
                             Batal
                         </button>
                         <button
+                            type="button"
                             className="btn btn-error"
                             onClick={() => {
+                                if (!confirm.id) return;
                                 onDelete(confirm.id);
-                                setConfirm({ open: false });
+                                setConfirm({ open: false, id: null });
                             }}
                         >
                             Hapus
@@ -328,9 +404,44 @@ export default function CertificationRulePage() {
                     </div>
                 </div>
                 <form method="dialog" className="modal-backdrop">
-                    <button>close</button>
+                    <button type="button" onClick={() => setConfirm({ open: false, id: null })}>
+                        close
+                    </button>
                 </form>
             </dialog>
+
+            {/* Floating status menu: Aktif / Nonaktif */}
+            {statusMenu && (
+                <div className="fixed inset-0 z-[999]" onClick={() => setStatusMenu(null)}>
+                    <div
+                        className="absolute"
+                        style={{ top: statusMenu.y, left: statusMenu.x }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="bg-base-100 shadow-xl rounded-2xl p-3 text-xs flex flex-col gap-2">
+                            {[
+                                { active: true, label: "Aktif" },
+                                { active: false, label: "Nonaktif" },
+                            ].map(({ active, label }) => {
+                                const { btnCls } = getStatusStyle(active);
+                                return (
+                                    <button
+                                        key={label}
+                                        type="button"
+                                        className={`btn btn-xs ${btnCls} text-white rounded-full w-full justify-center`}
+                                        onClick={async () => {
+                                            await handleChangeStatus(statusMenu.row, active);
+                                            setStatusMenu(null);
+                                        }}
+                                    >
+                                        {label}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

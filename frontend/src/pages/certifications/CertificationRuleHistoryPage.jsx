@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import toast from "react-hot-toast";
 import Select from "react-select";
 import Pagination from "../../components/common/Pagination";
@@ -19,8 +19,19 @@ export default function CertificationRuleHistoryPage() {
     const [totalPages, setTotalPages] = useState(0);
     const [totalElements, setTotalElements] = useState(0);
 
+    // options dibikin constant biar ga nulis ulang
+    const actionOptions = useMemo(
+        () => [
+            { value: "all", label: "Semua Aksi" },
+            { value: "CREATED", label: "CREATED" },
+            { value: "UPDATED", label: "UPDATED" },
+            { value: "DELETED", label: "DELETED" },
+        ],
+        []
+    );
+
     // Filters
-    const [filterAction, setFilterAction] = useState({ value: "all", label: "Semua Aksi" });
+    const [filterAction, setFilterAction] = useState(actionOptions[0]);
 
     async function load() {
         setLoading(true);
@@ -45,6 +56,7 @@ export default function CertificationRuleHistoryPage() {
 
     useEffect(() => {
         load();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [id, page, rowsPerPage, filterAction]);
 
     useEffect(() => {
@@ -63,6 +75,15 @@ export default function CertificationRuleHistoryPage() {
         });
     };
 
+    // handler khusus biar clear filter selalu balik ke "Semua Aksi"
+    const handleChangeAction = (option) => {
+        if (!option) {
+            setFilterAction(actionOptions[0]); // reset ke default
+        } else {
+            setFilterAction(option);
+        }
+    };
+
     return (
         <div className="p-4">
             {/* Toolbar */}
@@ -75,43 +96,24 @@ export default function CertificationRuleHistoryPage() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 text-xs items-end">
                     {/* Filter aksi */}
-                    <div className="col-span-2">
+                    <div className="col-span-1">
                         <Select
-                            options={[
-                                { value: "all", label: "Semua Aksi" },
-                                { value: "CREATED", label: "CREATED" },
-                                { value: "UPDATED", label: "UPDATED" },
-                                { value: "DELETED", label: "DELETED" },
-                            ]}
+                            options={actionOptions}
                             value={filterAction}
-                            onChange={setFilterAction}
+                            onChange={handleChangeAction}
                             placeholder="Filter Aksi"
                             isClearable
                         />
                     </div>
 
                     <div className="col-span-1"></div>
-
-                    {/* Clear Filter */}
-                    <div className="col-span-1">
-                        <button
-                            className="btn btn-soft btn-accent border-accent btn-sm w-full"
-                            onClick={() => {
-                                setFilterAction({ value: "all", label: "Semua Aksi" });
-                                setPage(1);
-                                toast.success("✅ Filter direset");
-                            }}
-                        >
-                            Clear Filter
-                        </button>
-                    </div>
                 </div>
             </div>
 
             {/* Table */}
             <div className="overflow-x-auto rounded-xl border border-gray-200 shadow bg-base-100">
                 <table className="table table-zebra text-xs">
-                    <thead className="bg-base-200">
+                    <thead className="bg-base-200 text-xs">
                         <tr>
                             <th>No</th>
                             <th>Aksi</th>

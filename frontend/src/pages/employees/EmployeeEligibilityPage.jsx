@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import toast from "react-hot-toast";
 import Select from "react-select";
@@ -10,6 +10,9 @@ import { fetchCertifications } from "../../services/certificationService";
 import { fetchCertificationLevels } from "../../services/certificationLevelService";
 import { fetchSubFields } from "../../services/subFieldService";
 import { searchEmployees } from "../../services/employeeService";
+import { Eye, RotateCw, Eraser } from "lucide-react";
+
+const TABLE_COLS = 15; // No + Aksi + 12 kolom lama + Perpanjang
 
 export default function EmployeeEligibilityPage() {
     const [rows, setRows] = useState([]);
@@ -22,12 +25,13 @@ export default function EmployeeEligibilityPage() {
     const [totalPages, setTotalPages] = useState(0);
     const [totalElements, setTotalElements] = useState(0);
 
-    // Filters
+    // Master options
     const [jobOptions, setJobOptions] = useState([]);
     const [certOptions, setCertOptions] = useState([]);
     const [levelOptions, setLevelOptions] = useState([]);
     const [subOptions, setSubOptions] = useState([]);
 
+    // Filters
     const [filterEmployee, setFilterEmployee] = useState(null);
     const [filterJob, setFilterJob] = useState([]);
     const [filterCert, setFilterCert] = useState([]);
@@ -36,7 +40,49 @@ export default function EmployeeEligibilityPage() {
     const [filterStatus, setFilterStatus] = useState([]);
     const [filterSource, setFilterSource] = useState([]);
 
-    // Load data
+    const statusBadgeClass = useMemo(
+        () => ({
+            ACTIVE: "badge-success",
+            DUE: "badge-warning",
+            EXPIRED: "badge-error",
+            NOT_YET_CERTIFIED: "badge-secondary",
+        }),
+        []
+    );
+
+    // 🔹 Helper: label status yang lebih ramah user
+    function formatStatusLabel(status) {
+        if (!status) return "-";
+        switch (status) {
+            case "NOT_YET_CERTIFIED":
+                return "Belum Sertifikasi";
+            case "ACTIVE":
+                return "Active";
+            case "DUE":
+                return "Due";
+            case "EXPIRED":
+                return "Expired";
+            default: {
+                const s = status.toString().toLowerCase();
+                return s.charAt(0).toUpperCase() + s.slice(1);
+            }
+        }
+    }
+
+    // 🔹 Helper: label source yang lebih enak dibaca
+    function formatSourceLabel(source) {
+        if (!source) return "-";
+        switch (source) {
+            case "BY_JOB":
+                return "By Job";
+            case "BY_NAME":
+                return "By Name";
+            default:
+                return source;
+        }
+    }
+
+    // 🔹 Load data table
     async function load() {
         setLoading(true);
         try {
@@ -63,12 +109,13 @@ export default function EmployeeEligibilityPage() {
         }
     }
 
+    // 🔹 Refresh eligibility
     async function onRefresh() {
         setRefreshing(true);
         try {
             await refreshEmployeeEligibility();
             toast.success("Eligibility berhasil di-refresh");
-            load();
+            await load();
         } catch {
             toast.error("Gagal refresh eligibility");
         } finally {
@@ -76,7 +123,7 @@ export default function EmployeeEligibilityPage() {
         }
     }
 
-    // Load filter options
+    // 🔹 Load master filter options
     async function loadFilters() {
         try {
             const [jobs, certs, levels, subs] = await Promise.all([
@@ -88,7 +135,7 @@ export default function EmployeeEligibilityPage() {
 
             setJobOptions(jobs.map((j) => ({ value: j.id, label: j.name })));
             setCertOptions(certs.map((c) => ({ value: c.code, label: c.code })));
-            setLevelOptions(levels.map((l) => ({ value: l.level, label: l.level })));
+            setLevelOptions(levels.map((l) => ({ value: l.level, label: String(l.level) })));
             setSubOptions(subs.map((s) => ({ value: s.code, label: s.code })));
         } catch (err) {
             console.error("loadFilters error:", err);
@@ -96,11 +143,11 @@ export default function EmployeeEligibilityPage() {
         }
     }
 
-    // Async search employees
+    // Async search employees (untuk filter pegawai)
     const loadEmployees = async (inputValue) => {
         try {
             const res = await searchEmployees({ search: inputValue, page: 0, size: 20 });
-            return res.content.map((e) => ({
+            return (res.content || []).map((e) => ({
                 value: e.id,
                 label: `${e.nip} - ${e.name}`,
             }));
@@ -109,10 +156,13 @@ export default function EmployeeEligibilityPage() {
         }
     };
 
+    // load data tiap dependency berubah
     useEffect(() => {
         load();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [page, rowsPerPage, filterEmployee, filterJob, filterCert, filterLevel, filterSub, filterStatus, filterSource]);
 
+    // reset ke page 1 tiap filter berubah
     useEffect(() => {
         setPage(1);
     }, [filterEmployee, filterJob, filterCert, filterLevel, filterSub, filterStatus, filterSource]);
@@ -127,6 +177,7 @@ export default function EmployeeEligibilityPage() {
         <div>
             {/* Toolbar */}
             <div className="mb-4 space-y-3">
+                {/* Row 1: Filter pegawai + tombol kanan */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 text-xs">
                     <div className="col-span-1">
                         <AsyncSelect
@@ -139,15 +190,36 @@ export default function EmployeeEligibilityPage() {
                             isClearable
                         />
                     </div>
-                    <div className="col-span-3"></div>
-                    <div className="col-span-1">
-                        <button className="btn btn-primary btn-sm w-full" onClick={onRefresh} disabled={refreshing}>
-                            {refreshing && <span className="loading loading-spinner loading-xs" />}
-                            {refreshing ? "Refreshing..." : "Refresh Eligibility"}
-                        </button>
-                    </div>
+
+                    {/* spacer biar tombol tetap di kanan */}
+                    <div className="col-span-3" />
+
+                    {/* Tombol Refresh – col-span 1 */}
                     <div className="col-span-1">
                         <button
+                            type="button"
+                            className={`btn btn-primary btn-sm w-full ${refreshing ? "btn-disabled" : ""}`}
+                            onClick={onRefresh}
+                            disabled={refreshing}
+                        >
+                            {refreshing ? (
+                                <>
+                                    <span className="loading loading-spinner loading-xs" />
+                                    Refreshing...
+                                </>
+                            ) : (
+                                <>
+                                    <RotateCw className="w-4 h-4" />
+                                    Refresh Eligibility
+                                </>
+                            )}
+                        </button>
+                    </div>
+
+                    {/* Tombol Clear – col-span 1 */}
+                    <div className="col-span-1">
+                        <button
+                            type="button"
                             className="btn btn-accent btn-soft border-accent btn-sm w-full"
                             onClick={() => {
                                 setFilterEmployee(null);
@@ -161,12 +233,13 @@ export default function EmployeeEligibilityPage() {
                                 toast.success("Clear filter berhasil");
                             }}
                         >
+                            <Eraser className="w-4 h-4" />
                             Clear Filter
                         </button>
                     </div>
                 </div>
 
-                {/* Filters */}
+                {/* Row 2: Filters detail */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 text-xs">
                     <Select
                         isMulti
@@ -199,10 +272,10 @@ export default function EmployeeEligibilityPage() {
                     <Select
                         isMulti
                         options={[
-                            { value: "NOT_YET_CERTIFIED", label: "BELUM SERTIFIKASI" },
-                            { value: "ACTIVE", label: "ACTIVE" },
-                            { value: "DUE", label: "DUE" },
-                            { value: "EXPIRED", label: "EXPIRED" },
+                            { value: "NOT_YET_CERTIFIED", label: "Belum Sertifikasi" },
+                            { value: "ACTIVE", label: "Active" },
+                            { value: "DUE", label: "Due" },
+                            { value: "EXPIRED", label: "Expired" },
                         ]}
                         value={filterStatus}
                         onChange={setFilterStatus}
@@ -227,51 +300,60 @@ export default function EmployeeEligibilityPage() {
                     <thead className="bg-base-200 text-xs">
                         <tr>
                             <th>No</th>
+                            <th>Aksi</th>
                             <th>NIP</th>
                             <th>Nama Pegawai</th>
                             <th>Jabatan</th>
-                            <th>Kode Sertifikasi</th>
+                            <th>Kode Sertifikat</th>
                             <th>Jenjang</th>
                             <th>Sub Bidang</th>
                             <th>SK Efektif</th>
                             <th>Status</th>
                             <th>Due Date</th>
                             <th>Sumber</th>
+                            <th>Training</th>
+                            <th>Refreshment</th>
+                            <th>Perpanjang</th>
                         </tr>
                     </thead>
                     <tbody className="text-xs">
                         {loading ? (
                             <tr>
-                                <td colSpan={11} className="text-center py-10">
+                                <td colSpan={TABLE_COLS} className="text-center py-10">
                                     <span className="loading loading-dots loading-md" />
                                 </td>
                             </tr>
                         ) : rows.length === 0 ? (
                             <tr>
-                                <td colSpan={11} className="text-center text-gray-400 py-10">
+                                <td colSpan={TABLE_COLS} className="text-center text-gray-400 py-10">
                                     Tidak ada data
                                 </td>
                             </tr>
                         ) : (
                             rows.map((r, idx) => (
-                                <tr key={r.id}>
+                                <tr key={r.id ?? `${r.employeeId}-${r.certificationRuleId}`}>
                                     <td>{startIdx + idx}</td>
-                                    <td>{r.nip}</td>
 
-                                    {/* 🔹 Nama Pegawai dengan Link ke Detail */}
+                                    {/* Aksi: tombol detail */}
                                     <td>
-                                        <Link
-                                            to={`/employee/${r.employeeId}`}
-                                            className="hover:text-secondary underline"
-                                        >
-                                            {r.employeeName}
-                                        </Link>
+                                        <div className="flex gap-2">
+                                            <div className="tooltip" data-tip="Lihat detail pegawai">
+                                                <Link
+                                                    to={`/employee/${r.employeeId}`}
+                                                    className="btn btn-xs btn-info btn-soft border-info"
+                                                >
+                                                    <Eye className="w-3 h-3" />
+                                                </Link>
+                                            </div>
+                                        </div>
                                     </td>
 
+                                    <td>{r.nip}</td>
+                                    <td>{r.employeeName}</td>
                                     <td>{r.jobPositionTitle}</td>
                                     <td>{r.certificationCode}</td>
-                                    <td>{r.certificationLevelLevel || "-"}</td>
-                                    <td>{r.subFieldCode || "-"}</td>
+                                    <td>{r.certificationLevelLevel ?? "-"}</td>
+                                    <td>{r.subFieldCode ?? "-"}</td>
                                     <td>
                                         {r.effectiveDate
                                             ? new Date(r.effectiveDate).toLocaleDateString("id-ID", {
@@ -281,20 +363,14 @@ export default function EmployeeEligibilityPage() {
                                               })
                                             : "-"}
                                     </td>
-
                                     <td>
                                         <span
                                             className={`badge badge-sm text-white whitespace-nowrap ${
-                                                r.status === "ACTIVE"
-                                                    ? "badge-success"
-                                                    : r.status === "DUE"
-                                                    ? "badge-warning"
-                                                    : r.status === "EXPIRED"
-                                                    ? "badge-error"
-                                                    : "badge-secondary"
+                                                statusBadgeClass[r.status] ?? "badge-secondary"
                                             }`}
+                                            title={r.sisaWaktu || ""}
                                         >
-                                            {r.status === "NOT_YET_CERTIFIED" ? "BELUM SERTIFIKASI" : r.status}
+                                            {formatStatusLabel(r.status)}
                                         </span>
                                     </td>
                                     <td>
@@ -308,13 +384,16 @@ export default function EmployeeEligibilityPage() {
                                     </td>
                                     <td>
                                         <span
-                                            className={`badge badge-sm text-white ${
-                                                r.source === "BY_JOB" ? "badge-accent" : "badge-info"
+                                            className={`badge badge-sm text-white whitespace-nowrap ${
+                                                r.source === "BY_JOB" ? "badge-neutral" : "badge-info"
                                             }`}
                                         >
-                                            {r.source}
+                                            {formatSourceLabel(r.source)}
                                         </span>
                                     </td>
+                                    <td className="text-center">{r.trainingCount ?? 0}</td>
+                                    <td className="text-center">{r.refreshmentCount ?? 0}</td>
+                                    <td className="text-center">{r.perpanjangCount ?? 0}</td>
                                 </tr>
                             ))
                         )}

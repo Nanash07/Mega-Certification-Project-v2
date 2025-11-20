@@ -10,8 +10,9 @@ import {
 } from "../../services/employeeBatchService";
 import { fetchBatchById, sendBatchNotifications } from "../../services/batchService";
 import AddEmployeeBatchModal from "../../components/batches/AddEmployeeBatchModal";
+import EditBatchModal from "../../components/batches/EditBatchModal";
 import Pagination from "../../components/common/Pagination";
-import { ArrowLeft, Plus, Send, RotateCcw } from "lucide-react";
+import { ArrowLeft, Plus, Send, RotateCcw, Pencil } from "lucide-react";
 import Select from "react-select";
 
 export default function DetailBatchPage() {
@@ -30,6 +31,7 @@ export default function DetailBatchPage() {
     const [totalElements, setTotalElements] = useState(0);
 
     const [openAdd, setOpenAdd] = useState(false);
+    const [openEdit, setOpenEdit] = useState(false);
     const [confirmDelete, setConfirmDelete] = useState({ open: false, id: null });
     const [confirmSend, setConfirmSend] = useState(false);
 
@@ -44,12 +46,27 @@ export default function DetailBatchPage() {
     // kirim email
     const [sendingEmails, setSendingEmails] = useState(false);
 
+    // disable action per row waktu request
+    const [pendingRowId, setPendingRowId] = useState(null);
+
     const statusOptions = [
         { value: "REGISTERED", label: "Registered" },
         { value: "ATTENDED", label: "Attended" },
         { value: "PASSED", label: "Passed" },
         { value: "FAILED", label: "Failed" },
     ];
+
+    // badge jenis
+    function renderTypeBadge(type) {
+        if (!type) return "-";
+        const map = {
+            CERTIFICATION: { label: "Sertifikasi", cls: "badge-info" },
+            TRAINING: { label: "Training", cls: "badge-primary" },
+            REFRESHMENT: { label: "Refreshment", cls: "badge-secondary" },
+        };
+        const m = map[type] || { label: type, cls: "badge-neutral" };
+        return <span className={`badge badge-sm ${m.cls}`}>{m.label}</span>;
+    }
 
     // ================== LOAD DATA ==================
     async function loadData() {
@@ -61,7 +78,7 @@ export default function DetailBatchPage() {
                     batchId: id,
                     page: page - 1,
                     size: rowsPerPage,
-                    search: filterEmployee?.value ?? null, // NIP
+                    search: filterEmployee?.value ?? null, // NIP / nama (BE handle both)
                     status: filterStatus?.value ?? null,
                     regional: filterRegional?.value ?? null,
                     division: filterDivision?.value ?? null,
@@ -80,7 +97,6 @@ export default function DetailBatchPage() {
         }
     }
 
-    // load paged data saat param berubah
     useEffect(() => {
         loadData();
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -101,12 +117,15 @@ export default function DetailBatchPage() {
 
     // ================== HANDLERS ==================
     async function handleUpdateStatus(pid, status) {
+        setPendingRowId(pid);
         try {
             const updated = await updateEmployeeBatchStatus(pid, status);
             toast.success("Status peserta diperbarui");
             setParticipants((prev) => prev.map((p) => (p.id === pid ? { ...p, ...updated } : p)));
         } catch (e) {
             toast.error(e?.response?.data?.message || "Gagal update status");
+        } finally {
+            setPendingRowId(null);
         }
     }
 
@@ -123,12 +142,15 @@ export default function DetailBatchPage() {
     }
 
     async function handleRetry(pid) {
+        setPendingRowId(pid);
         try {
             const updated = await retryEmployeeBatch(pid);
             toast.success("Peserta di-set ulang ke REGISTERED");
             setParticipants((prev) => prev.map((p) => (p.id === pid ? { ...p, ...updated } : p)));
         } catch (e) {
             toast.error(e?.response?.data?.message || "Gagal set ulang peserta");
+        } finally {
+            setPendingRowId(null);
         }
     }
 
@@ -137,7 +159,9 @@ export default function DetailBatchPage() {
         try {
             if (!batch) return;
             setSendingEmails(true);
-            const sent = await sendBatchNotifications(batch.id);
+            const sent = await sendBatchNotifications(batch.id, {
+                status: filterStatus?.value, // optional
+            });
             toast.success(`Email terkirim ke ${sent} peserta`);
         } catch (err) {
             console.error(err);
@@ -152,9 +176,7 @@ export default function DetailBatchPage() {
     const employeeOptions = useMemo(
         () =>
             (allParticipants.length ? allParticipants : participants).map((p) => ({
-                // kirim NIP ke BE
                 value: p.employeeNip,
-                // label informatif
                 label: `${p.employeeNip} - ${p.employeeName}${p.employeeJobName ? ` (${p.employeeJobName})` : ""}`,
             })),
         [allParticipants, participants]
@@ -193,14 +215,26 @@ export default function DetailBatchPage() {
     // ================== RENDER ==================
     return (
         <div className="space-y-6">
-            {/* Header */}
-            <div>
+            {/* Header Row: Back (kiri) — Edit (kanan) */}
+            <div className="flex items-center justify-between gap-2">
                 <button className="btn btn-sm btn-accent flex items-center gap-1" onClick={() => navigate(-1)}>
                     <ArrowLeft className="w-4 h-4" />
                     Kembali
                 </button>
-                <h2 className="text-xl font-bold mt-2">Detail Batch</h2>
+
+                <button
+                    className="btn btn-secondary btn-sm flex items-center gap-1 disabled:opacity-60"
+                    onClick={() => setOpenEdit(true)}
+                    disabled={!batch}
+                    title="Edit detail batch"
+                >
+                    <Pencil className="w-4 h-4" />
+                    Edit Batch
+                </button>
             </div>
+
+            {/* Title */}
+            <h2 className="text-xl font-bold">Detail Batch</h2>
 
             {/* Batch Info */}
             {batch && (
@@ -210,11 +244,23 @@ export default function DetailBatchPage() {
                             <span className="font-bold">Nama Batch:</span>
                             <div>{batch.batchName}</div>
                         </div>
+
+                        {/* JENIS BATCH (baru) */}
+                        <div>
+                            <span className="font-bold">Jenis Batch:</span>
+                            <div>{renderTypeBadge(batch.type)}</div>
+                        </div>
+
                         <div>
                             <span className="font-bold">Sertifikasi:</span>
                             <div>
-                                {batch.certificationName}
-                                {batch.certificationLevelName ? ` - ${batch.certificationLevelName}` : ""}
+                                {[
+                                    batch.certificationCode,
+                                    batch.certificationLevelName,
+                                    batch.subFieldCode ?? batch.subBidangCode,
+                                ]
+                                    .filter((x) => x && String(x).trim() !== "")
+                                    .join(" - ") || "-"}
                             </div>
                         </div>
                         <div>
@@ -262,9 +308,10 @@ export default function DetailBatchPage() {
                     </div>
                 </div>
             )}
-            {/* Actions (match ukuran filter: 6 kolom, tiap item col-span-1) */}
+
+            {/* Actions */}
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-6 gap-3 items-center">
-                {/* kolom 1 */}
+                {/* Tambah Peserta */}
                 <div className="col-span-1">
                     <button
                         className="btn btn-primary btn-sm w-full flex items-center gap-1"
@@ -275,7 +322,7 @@ export default function DetailBatchPage() {
                     </button>
                 </div>
 
-                {/* kolom 2 */}
+                {/* Kirim Email */}
                 <div className="col-span-1">
                     <button
                         className="btn btn-success btn-sm w-full flex items-center gap-1 disabled:opacity-60"
@@ -287,7 +334,7 @@ export default function DetailBatchPage() {
                     </button>
                 </div>
 
-                {/* kolom 6 (kolom 3–5 kosong otomatis) */}
+                {/* Clear Filter di paling kanan */}
                 <div className="col-span-1 xl:col-start-6">
                     <button className="btn btn-accent btn-soft border-accent btn-sm w-full" onClick={resetFilter}>
                         Clear Filter
@@ -295,7 +342,7 @@ export default function DetailBatchPage() {
                 </div>
             </div>
 
-            {/* Filters Row (Clear Filter sebaris dengan filter) */}
+            {/* Filters Row */}
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-6 gap-3 text-xs items-end">
                 <Select
                     options={employeeOptions}
@@ -421,14 +468,23 @@ export default function DetailBatchPage() {
                                             {p.status === "REGISTERED" && (
                                                 <>
                                                     <button
-                                                        className="btn btn-xs btn-warning btn-soft border-warning"
+                                                        className={`btn btn-xs btn-warning btn-soft border-warning ${
+                                                            pendingRowId === p.id ? "btn-disabled" : ""
+                                                        }`}
                                                         onClick={() => handleUpdateStatus(p.id, "ATTENDED")}
+                                                        disabled={pendingRowId === p.id}
                                                     >
+                                                        {pendingRowId === p.id ? (
+                                                            <span className="loading loading-spinner loading-xs" />
+                                                        ) : null}
                                                         Attend
                                                     </button>
                                                     <button
-                                                        className="btn btn-xs btn-neutral btn-soft border-neutral"
+                                                        className={`btn btn-xs btn-neutral btn-soft border-neutral ${
+                                                            pendingRowId === p.id ? "btn-disabled" : ""
+                                                        }`}
                                                         onClick={() => setConfirmDelete({ open: true, id: p.id })}
+                                                        disabled={pendingRowId === p.id}
                                                     >
                                                         Hapus
                                                     </button>
@@ -439,15 +495,27 @@ export default function DetailBatchPage() {
                                             {p.status === "ATTENDED" && (
                                                 <>
                                                     <button
-                                                        className="btn btn-xs btn-success btn-soft border-success"
+                                                        className={`btn btn-xs btn-success btn-soft border-success ${
+                                                            pendingRowId === p.id ? "btn-disabled" : ""
+                                                        }`}
                                                         onClick={() => handleUpdateStatus(p.id, "PASSED")}
+                                                        disabled={pendingRowId === p.id}
                                                     >
+                                                        {pendingRowId === p.id ? (
+                                                            <span className="loading loading-spinner loading-xs" />
+                                                        ) : null}
                                                         Passed
                                                     </button>
                                                     <button
-                                                        className="btn btn-xs btn-error btn-soft border-error"
+                                                        className={`btn btn-xs btn-error btn-soft border-error ${
+                                                            pendingRowId === p.id ? "btn-disabled" : ""
+                                                        }`}
                                                         onClick={() => handleUpdateStatus(p.id, "FAILED")}
+                                                        disabled={pendingRowId === p.id}
                                                     >
+                                                        {pendingRowId === p.id ? (
+                                                            <span className="loading loading-spinner loading-xs" />
+                                                        ) : null}
                                                         Failed
                                                     </button>
                                                 </>
@@ -456,11 +524,18 @@ export default function DetailBatchPage() {
                                             {/* FAILED: Ulangi */}
                                             {p.status === "FAILED" && (
                                                 <button
-                                                    className="btn btn-xs btn-info btn-soft border-info flex items-center gap-1"
+                                                    className={`btn btn-xs btn-info btn-soft border-info flex items-center gap-1 ${
+                                                        pendingRowId === p.id ? "btn-disabled" : ""
+                                                    }`}
                                                     onClick={() => handleRetry(p.id)}
                                                     title="Ulang attempt (balik ke REGISTERED)"
+                                                    disabled={pendingRowId === p.id}
                                                 >
-                                                    <RotateCcw className="w-3 h-3" />
+                                                    {pendingRowId === p.id ? (
+                                                        <span className="loading loading-spinner loading-xs" />
+                                                    ) : (
+                                                        <RotateCcw className="w-3 h-3" />
+                                                    )}
                                                     Ulang
                                                 </button>
                                             )}
@@ -494,6 +569,9 @@ export default function DetailBatchPage() {
             {/* Modal Tambah Peserta */}
             <AddEmployeeBatchModal open={openAdd} batchId={id} onClose={() => setOpenAdd(false)} onSaved={loadData} />
 
+            {/* Modal Edit Batch */}
+            <EditBatchModal open={openEdit} data={batch} onClose={() => setOpenEdit(false)} onSaved={loadData} />
+
             {/* Confirm Delete Modal */}
             {confirmDelete.open && (
                 <dialog className="modal" open>
@@ -521,7 +599,14 @@ export default function DetailBatchPage() {
                     <div className="modal-box">
                         <h3 className="font-bold text-lg">Kirim Email ke Peserta?</h3>
                         <p className="py-2">
-                            Sistem akan mengirim email ke <b>semua peserta</b> pada batch ini.
+                            Sistem akan mengirim email ke <b>semua peserta</b> pada batch ini
+                            {filterStatus?.value ? (
+                                <>
+                                    {" "}
+                                    dengan status <b>{filterStatus.value}</b>
+                                </>
+                            ) : null}
+                            .
                             {typeof totalElements === "number" && totalElements > 0 ? (
                                 <>
                                     {" "}

@@ -18,5 +18,5 @@ public class NotificationResponse {
     private LocalDateTime sentAt;
     private String relatedEntity;
     private Long relatedEntityId;
-    private String type; // tambahin biar FE bisa bedain CERT_REMINDER, BATCH_NOTIFICATION
+    private String type; // CERT_REMINDER, EXPIRED_NOTICE, BATCH_NOTIFICATION, dll
 }

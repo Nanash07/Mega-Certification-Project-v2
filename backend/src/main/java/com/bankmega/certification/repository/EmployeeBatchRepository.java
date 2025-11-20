@@ -28,4 +28,6 @@ public interface EmployeeBatchRepository
     List<EmployeeBatch> findByEmployee_IdAndBatch_CertificationRule_IdAndDeletedAtIsNull(Long employeeId, Long ruleId);
 
     List<EmployeeBatch> findByBatch_StatusInAndDeletedAtIsNull(List<Batch.Status> statuses);
+
+    List<EmployeeBatch> findByBatch_IdAndEmployee_IdIn(Long batchId, List<Long> employeeIds);
 }

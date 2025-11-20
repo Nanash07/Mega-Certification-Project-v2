@@ -30,7 +30,7 @@ import DivisionPage from "./pages/organizations/DivisionPage";
 import UnitPage from "./pages/organizations/UnitPage";
 import JobPositionPage from "./pages/organizations/JobPositionPage";
 
-// ================= CERTIFICATION MASTER =================
+// ================= SERTIFIKAT (MASTER) =================
 import CertificationPage from "./pages/certifications/CertificationPage";
 import CertificationLevelPage from "./pages/certifications/CertificationLevelPage";
 import SubFieldPage from "./pages/certifications/SubFieldPage";
@@ -257,9 +257,9 @@ export default function App() {
                     }
                 />
 
-                {/* ===== CERTIFICATION MASTER ===== */}
+                {/* ===== SERTIFIKAT (MASTER) – disesuaikan dengan MENU baru ===== */}
                 <Route
-                    path="/sertifikasi/jenis"
+                    path="/sertifikat/jenis"
                     element={
                         <ProtectedRoute roles={["SUPERADMIN"]}>
                             <MainLayout>
@@ -269,7 +269,7 @@ export default function App() {
                     }
                 />
                 <Route
-                    path="/sertifikasi/jenjang"
+                    path="/sertifikat/jenjang"
                     element={
                         <ProtectedRoute roles={["SUPERADMIN"]}>
                             <MainLayout>
@@ -279,7 +279,7 @@ export default function App() {
                     }
                 />
                 <Route
-                    path="/sertifikasi/sub-bidang"
+                    path="/sertifikat/sub-bidang"
                     element={
                         <ProtectedRoute roles={["SUPERADMIN"]}>
                             <MainLayout>
@@ -289,7 +289,7 @@ export default function App() {
                     }
                 />
                 <Route
-                    path="/sertifikasi/aturan-sertifikat"
+                    path="/sertifikat/aturan-sertifikat"
                     element={
                         <ProtectedRoute roles={["SUPERADMIN"]}>
                             <MainLayout>
@@ -299,7 +299,7 @@ export default function App() {
                     }
                 />
                 <Route
-                    path="/sertifikasi/aturan-sertifikat/histories"
+                    path="/sertifikat/aturan-sertifikat/histories"
                     element={
                         <ProtectedRoute roles={["SUPERADMIN"]}>
                             <MainLayout>
@@ -309,7 +309,7 @@ export default function App() {
                     }
                 />
                 <Route
-                    path="/sertifikasi/lembaga"
+                    path="/sertifikat/lembaga"
                     element={
                         <ProtectedRoute roles={["SUPERADMIN"]}>
                             <MainLayout>
@@ -331,6 +331,7 @@ export default function App() {
                     }
                 />
 
+                {/* ===== SETTINGS / NOTIFIKASI ===== */}
                 <Route
                     path="/settings/email-config"
                     element={
@@ -351,6 +352,7 @@ export default function App() {
                         </ProtectedRoute>
                     }
                 />
+
                 {/* ===== FALLBACK ===== */}
                 <Route path="*" element={<Navigate to="/login" replace />} />
             </Routes>

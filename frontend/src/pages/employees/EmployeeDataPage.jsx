@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { Download, Upload, History, Eraser } from "lucide-react";
 import toast from "react-hot-toast";
 import Select from "react-select";
 import AsyncSelect from "react-select/async";
@@ -14,8 +15,8 @@ import {
     fetchJobPositions,
     searchEmployees,
 } from "../../services/employeeService";
-import EditEmployeeModal from "../../components/employees/EditEmployeeModal";
 import ImportEmployeeModal from "../../components/employees/ImportEmployeeModal";
+import { Eye, Pencil, Trash2 } from "lucide-react";
 
 export default function EmployeePage() {
     const navigate = useNavigate();
@@ -27,6 +28,8 @@ export default function EmployeePage() {
     const [rowsPerPage, setRowsPerPage] = useState(10);
     const [totalPages, setTotalPages] = useState(0);
     const [totalElements, setTotalElements] = useState(0);
+
+    const TABLE_COLS = 12;
 
     // Filters
     const [filterEmployee, setFilterEmployee] = useState(null);
@@ -49,9 +52,15 @@ export default function EmployeePage() {
     ];
 
     // Modals
-    const [editItem, setEditItem] = useState(null);
     const [openImport, setOpenImport] = useState(false);
     const [confirm, setConfirm] = useState({ open: false, id: null });
+
+    // Helper: format status -> kapital depan doang
+    function formatStatusLabel(status) {
+        if (!status) return "-";
+        const s = status.toString().toLowerCase();
+        return s.charAt(0).toUpperCase() + s.slice(1);
+    }
 
     // Load master data
     useEffect(() => {
@@ -72,7 +81,7 @@ export default function EmployeePage() {
                 search: inputValue,
                 page: 0,
                 size: 20,
-                includeResigned, // 🧠 ikut toggle checkbox
+                includeResigned,
             });
             return res.content.map((e) => ({
                 value: e.id,
@@ -175,27 +184,31 @@ export default function EmployeePage() {
             {/* Toolbar */}
             <div className="mb-4 space-y-3">
                 <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-6 gap-3">
-                    <div className="hidden lg:block col-span-2"></div>
-                    <div className="col-span-1">
-                        <button className="btn btn-warning btn-sm w-full" onClick={handleDownloadTemplate}>
-                            Download Template
-                        </button>
-                    </div>
                     <div className="col-span-1">
                         <button className="btn btn-success btn-sm w-full" onClick={() => setOpenImport(true)}>
+                            <Upload className="w-4 h-4" />
                             Import Excel
                         </button>
                     </div>
+                    <div className="col-span-1">
+                        <button className="btn btn-secondary btn-sm w-full" onClick={handleDownloadTemplate}>
+                            <Download className="w-4 h-4" />
+                            Download Template
+                        </button>
+                    </div>
+                    <div className="hidden lg:block col-span-2"></div>
                     <div className="col-span-1">
                         <button
                             className="btn btn-sm btn-accent w-full"
                             onClick={() => navigate("/employee/data/histories")}
                         >
+                            <History className="w-4 h-4" />
                             Histori
                         </button>
                     </div>
                     <div className="col-span-1">
                         <button className="btn btn-accent btn-soft border-accent btn-sm w-full" onClick={resetFilter}>
+                            <Eraser className="w-4 h-4" />
                             Clear Filter
                         </button>
                     </div>
@@ -204,7 +217,7 @@ export default function EmployeePage() {
                 {/* Filters */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 text-xs items-center">
                     <AsyncSelect
-                        key={includeResigned ? "withResign" : "noResign"} // 🔥 re-render saat toggle berubah
+                        key={includeResigned ? "withResign" : "noResign"}
                         cacheOptions
                         defaultOptions
                         loadOptions={loadEmployees}
@@ -287,13 +300,13 @@ export default function EmployeePage() {
                     <tbody className="text-xs">
                         {loading ? (
                             <tr>
-                                <td colSpan={12} className="text-center py-10">
+                                <td colSpan={TABLE_COLS} className="text-center py-10">
                                     <span className="loading loading-dots loading-md" />
                                 </td>
                             </tr>
                         ) : rows.length === 0 ? (
                             <tr>
-                                <td colSpan={12} className="text-center text-gray-400 py-10">
+                                <td colSpan={TABLE_COLS} className="text-center text-gray-400 py-10">
                                     Tidak ada data
                                 </td>
                             </tr>
@@ -301,26 +314,37 @@ export default function EmployeePage() {
                             rows.map((e, idx) => (
                                 <tr key={e.id}>
                                     <td>{startIdx + idx}</td>
-                                    <td className="flex gap-2">
-                                        <button
-                                            className="btn btn-xs btn-warning btn-soft border-warning"
-                                            onClick={() => setEditItem(e)}
-                                        >
-                                            Edit
-                                        </button>
-                                        <button
-                                            className="btn btn-xs btn-error btn-soft border-error"
-                                            onClick={() => setConfirm({ open: true, id: e.id })}
-                                        >
-                                            Hapus
-                                        </button>
-                                    </td>
-                                    <td>{e.nip}</td>
+
+                                    {/* Aksi: detail, hapus pakai icon + tooltip */}
                                     <td>
-                                        <Link to={`/employee/${e.id}`} className="hover:text-secondary underline">
-                                            {e.name}
-                                        </Link>
+                                        <div className="flex gap-2">
+                                            {/* Detail */}
+                                            <div className="tooltip" data-tip="Lihat detail pegawai">
+                                                <Link
+                                                    to={`/employee/${e.id}`}
+                                                    className="btn btn-xs btn-info btn-soft border-info"
+                                                >
+                                                    <Eye className="w-3 h-3" />
+                                                </Link>
+                                            </div>
+
+                                            {/* Hapus */}
+                                            <div className="tooltip" data-tip="Hapus pegawai dari sistem">
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-xs btn-error btn-soft border-error"
+                                                    onClick={() => setConfirm({ open: true, id: e.id })}
+                                                >
+                                                    <Trash2 className="w-3 h-3" />
+                                                </button>
+                                            </div>
+                                        </div>
                                     </td>
+
+                                    <td>{e.nip}</td>
+                                    {/* Nama: teks biasa */}
+                                    <td>{e.name}</td>
+
                                     <td>
                                         <span
                                             className={`badge badge-sm text-white ${
@@ -333,7 +357,7 @@ export default function EmployeePage() {
                                                     : "badge-ghost"
                                             }`}
                                         >
-                                            {e.status}
+                                            {formatStatusLabel(e.status)}
                                         </span>
                                     </td>
                                     <td>{e.email}</td>
@@ -375,7 +399,6 @@ export default function EmployeePage() {
             />
 
             {/* Modals */}
-            <EditEmployeeModal open={!!editItem} initial={editItem} onClose={() => setEditItem(null)} onSaved={load} />
             <ImportEmployeeModal open={openImport} onClose={() => setOpenImport(false)} onImported={load} />
 
             {/* Confirm Delete Modal */}

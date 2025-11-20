@@ -53,4 +53,6 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long>, JpaSp
 
     List<Employee> findByNipIn(Collection<String> nips);
 
+    List<Employee> findByIdInAndDeletedAtIsNull(List<Long> ids);
+
 }

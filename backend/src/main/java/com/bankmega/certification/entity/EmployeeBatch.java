@@ -1,5 +1,4 @@
 // src/main/java/com/bankmega/certification/entity/EmployeeBatch.java
-
 package com.bankmega.certification.entity;
 
 import jakarta.persistence.*;
@@ -12,10 +11,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 
 @Entity
-@Table(
-    name = "employee_batches",
-    uniqueConstraints = @UniqueConstraint(columnNames = {"batch_id", "employee_id"})
-)
+@Table(name = "employee_batches", uniqueConstraints = @UniqueConstraint(columnNames = { "batch_id", "employee_id" }))
 @Getter
 @Setter
 @NoArgsConstructor
@@ -41,6 +37,11 @@ public class EmployeeBatch {
     @Enumerated(EnumType.STRING)
     @Column(length = 20, nullable = false)
     private Status status;
+
+    // ✅ NEW: snapshot jenis proses saat enroll
+    @Enumerated(EnumType.STRING)
+    @Column(name = "process_type", length = 20, nullable = false)
+    private ProcessType processType;
 
     @Column(name = "registration_date")
     private LocalDate registrationDate;
@@ -70,10 +71,10 @@ public class EmployeeBatch {
     private Instant deletedAt;
 
     public enum Status {
-        REGISTERED,  // daftar
-        ATTENDED,    // hadir ujian/training
-        PASSED,      // lulus
-        FAILED,      // gagal
-        CANCELED     // batal
+        REGISTERED, ATTENDED, PASSED, FAILED, CANCELED
+    }
+
+    public enum ProcessType {
+        CERTIFICATION, TRAINING, REFRESHMENT
     }
 }

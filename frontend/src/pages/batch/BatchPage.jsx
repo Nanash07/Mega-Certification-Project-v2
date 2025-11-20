@@ -1,11 +1,10 @@
-// src/pages/batches/BatchPage.jsx
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import toast from "react-hot-toast";
 import Select from "react-select";
 import AsyncSelect from "react-select/async";
 import Pagination from "../../components/common/Pagination";
-import { Plus } from "lucide-react";
+import { Plus, Pencil, Trash2, Eye, ChevronDown, Eraser } from "lucide-react";
 import { fetchBatches, deleteBatch, searchBatches } from "../../services/batchService";
 import { fetchCertificationRules } from "../../services/certificationRuleService";
 import CreateBatchModal from "../../components/batches/CreateBatchModal";
@@ -41,14 +40,76 @@ export default function BatchPage() {
     const [editItem, setEditItem] = useState(null);
     const [confirmDelete, setConfirmDelete] = useState({ open: false, id: null });
 
-    // Async search batches
+    // 🔹 Floating status menu: { row, x, y }
+    const [statusMenu, setStatusMenu] = useState(null);
+
+    const TABLE_COLS = 12; // total kolom tabel
+
+    // Badge jenis batch
+    function renderTypeBadge(type) {
+        if (!type) return "-";
+        const map = {
+            CERTIFICATION: { label: "Sertifikasi", cls: "badge-info text-white" },
+            TRAINING: { label: "Training", cls: "badge-primary text-white" },
+            REFRESHMENT: { label: "Refreshment", cls: "badge-secondary text-white" },
+        };
+        const m = map[type] || { label: type, cls: "badge-neutral" };
+        return <span className={`badge badge-sm ${m.cls}`}>{m.label}</span>;
+    }
+
+    // Format status: "PLANNED" -> "Planned"
+    function formatStatusLabel(s) {
+        if (!s) return "-";
+        const val = s.toString().toLowerCase();
+        return val.charAt(0).toUpperCase() + val.slice(1);
+    }
+
+    // Mapping style status (badge + button)
+    function getStatusStyle(status) {
+        switch (status) {
+            case "PLANNED":
+                return { label: "Planned", badgeCls: "badge-warning", btnCls: "btn-warning" };
+            case "ONGOING":
+                return { label: "Ongoing", badgeCls: "badge-info", btnCls: "btn-info" };
+            case "FINISHED":
+                return { label: "Finished", badgeCls: "badge-success", btnCls: "btn-success" };
+            case "CANCELED":
+            default:
+                return { label: "Canceled", badgeCls: "badge-error", btnCls: "btn-error" };
+        }
+    }
+
+    // 🔹 Badge status: trigger, dropdown dirender fixed di luar tabel
+    function renderStatusBadge(row) {
+        if (!row.status) return "-";
+
+        const { label } = getStatusStyle(row.status);
+        const badgeCls = getStatusStyle(row.status).badgeCls;
+
+        return (
+            <button
+                type="button"
+                className={`badge badge-sm whitespace-nowrap cursor-pointer flex items-center gap-1 ${badgeCls} text-white`}
+                onClick={(e) => {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    setStatusMenu({
+                        row,
+                        x: rect.left,
+                        y: rect.bottom + 4, // sedikit di bawah badge
+                    });
+                }}
+            >
+                <span>{label}</span>
+                <ChevronDown className="w-3 h-3" />
+            </button>
+        );
+    }
+
+    // Async search batches (untuk filter)
     const loadBatches = async (inputValue) => {
         try {
             const res = await searchBatches({ search: inputValue, page: 0, size: 20 });
-            return res.content.map((b) => ({
-                value: b.id,
-                label: `${b.batchName}`,
-            }));
+            return (res.content || []).map((b) => ({ value: b.id, label: `${b.batchName}` }));
         } catch {
             return [];
         }
@@ -72,10 +133,7 @@ export default function BatchPage() {
                         const parts = [r.certificationCode, r.certificationLevelName, r.subFieldCode].filter(
                             (x) => x && x.trim() !== ""
                         );
-                        return {
-                            value: r.id,
-                            label: parts.join(" - "),
-                        };
+                        return { value: r.id, label: parts.join(" - ") };
                     })
                 );
             })
@@ -89,9 +147,9 @@ export default function BatchPage() {
             const params = {
                 page: page - 1,
                 size: rowsPerPage,
-                batchIds: filterBatch ? [filterBatch.value] : [],
-                status: status ? status.value : null,
-                certificationRuleId: certRule ? certRule.value : null,
+                batchIds: filterBatch ? [filterBatch.value] : undefined,
+                status: status?.value,
+                certificationRuleId: certRule?.value,
             };
             const res = await fetchBatches(params);
             setRows(res.content || []);
@@ -106,6 +164,7 @@ export default function BatchPage() {
 
     useEffect(() => {
         load();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [page, rowsPerPage, filterBatch, status, certRule]);
 
     // Reset filter
@@ -127,6 +186,22 @@ export default function BatchPage() {
             toast.error(err?.response?.data?.message || "Gagal menghapus batch");
         } finally {
             setConfirmDelete({ open: false, id: null });
+        }
+    }
+
+    // 🔹 Ubah status batch (sementara update di frontend, lo bisa sambungin ke API)
+    async function handleChangeStatus(batch, newStatus) {
+        if (batch.status === newStatus) return;
+
+        try {
+            // TODO: sambungkan ke API update status batch, contoh:
+            // await updateBatchStatus(batch.id, newStatus);
+
+            // Untuk sekarang, update state lokal biar UI ke-refresh
+            setRows((prev) => prev.map((r) => (r.id === batch.id ? { ...r, status: newStatus } : r)));
+            toast.success(`Status diubah ke ${formatStatusLabel(newStatus)}`);
+        } catch {
+            toast.error("Gagal mengubah status batch");
         }
     }
 
@@ -161,15 +236,24 @@ export default function BatchPage() {
                         placeholder="Filter Certification Rule"
                         isClearable
                     />
-                    <div className="col-span-1"></div>
+                    <div className="col-span-1" />
                     <div className="col-span-1">
-                        <button className="btn btn-primary btn-sm w-full" onClick={() => setOpenCreate(true)}>
+                        <button
+                            type="button"
+                            className="btn btn-primary btn-sm w-full"
+                            onClick={() => setOpenCreate(true)}
+                        >
                             <Plus className="w-4 h-4" />
                             Tambah Batch
                         </button>
                     </div>
                     <div className="col-span-1">
-                        <button className="btn btn-accent btn-soft border-accent btn-sm w-full" onClick={resetFilter}>
+                        <button
+                            type="button"
+                            className="btn btn-accent btn-soft border-accent btn-sm w-full"
+                            onClick={resetFilter}
+                        >
+                            <Eraser className="w-4 h-4" />
                             Clear Filter
                         </button>
                     </div>
@@ -184,6 +268,7 @@ export default function BatchPage() {
                             <th>No</th>
                             <th>Aksi</th>
                             <th>Nama Batch</th>
+                            <th>Jenis</th>
                             <th>Sertifikasi</th>
                             <th>Lembaga</th>
                             <th>Tanggal Mulai</th>
@@ -197,13 +282,13 @@ export default function BatchPage() {
                     <tbody className="text-xs">
                         {loading ? (
                             <tr>
-                                <td colSpan={11} className="text-center py-10">
+                                <td colSpan={TABLE_COLS} className="text-center py-10">
                                     <span className="loading loading-dots loading-md" />
                                 </td>
                             </tr>
                         ) : rows.length === 0 ? (
                             <tr>
-                                <td colSpan={11} className="text-center text-gray-400 py-10">
+                                <td colSpan={TABLE_COLS} className="text-center text-gray-400 py-10">
                                     Tidak ada data
                                 </td>
                             </tr>
@@ -211,50 +296,64 @@ export default function BatchPage() {
                             rows.map((b, idx) => (
                                 <tr key={b.id}>
                                     <td>{startIdx + idx}</td>
-                                    <td className="flex gap-2">
-                                        <button
-                                            className="btn btn-xs btn-warning btn-soft border-warning"
-                                            onClick={() => setEditItem(b)}
-                                        >
-                                            Edit
-                                        </button>
-                                        <button
-                                            className="btn btn-xs btn-error btn-soft border-error"
-                                            onClick={() => setConfirmDelete({ open: true, id: b.id })}
-                                        >
-                                            Hapus
-                                        </button>
-                                    </td>
+
+                                    {/* Aksi: detail + edit + hapus (icon + tooltip) */}
                                     <td>
-                                        <Link to={`/batch/${b.id}`} className="underline hover:text-secondary">
-                                            {b.batchName}
-                                        </Link>
+                                        <div className="flex gap-2">
+                                            {/* Detail */}
+                                            <div className="tooltip" data-tip="Lihat detail batch">
+                                                <Link
+                                                    to={`/batch/${b.id}`}
+                                                    className="btn btn-xs btn-info border btn-soft border-info"
+                                                >
+                                                    <Eye className="w-3 h-3" />
+                                                </Link>
+                                            </div>
+
+                                            {/* Edit */}
+                                            <div className="tooltip" data-tip="Edit batch">
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-xs btn-warning btn-soft border-warning"
+                                                    onClick={() => setEditItem(b)}
+                                                >
+                                                    <Pencil className="w-3 h-3" />
+                                                </button>
+                                            </div>
+
+                                            {/* Hapus */}
+                                            <div className="tooltip" data-tip="Hapus batch">
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-xs btn-error btn-soft border-error"
+                                                    onClick={() => setConfirmDelete({ open: true, id: b.id })}
+                                                >
+                                                    <Trash2 className="w-3 h-3" />
+                                                </button>
+                                            </div>
+                                        </div>
                                     </td>
+
+                                    {/* Nama batch: teks biasa */}
+                                    <td>{b.batchName}</td>
+
+                                    <td>{renderTypeBadge(b.type)}</td>
                                     <td>
-                                        {b.certificationName}
-                                        {b.certificationLevelName ? ` - ${b.certificationLevelName}` : ""}
+                                        {[
+                                            b.certificationCode,
+                                            b.certificationLevelName,
+                                            b.subFieldCode ?? b.subBidangCode,
+                                        ]
+                                            .filter((x) => x && String(x).trim() !== "")
+                                            .join(" - ") || "-"}
                                     </td>
                                     <td>{b.institutionName || "-"}</td>
                                     <td>{b.startDate ? new Date(b.startDate).toLocaleDateString("id-ID") : "-"}</td>
                                     <td>{b.endDate ? new Date(b.endDate).toLocaleDateString("id-ID") : "-"}</td>
-                                    <td>{b.quota || "-"}</td>
+                                    <td>{b.quota ?? "-"}</td>
                                     <td>{b.totalParticipants ?? 0}</td>
                                     <td>{b.totalPassed ?? 0}</td>
-                                    <td>
-                                        <span
-                                            className={`badge badge-sm text-white ${
-                                                b.status === "PLANNED"
-                                                    ? "badge-info"
-                                                    : b.status === "ONGOING"
-                                                    ? "badge-warning"
-                                                    : b.status === "FINISHED"
-                                                    ? "badge-success"
-                                                    : "badge-error"
-                                            }`}
-                                        >
-                                            {b.status}
-                                        </span>
-                                    </td>
+                                    <td>{renderStatusBadge(b)}</td>
                                 </tr>
                             ))
                         )}
@@ -285,10 +384,14 @@ export default function BatchPage() {
                     <h3 className="font-bold text-lg">Hapus Batch?</h3>
                     <p className="py-2">Batch ini akan dihapus dari sistem.</p>
                     <div className="modal-action">
-                        <button className="btn" onClick={() => setConfirmDelete({ open: false, id: null })}>
+                        <button
+                            type="button"
+                            className="btn"
+                            onClick={() => setConfirmDelete({ open: false, id: null })}
+                        >
                             Batal
                         </button>
-                        <button className="btn btn-error" onClick={() => handleDelete(confirmDelete.id)}>
+                        <button type="button" className="btn btn-error" onClick={() => handleDelete(confirmDelete.id)}>
                             Hapus
                         </button>
                     </div>
@@ -297,6 +400,35 @@ export default function BatchPage() {
                     <button onClick={() => setConfirmDelete({ open: false, id: null })}>close</button>
                 </form>
             </dialog>
+
+            {/* 🔹 Floating status menu (fixed, di atas semua layer, gak ngubah tabel) */}
+            {statusMenu && (
+                <div className="fixed inset-0 z-[999]" onClick={() => setStatusMenu(null)}>
+                    <div
+                        className="absolute"
+                        style={{ top: statusMenu.y, left: statusMenu.x }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="bg-base-100 shadow-xl rounded-2xl p-3 text-xs flex flex-col gap-2">
+                            {["PLANNED", "ONGOING", "FINISHED", "CANCELED"].map((st) => {
+                                const { label, btnCls } = getStatusStyle(st);
+                                return (
+                                    <button
+                                        key={st}
+                                        className={`btn btn-xs ${btnCls} text-white rounded-full w-full justify-center`}
+                                        onClick={async () => {
+                                            await handleChangeStatus(statusMenu.row, st);
+                                            setStatusMenu(null);
+                                        }}
+                                    >
+                                        {label}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

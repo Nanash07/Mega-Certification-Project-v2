@@ -1,3 +1,4 @@
+// src/main/java/com/bankmega/certification/service/EmployeeEligibilityService.java
 package com.bankmega.certification.service;
 
 import com.bankmega.certification.dto.EmployeeEligibilityResponse;
@@ -81,6 +82,8 @@ public class EmployeeEligibilityService {
 
                 .createdAt(e.getCreatedAt())
                 .updatedAt(e.getUpdatedAt())
+                .trainingCount(e.getTrainingCount())
+                .refreshmentCount(e.getRefreshmentCount())
                 .build();
     }
 
@@ -136,7 +139,6 @@ public class EmployeeEligibilityService {
     // ===================== GET ALL BY EMPLOYEE =====================
     @Transactional(readOnly = true)
     public List<EmployeeEligibilityResponse> getByEmployeeId(Long employeeId) {
-        // Kalau pegawai RESIGN / soft-deleted → kosongin
         Employee emp = employeeRepo.findById(employeeId)
                 .orElseThrow(() -> new RuntimeException("Employee not found"));
         if (isResigned(emp)) {
@@ -285,7 +287,7 @@ public class EmployeeEligibilityService {
     }
 
     /**
-     * Sinkron eligibility dari mapping job & exception untuk 1 pegawai (ASSUMED:
+     * Sinkron eligibility dari mapping job & exception untuk 1 pegawai (assumed
      * active).
      */
     private List<EmployeeEligibility> syncEligibilitiesForEmployee(
@@ -308,7 +310,7 @@ public class EmployeeEligibilityService {
         List<EmployeeEligibility> existingElig = eligibilityRepo.findByEmployeeAndDeletedAtIsNull(employee);
         List<EmployeeEligibility> toSave = new ArrayList<>();
 
-        // deactivate outdated (sudah tidak required oleh job/exception)
+        // deactivate outdated
         Set<Long> requiredIds = new HashSet<>();
         mappingRules.forEach(r -> requiredIds.add(r.getId()));
         manualRules.forEach(r -> requiredIds.add(r.getId()));
@@ -338,7 +340,6 @@ public class EmployeeEligibilityService {
                     .findFirst()
                     .orElse(new EmployeeEligibility());
 
-            // set fields
             eligibility.setEmployee(employee);
             eligibility.setCertificationRule(rule);
             eligibility.setSource(
@@ -361,9 +362,7 @@ public class EmployeeEligibilityService {
         return toSave;
     }
 
-    /**
-     * Sinkron status eligibility dengan sertifikasi AKTIF untuk pegawai aktif saja.
-     */
+    /** Sinkron status eligibility dengan sertifikasi untuk pegawai aktif saja. */
     private void syncWithCertifications(List<Employee> employees) {
         if (employees == null || employees.isEmpty())
             return;
@@ -376,7 +375,6 @@ public class EmployeeEligibilityService {
                         c -> c.getEmployee().getId() + "-" + c.getCertificationRule().getId(),
                         c -> c,
                         (c1, c2) -> {
-                            // pilih yang certDate terbaru; handle null
                             LocalDate d1 = c1.getCertDate(), d2 = c2.getCertDate();
                             if (d1 == null && d2 == null)
                                 return c2;

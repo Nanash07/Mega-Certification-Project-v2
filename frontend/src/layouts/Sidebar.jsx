@@ -25,53 +25,50 @@ export const MENU = [
 
     // 2. Employee
     {
-        label: "Employee",
+        label: "Pegawai",
         icon: <User size={18} />,
         key: "employee",
         subMenu: [
             { label: "Data Pegawai", href: "/employee/data" },
             { label: "Eligibility", href: "/employee/eligibility" },
             { label: "Eligibility Manual", href: "/employee/exception" },
-            { label: "Sertifikasi Pegawai", href: "/employee/certification" },
+            { label: "Sertifikat Pegawai", href: "/employee/certification" },
         ],
     },
 
     // 3. Batch Sertifikasi
     {
-        label: "Batch Sertifikasi",
+        label: "Batch",
         icon: <ClipboardList size={18} />,
         href: "/batch",
         key: "batch",
     },
 
-    // 4. Mapping & Scope
+    // 4. Mapping (langsung klik, tanpa submenu)
     {
         label: "Mapping",
         icon: <ListChecks size={18} />,
+        href: "/mapping/job-certification",
         key: "mapping",
-        subMenu: [
-            { label: "Mapping Jabatan Sertifikasi", href: "/mapping/job-certification" },
-            { label: "PIC Scope", href: "/mapping/pic-certification-scope" },
-        ],
     },
 
     // 5. Master Sertifikasi
     {
-        label: "Sertifikasi",
+        label: "Sertifikat",
         icon: <BadgeCheck size={18} />,
-        key: "sertifikasi",
+        key: "sertifikat",
         subMenu: [
-            { label: "Aturan Sertifikasi", href: "/sertifikasi/aturan-sertifikat" },
-            { label: "Jenis", href: "/sertifikasi/jenis" },
-            { label: "Jenjang", href: "/sertifikasi/jenjang" },
-            { label: "Sub Bidang", href: "/sertifikasi/sub-bidang" },
-            { label: "Lembaga", href: "/sertifikasi/lembaga" },
+            { label: "Aturan Sertifikat", href: "/sertifikat/aturan-sertifikat" },
+            { label: "Jenis", href: "/sertifikat/jenis" },
+            { label: "Jenjang", href: "/sertifikat/jenjang" },
+            { label: "Sub Bidang", href: "/sertifikat/sub-bidang" },
+            { label: "Lembaga", href: "/sertifikat/lembaga" },
         ],
     },
 
     // 6. Organization
     {
-        label: "Organization",
+        label: "Organisasi",
         icon: <Users size={18} />,
         key: "organization",
         subMenu: [
@@ -84,7 +81,7 @@ export const MENU = [
 
     // 7. User Management
     {
-        label: "Manajemen User",
+        label: "User",
         icon: <Settings size={18} />,
         href: "/user",
         key: "user",

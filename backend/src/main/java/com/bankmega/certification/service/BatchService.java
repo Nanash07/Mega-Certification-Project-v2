@@ -266,22 +266,8 @@ public class BatchService {
     }
 
     private void validateBatchStatusTransition(Batch.Status current, Batch.Status next) {
-        if (current == null || next == null || current == next)
-            return;
-
-        switch (current) {
-            case PLANNED -> {
-                if (!(next == Batch.Status.ONGOING || next == Batch.Status.CANCELED)) {
-                    throw new IllegalStateException("Batch PLANNED hanya bisa ke ONGOING atau CANCELED");
-                }
-            }
-            case ONGOING -> {
-                if (!(next == Batch.Status.FINISHED || next == Batch.Status.CANCELED)) {
-                    throw new IllegalStateException("Batch ONGOING hanya bisa ke FINISHED atau CANCELED");
-                }
-            }
-            case FINISHED, CANCELED ->
-                throw new IllegalStateException("Batch FINISHED/CANCELED tidak bisa diubah lagi");
+        if (next == null) {
+            throw new IllegalArgumentException("Status batch tidak boleh null");
         }
     }
 

@@ -2,21 +2,36 @@ import api from "./api";
 
 const BASE = "/batches";
 
+/** helper: bersihin params dan serialize array ke comma-separated */
+function buildParams(params = {}) {
+    const q = {};
+    const set = (k, v) => {
+        if (v === undefined || v === null || v === "") return;
+        if (Array.isArray(v)) q[k] = v.join(",");
+        else q[k] = v;
+    };
+
+    set("page", params.page);
+    set("size", params.size);
+    // filter
+    set("batchIds", params.batchIds);
+    set("status", params.status);
+    set("certificationRuleId", params.certificationRuleId);
+    set("search", params.search);
+
+    // sort: Spring format -> sort=field,direction
+    if (params.sortField) {
+        q.sort = `${params.sortField},${params.sortDirection || "asc"}`;
+    }
+    return q;
+}
+
 // ================== BATCH CRUD ==================
 
 // 🔹 Paging + Filter + Search (tabel list)
 export async function fetchBatches(params) {
     try {
-        const query = { ...params };
-
-        // 👉 Convert sortField & sortDirection ke format Spring: sort=field,direction
-        if (params?.sortField) {
-            query.sort = `${params.sortField},${params.sortDirection || "asc"}`;
-            delete query.sortField;
-            delete query.sortDirection;
-        }
-
-        const { data } = await api.get(`${BASE}/paged`, { params: query });
+        const { data } = await api.get(`${BASE}/paged`, { params: buildParams(params) });
         return data || { content: [], totalPages: 0, totalElements: 0 };
     } catch (err) {
         console.error("❌ fetchBatches error:", err);
@@ -61,7 +76,7 @@ export async function deleteBatch(id) {
 export async function searchBatches({ search, page = 0, size = 20 }) {
     try {
         const { data } = await api.get(`${BASE}/paged`, {
-            params: { search, page, size },
+            params: buildParams({ search, page, size }),
         });
         return data || { content: [], totalPages: 0, totalElements: 0 };
     } catch (err) {
@@ -80,12 +95,13 @@ export async function fetchBatchById(id) {
         return null;
     }
 }
+
+// 🔹 Kirim email notifikasi ke peserta batch
 export async function sendBatchNotifications(batchId, { status } = {}) {
     try {
         const { data } = await api.post(`/notifications/batches/${batchId}/send`, null, {
             params: status ? { status } : {},
         });
-        // backend bisa balikin {sent: n} atau angka langsung
         return typeof data === "number" ? data : data?.sent ?? 0;
     } catch (err) {
         console.error("❌ sendBatchNotifications error:", err);

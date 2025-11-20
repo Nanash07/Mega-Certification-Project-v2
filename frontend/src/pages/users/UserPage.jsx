@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import Select from "react-select";
 import AsyncSelect from "react-select/async";
@@ -7,9 +8,11 @@ import { fetchUsers, deleteUser, toggleUser, fetchActiveUsers } from "../../serv
 import { fetchRoles } from "../../services/roleService";
 import CreateUserModal from "../../components/users/CreateUserModal";
 import EditUserModal from "../../components/users/EditUserModal";
+import { Pencil, Trash2, ChevronDown, Plus, Eraser, Target } from "lucide-react";
 
 export default function UserPage() {
     // ===================== STATE =====================
+    const navigate = useNavigate();
     const [rows, setRows] = useState([]);
     const [loading, setLoading] = useState(false);
 
@@ -20,12 +23,15 @@ export default function UserPage() {
 
     const [roles, setRoles] = useState([]);
     const [filterUser, setFilterUser] = useState(null);
-    const [filterRole, setFilterRole] = useState([]);
-    const [filterStatus, setFilterStatus] = useState([]);
+    const [filterRole, setFilterRole] = useState(null);
+    const [filterStatus, setFilterStatus] = useState(null);
 
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [editData, setEditData] = useState(null);
     const [confirm, setConfirm] = useState({ open: false, id: null });
+
+    // floating menu status (Active / Nonactive)
+    const [statusMenu, setStatusMenu] = useState(null);
 
     // ===================== LOAD ROLES =====================
     useEffect(() => {
@@ -74,6 +80,57 @@ export default function UserPage() {
         }
     };
 
+    // ===================== STATUS STYLE =====================
+    function getStatusStyle(isActive) {
+        if (isActive) {
+            return {
+                label: "Active",
+                badgeCls: "badge-success",
+                btnCls: "btn-success",
+            };
+        }
+        return {
+            label: "Nonactive",
+            badgeCls: "badge-warning",
+            btnCls: "btn-warning",
+        };
+    }
+
+    function renderStatusBadge(row) {
+        const { label, badgeCls } = getStatusStyle(row.isActive);
+
+        return (
+            <button
+                type="button"
+                className={`badge badge-sm whitespace-nowrap cursor-pointer flex items-center gap-1 ${badgeCls} text-white`}
+                onClick={(e) => {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    setStatusMenu({
+                        row,
+                        x: rect.left,
+                        y: rect.bottom + 4,
+                    });
+                }}
+            >
+                <span>{label}</span>
+                <ChevronDown className="w-3 h-3" />
+            </button>
+        );
+    }
+
+    async function handleChangeStatus(row, newIsActive) {
+        if (row.isActive === newIsActive) return;
+
+        try {
+            // toggleUser diasumsikan flip status
+            const updated = await toggleUser(row.id);
+            toast.success(`User ${updated.isActive ? "diaktifkan" : "dinonaktifkan"}`);
+            loadUsers();
+        } catch {
+            toast.error("Gagal mengubah status user");
+        }
+    }
+
     // ===================== HANDLERS =====================
     async function onDelete(id) {
         try {
@@ -85,20 +142,10 @@ export default function UserPage() {
         }
     }
 
-    async function onToggle(id) {
-        try {
-            const updated = await toggleUser(id);
-            toast.success(`User ${updated.isActive ? "diaktifkan" : "dinonaktifkan"}`);
-            loadUsers();
-        } catch {
-            toast.error("Gagal mengubah status user");
-        }
-    }
-
     const resetFilter = () => {
         setFilterUser(null);
-        setFilterRole([]);
-        setFilterStatus([]);
+        setFilterRole(null);
+        setFilterStatus(null);
         setPage(1);
         toast.success("Filter direset");
     };
@@ -110,7 +157,7 @@ export default function UserPage() {
         <div>
             {/* Toolbar */}
             <div className="mb-4 space-y-3">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 text-xs items-end">
                     <AsyncSelect
                         cacheOptions
                         defaultOptions
@@ -141,12 +188,31 @@ export default function UserPage() {
                         isClearable
                     />
 
-                    <button className="btn btn-sm btn-primary w-full" onClick={() => setShowCreateModal(true)}>
-                        + Tambah User
+                    <button
+                        className="btn btn-sm btn-primary w-full"
+                        type="button"
+                        onClick={() => setShowCreateModal(true)}
+                    >
+                        <Plus className="w-4 h-4" />
+                        Tambah User
                     </button>
 
-                    <button className="btn btn-sm btn-accent btn-soft border-accent w-full" onClick={resetFilter}>
-                        Reset Filter
+                    <button
+                        className="btn btn-sm btn-info w-full"
+                        type="button"
+                        onClick={() => navigate("/mapping/pic-certification-scope")}
+                    >
+                        <Target className="w-4 h-4" />
+                        Kelola PIC Scope
+                    </button>
+
+                    <button
+                        className="btn btn-sm btn-accent btn-soft border-accent w-full"
+                        type="button"
+                        onClick={resetFilter}
+                    >
+                        <Eraser className="w-4 h-4" />
+                        Clear Filter
                     </button>
                 </div>
             </div>
@@ -157,14 +223,14 @@ export default function UserPage() {
                     <thead className="bg-base-200 text-xs">
                         <tr>
                             <th>No</th>
+                            <th>Aksi</th>
                             <th>Username</th>
                             <th>Email</th>
                             <th>Nama Pegawai</th>
                             <th>NIP</th>
-                            <th>Role</th>
                             <th>Status</th>
+                            <th>Role</th>
                             <th>Updated At</th>
-                            <th>Aksi</th>
                         </tr>
                     </thead>
                     <tbody className="text-xs">
@@ -184,22 +250,34 @@ export default function UserPage() {
                             rows.map((u, idx) => (
                                 <tr key={u.id}>
                                     <td>{startIdx + idx}</td>
+                                    <td className="whitespace-nowrap">
+                                        <div className="flex gap-2">
+                                            <div className="tooltip" data-tip="Edit user">
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-warning btn-soft btn-xs border border-warning"
+                                                    onClick={() => setEditData(u)}
+                                                >
+                                                    <Pencil className="w-3 h-3" />
+                                                </button>
+                                            </div>
+                                            <div className="tooltip" data-tip="Hapus user">
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-error btn-soft btn-xs border border-error"
+                                                    onClick={() => setConfirm({ open: true, id: u.id })}
+                                                >
+                                                    <Trash2 className="w-3 h-3" />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </td>
                                     <td>{u.username}</td>
                                     <td>{u.email || "-"}</td>
                                     <td>{u.employeeName || "-"}</td>
                                     <td>{u.employeeNip || "-"}</td>
+                                    <td>{renderStatusBadge(u)}</td>
                                     <td>{u.roleName || "-"}</td>
-                                    <td>
-                                        {u.isActive ? (
-                                            <span className="badge badge-success border-success badge-sm text-slate-50">
-                                                ACTIVE
-                                            </span>
-                                        ) : (
-                                            <span className="badge badge-secondary border-secondary badge-sm text-slate-50">
-                                                NONACTIVE
-                                            </span>
-                                        )}
-                                    </td>
                                     <td>
                                         {u.updatedAt
                                             ? new Date(u.updatedAt).toLocaleDateString("id-ID", {
@@ -210,30 +288,6 @@ export default function UserPage() {
                                                   minute: "2-digit",
                                               })
                                             : "-"}
-                                    </td>
-                                    <td className="space-x-1 whitespace-nowrap">
-                                        <button
-                                            className={`btn btn-xs ${
-                                                u.isActive
-                                                    ? "btn-secondary border-secondary btn-soft"
-                                                    : "btn-success border-success btn-soft"
-                                            }`}
-                                            onClick={() => onToggle(u.id)}
-                                        >
-                                            {u.isActive ? "Nonaktifkan" : "Aktifkan"}
-                                        </button>
-                                        <button
-                                            className="btn btn-xs border-warning btn-soft btn-warning"
-                                            onClick={() => setEditData(u)}
-                                        >
-                                            Edit
-                                        </button>
-                                        <button
-                                            className="btn btn-xs border-error btn-soft btn-error"
-                                            onClick={() => setConfirm({ open: true, id: u.id })}
-                                        >
-                                            Hapus
-                                        </button>
                                     </td>
                                 </tr>
                             ))
@@ -299,6 +353,35 @@ export default function UserPage() {
                         <button onClick={() => setConfirm({ open: false, id: null })}>close</button>
                     </form>
                 </dialog>
+            )}
+
+            {/* Floating status menu */}
+            {statusMenu && (
+                <div className="fixed inset-0 z-[999]" onClick={() => setStatusMenu(null)}>
+                    <div
+                        className="absolute"
+                        style={{ top: statusMenu.y, left: statusMenu.x }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="bg-base-100 shadow-xl rounded-2xl p-3 text-xs flex flex-col gap-2">
+                            {[true, false].map((val) => {
+                                const { label, btnCls } = getStatusStyle(val);
+                                return (
+                                    <button
+                                        key={String(val)}
+                                        className={`btn btn-xs ${btnCls} text-white rounded-full w-full justify-center`}
+                                        onClick={async () => {
+                                            await handleChangeStatus(statusMenu.row, val);
+                                            setStatusMenu(null);
+                                        }}
+                                    >
+                                        {label}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );

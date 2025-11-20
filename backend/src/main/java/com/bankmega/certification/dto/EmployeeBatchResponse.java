@@ -1,6 +1,7 @@
 package com.bankmega.certification.dto;
 
 import com.bankmega.certification.entity.EmployeeBatch.Status;
+import com.bankmega.certification.entity.EmployeeBatch.ProcessType;
 import lombok.*;
 
 import java.time.Instant;
@@ -15,31 +16,33 @@ public class EmployeeBatchResponse {
 
     private Long id;
 
-    // 🔹 Data pegawai
+    // Pegawai
     private Long employeeId;
     private String employeeNip;
     private String employeeName;
 
-    // ✅ NEW: struktur organisasi & jabatan
+    // Org/Jabatan
     private String employeeJobName;
     private String employeeDivisionName;
     private String employeeRegionalName;
     private String employeeUnitName;
 
-    // 🔹 Data batch
+    // Batch
     private Long batchId;
     private String batchName;
 
-    // 🔹 Status peserta
+    // Status + jenis proses (CERTIFICATION/TRAINING/REFRESHMENT)
     private Status status;
+    private ProcessType processType;
 
-    // 🔹 Detail proses
+    // Detail proses
     private LocalDate registrationDate;
     private LocalDate attendedAt;
     private LocalDate resultDate;
+    private Integer score;
     private String notes;
 
-    // 🔹 Audit
+    // Audit
     private Instant createdAt;
     private Instant updatedAt;
 }

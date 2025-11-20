@@ -152,7 +152,6 @@ public class EmployeeService {
                 emp.setJobPosition(job);
                 emp.setEffectiveDate(req.getEffectiveDate());
                 emp.setStatus(req.getStatus());
-                emp.setPhotoUrl(req.getPhotoUrl());
 
                 return emp;
         }
@@ -191,7 +190,6 @@ public class EmployeeService {
                                 .jobName(e.getJobPosition() != null ? e.getJobPosition().getName() : null)
                                 .effectiveDate(e.getEffectiveDate())
                                 .status(e.getStatus())
-                                .photoUrl(e.getPhotoUrl())
                                 .createdAt(e.getCreatedAt())
                                 .updatedAt(e.getUpdatedAt())
                                 .deletedAt(e.getDeletedAt())

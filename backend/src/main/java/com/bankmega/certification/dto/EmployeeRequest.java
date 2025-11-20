@@ -20,5 +20,4 @@ public class EmployeeRequest {
 
     private LocalDate effectiveDate;
     private String status;
-    private String photoUrl;
 }

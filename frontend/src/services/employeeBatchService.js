@@ -2,7 +2,7 @@ import api from "./api";
 
 const BASE = "/employee-batches";
 
-// Get peserta by batch (tanpa paging → return array)
+// tanpa paging
 export async function fetchEmployeeBatches(batchId) {
     try {
         const { data } = await api.get(`${BASE}/batch/${batchId}`);
@@ -13,36 +13,36 @@ export async function fetchEmployeeBatches(batchId) {
     }
 }
 
-// Get peserta by batch (with paging → return page object)
+// dengan paging + filter org
 export async function fetchEmployeeBatchesPaged({
     batchId,
     page = 0,
     size = 10,
     search,
     status,
-    regional, // NEW
-    division, // NEW
-    unit, // NEW
-    job, // NEW
+    regional,
+    division,
+    unit,
+    job,
 }) {
     try {
         const params = { page, size };
         if (search) params.search = search;
         if (status) params.status = status;
-        if (regional) params.regional = regional; // NEW
-        if (division) params.division = division; // NEW
-        if (unit) params.unit = unit; // NEW
-        if (job) params.job = job; // NEW
+        if (regional) params.regional = regional;
+        if (division) params.division = division;
+        if (unit) params.unit = unit;
+        if (job) params.job = job;
 
         const { data } = await api.get(`${BASE}/batch/${batchId}/paged`, { params });
-        return data; // { content, totalPages, totalElements, ... }
+        return data || { content: [], totalPages: 0, totalElements: 0 };
     } catch (err) {
         console.error("fetchEmployeeBatchesPaged error:", err);
         return { content: [], totalPages: 0, totalElements: 0 };
     }
 }
 
-// Tambah peserta (single)
+// tambah peserta single
 export async function addEmployeeToBatch(batchId, employeeId) {
     try {
         const { data } = await api.post(`${BASE}/batch/${batchId}/employee/${employeeId}`);
@@ -53,23 +53,26 @@ export async function addEmployeeToBatch(batchId, employeeId) {
     }
 }
 
-// Tambah peserta (bulk)
-export async function addEmployeesToBatchBulk(batchId, employeeIds) {
+// tambah peserta bulk
+export async function addEmployeesToBatchBulk(batchId, employeeIds = []) {
     try {
         const { data } = await api.post(`${BASE}/batch/${batchId}/employees/bulk`, employeeIds);
-        return data;
+        return Array.isArray(data) ? data : [];
     } catch (err) {
         console.error("addEmployeesToBatchBulk error:", err);
         throw err;
     }
 }
 
-// Update status peserta
+// update status via @RequestParam (BE: PUT /{id}/status)
 export async function updateEmployeeBatchStatus(id, status, score, notes) {
     try {
-        const { data } = await api.put(`${BASE}/${id}/status`, null, {
-            params: { status, score, notes },
-        });
+        const params = {};
+        if (status != null) params.status = status; // REGISTERED/ATTENDED/PASSED/FAILED
+        if (score != null) params.score = score; // optional
+        if (notes != null) params.notes = notes; // optional
+
+        const { data } = await api.put(`${BASE}/${id}/status`, null, { params });
         return data;
     } catch (err) {
         console.error("updateEmployeeBatchStatus error:", err);
@@ -77,7 +80,7 @@ export async function updateEmployeeBatchStatus(id, status, score, notes) {
     }
 }
 
-// Retry peserta FAILED -> REGISTERED
+// retry FAILED -> REGISTERED
 export async function retryEmployeeBatch(id) {
     try {
         const { data } = await api.patch(`${BASE}/${id}/retry`);
@@ -88,7 +91,7 @@ export async function retryEmployeeBatch(id) {
     }
 }
 
-// Delete peserta
+// hapus peserta (REGISTERED only)
 export async function deleteEmployeeFromBatch(id) {
     try {
         await api.delete(`${BASE}/${id}`);
@@ -99,7 +102,7 @@ export async function deleteEmployeeFromBatch(id) {
     }
 }
 
-// Get eligible employees untuk batch
+// eligible list
 export async function fetchEligibleEmployees(batchId) {
     try {
         const { data } = await api.get(`${BASE}/batch/${batchId}/eligible`);

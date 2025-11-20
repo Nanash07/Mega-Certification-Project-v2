@@ -12,7 +12,6 @@ const emptyForm = {
   jobPositionId: "",
   joinDate: "",
   status: "ACTIVE",
-  photoUrl: "",
 };
 
 export default function CreateEmployeeModal({ open, onClose, onSaved }) {

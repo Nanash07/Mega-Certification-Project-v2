@@ -65,9 +65,6 @@ public class Employee {
     @Column(name = "status", nullable = false)
     private String status; // ACTIVE / RESIGN / MUTASI
 
-    @Column(name = "photo_url")
-    private String photoUrl;
-
     @CreatedDate
     @Column(name = "created_at", updatable = false)
     private Instant createdAt;

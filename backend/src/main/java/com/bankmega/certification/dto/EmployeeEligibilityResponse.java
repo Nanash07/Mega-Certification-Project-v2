@@ -38,4 +38,7 @@ public class EmployeeEligibilityResponse {
 
     private Instant createdAt;
     private Instant updatedAt;
+
+    private Integer trainingCount;
+    private Integer refreshmentCount;
 }

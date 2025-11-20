@@ -1,3 +1,4 @@
+// src/main/java/com/bankmega/certification/entity/EmployeeEligibility.java
 package com.bankmega.certification.entity;
 
 import jakarta.persistence.*;
@@ -10,12 +11,9 @@ import java.time.Instant;
 import java.time.LocalDate;
 
 @Entity
-@Table(
-    name = "employee_eligibilities",
-    uniqueConstraints = {
-        @UniqueConstraint(columnNames = {"employee_id", "certification_rule_id"})
-    }
-)
+@Table(name = "employee_eligibilities", uniqueConstraints = {
+        @UniqueConstraint(columnNames = { "employee_id", "certification_rule_id" })
+})
 @Getter
 @Setter
 @NoArgsConstructor
@@ -66,6 +64,15 @@ public class EmployeeEligibility {
     @Column(name = "is_active")
     private Boolean isActive = true;
 
+    // ✅ NEW: counters per-siklus (reset saat lulus CERTIFICATION)
+    @Builder.Default
+    @Column(name = "training_count", nullable = false)
+    private Integer trainingCount = 0;
+
+    @Builder.Default
+    @Column(name = "refreshment_count", nullable = false)
+    private Integer refreshmentCount = 0;
+
     // 🔹 Audit
     @CreatedDate
     @Column(name = "created_at", updatable = false)
@@ -78,16 +85,21 @@ public class EmployeeEligibility {
     @Column(name = "deleted_at")
     private Instant deletedAt;
 
-    // 🔹 Enum dipindahin ke dalam entity (tanpa ubah nama/value)
+    // Defaulting safeguard (kalau ada record lama)
+    @PrePersist
+    @PreUpdate
+    void ensureCounters() {
+        if (trainingCount == null)
+            trainingCount = 0;
+        if (refreshmentCount == null)
+            refreshmentCount = 0;
+    }
+
     public enum EligibilitySource {
-        BY_JOB,
-        BY_NAME,
+        BY_JOB, BY_NAME
     }
 
     public enum EligibilityStatus {
-        NOT_YET_CERTIFIED,
-        ACTIVE,
-        DUE,
-        EXPIRED
+        NOT_YET_CERTIFIED, ACTIVE, DUE, EXPIRED
     }
 }

@@ -1,6 +1,7 @@
 // src/pages/certifications/CertificationLevelPage.jsx
 import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
+import { Pencil, Trash2, Plus } from "lucide-react";
 import { fetchCertificationLevels, deleteCertificationLevel } from "../../services/certificationLevelService";
 import CreateCertificationLevelModal from "../../components/certification-levels/CreateCertificationLevelModal";
 import EditCertificationLevelModal from "../../components/certification-levels/EditCertificationLevelModal";
@@ -58,17 +59,23 @@ export default function CertificationLevelPage() {
 
     return (
         <div>
-            {/* Header + actions */}
-            <div className="mb-4 flex">
-                <button className="btn btn-sm btn-primary w-full md:w-auto" onClick={() => setOpenCreate(true)}>
-                    + Tambah Jenjang
-                </button>
+            {/* Toolbar */}
+            <div className="mb-4 space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 text-xs items-end">
+                    {/* Tambah */}
+                    <div className="col-span-1">
+                        <button className="btn btn-sm btn-primary w-full" onClick={() => setOpenCreate(true)}>
+                            <Plus className="w-4 h-4" />
+                            Tambah Jenjang
+                        </button>
+                    </div>
+                </div>
             </div>
 
             {/* Table */}
             <div className="overflow-x-auto rounded-xl border border-gray-200 shadow bg-base-100">
                 <table className="table table-zebra">
-                    <thead className="bg-base-200 text-xs">
+                    <thead className="bg-base-200 text-xs whitespace-nowrap">
                         <tr>
                             <th>No.</th>
                             <th>Aksi</th>
@@ -76,7 +83,7 @@ export default function CertificationLevelPage() {
                             <th>Nama Jenjang</th>
                         </tr>
                     </thead>
-                    <tbody className="text-xs">
+                    <tbody className="text-xs whitespace-nowrap">
                         {loading ? (
                             <tr>
                                 <td colSpan={4} className="py-10 text-center">
@@ -93,25 +100,31 @@ export default function CertificationLevelPage() {
                             filtered.map((row, idx) => (
                                 <tr key={row.id}>
                                     <td>{idx + 1}</td>
-                                    <td className="space-x-1">
-                                        <button
-                                            className="btn btn-xs btn-soft btn-warning border-warning"
-                                            onClick={() => setEditItem(row)}
-                                        >
-                                            Edit
-                                        </button>
-                                        <button
-                                            className="btn btn-xs btn-soft btn-error border-error"
-                                            onClick={() =>
-                                                setConfirm({
-                                                    open: true,
-                                                    id: row.id,
-                                                    name: `${row.name} (Level ${row.level})`,
-                                                })
-                                            }
-                                        >
-                                            Delete
-                                        </button>
+                                    <td>
+                                        <div className="flex gap-2">
+                                            <div className="tooltip" data-tip="Edit jenjang">
+                                                <button
+                                                    className="btn btn-xs btn-soft btn-warning border-warning"
+                                                    onClick={() => setEditItem(row)}
+                                                >
+                                                    <Pencil className="w-3 h-3" />
+                                                </button>
+                                            </div>
+                                            <div className="tooltip" data-tip="Hapus jenjang">
+                                                <button
+                                                    className="btn btn-xs btn-soft btn-error border-error"
+                                                    onClick={() =>
+                                                        setConfirm({
+                                                            open: true,
+                                                            id: row.id,
+                                                            name: `${row.name} (Level ${row.level})`,
+                                                        })
+                                                    }
+                                                >
+                                                    <Trash2 className="w-3 h-3" />
+                                                </button>
+                                            </div>
+                                        </div>
                                     </td>
                                     <td>{row.level}</td>
                                     <td>{row.name}</td>
@@ -149,21 +162,25 @@ export default function CertificationLevelPage() {
                         Yakin mau hapus <b>{confirm.name}</b>?
                     </p>
                     <div className="modal-action">
-                        <button className="btn" onClick={() => setConfirm({ open: false })}>
+                        <button className="btn" onClick={() => setConfirm({ open: false, id: undefined, name: "" })}>
                             Batal
                         </button>
                         <button
                             className="btn btn-error"
                             onClick={() => {
                                 onDelete(confirm.id);
-                                setConfirm({ open: false });
+                                setConfirm({ open: false, id: undefined, name: "" });
                             }}
                         >
                             Hapus
                         </button>
                     </div>
                 </div>
-                <form method="dialog" className="modal-backdrop" onSubmit={() => setConfirm({ open: false })}>
+                <form
+                    method="dialog"
+                    className="modal-backdrop"
+                    onSubmit={() => setConfirm({ open: false, id: undefined, name: "" })}
+                >
                     <button>close</button>
                 </form>
             </dialog>

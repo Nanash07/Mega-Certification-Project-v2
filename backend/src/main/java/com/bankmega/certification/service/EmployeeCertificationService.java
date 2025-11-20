@@ -9,6 +9,7 @@ import com.bankmega.certification.entity.EmployeeCertificationHistory.ActionType
 import com.bankmega.certification.entity.Institution;
 import com.bankmega.certification.repository.CertificationRuleRepository;
 import com.bankmega.certification.repository.EmployeeCertificationRepository;
+import com.bankmega.certification.repository.EmployeeEligibilityRepository;
 import com.bankmega.certification.repository.EmployeeRepository;
 import com.bankmega.certification.repository.InstitutionRepository;
 import com.bankmega.certification.specification.EmployeeCertificationSpecification;
@@ -36,6 +37,7 @@ public class EmployeeCertificationService {
     private final EmployeeRepository employeeRepo;
     private final CertificationRuleRepository ruleRepo;
     private final InstitutionRepository institutionRepo;
+    private final EmployeeEligibilityRepository eligibilityRepo; // <-- NEW
     private final FileStorageService fileStorageService;
     private final EmployeeCertificationHistoryService historyService;
 
@@ -93,7 +95,7 @@ public class EmployeeCertificationService {
      * null.
      */
     private void updateValidity(EmployeeCertification ec) {
-        // Fallback ke rule current kalau snapshot null (kasus record hasil batch)
+        // Fallback ke rule current kalau snapshot null (kasus record hasil batch lama)
         Integer validityMonths = ec.getRuleValidityMonths();
         if (validityMonths == null && ec.getCertificationRule() != null) {
             validityMonths = ec.getCertificationRule().getValidityMonths();
@@ -170,8 +172,8 @@ public class EmployeeCertificationService {
                 !Objects.equals(ec.getCertDate(), req.getCertDate()) ||
                 !Objects.equals(ec.getProcessType(), req.getProcessType()) ||
                 (req.getInstitutionId() != null &&
-                        (ec.getInstitution() == null
-                                || !Objects.equals(ec.getInstitution().getId(), req.getInstitutionId())))
+                        (ec.getInstitution() == null ||
+                                !Objects.equals(ec.getInstitution().getId(), req.getInstitutionId())))
                 ||
                 (req.getCertificationRuleId() != null &&
                         !Objects.equals(ec.getCertificationRule().getId(), req.getCertificationRuleId()));
@@ -188,6 +190,37 @@ public class EmployeeCertificationService {
         }
     }
 
+    /**
+     * Reset counter training & refreshment di eligibility untuk (employee, rule).
+     */
+    private void resetCountersFor(Long employeeId, Long ruleId) {
+        if (employeeId == null || ruleId == null)
+            return;
+
+        // Karena repo belum punya finder spesifik, ambil semua milik employee lalu
+        // filter ruleId
+        eligibilityRepo.findByEmployeeIdAndDeletedAtIsNull(employeeId).stream()
+                .filter(ee -> ee.getCertificationRule() != null &&
+                        Objects.equals(ee.getCertificationRule().getId(), ruleId))
+                .findFirst()
+                .ifPresent(ee -> {
+                    // Pastikan kolom sdh ada di entity
+                    ee.setTrainingCount(0);
+                    ee.setRefreshmentCount(0);
+                    ee.setUpdatedAt(Instant.now());
+                    eligibilityRepo.save(ee);
+                });
+    }
+
+    /** Reset counter jika sertifikat SERTIFIKASI valid (punya certDate). */
+    private void maybeResetCounters(EmployeeCertification ec) {
+        if (ec != null
+                && ec.getProcessType() == EmployeeCertification.ProcessType.SERTIFIKASI
+                && ec.getCertDate() != null) {
+            resetCountersFor(ec.getEmployee().getId(), ec.getCertificationRule().getId());
+        }
+    }
+
     // ================== Create ==================
     @Transactional
     public EmployeeCertificationResponse create(EmployeeCertificationRequest req) {
@@ -197,7 +230,7 @@ public class EmployeeCertificationService {
         CertificationRule rule = ruleRepo.findById(req.getCertificationRuleId())
                 .orElseThrow(() -> new RuntimeException("Certification Rule not found"));
 
-        Institution institution = req.getInstitutionId() != null
+        Institution institution = (req.getInstitutionId() != null)
                 ? institutionRepo.findById(req.getInstitutionId()).orElse(null)
                 : null;
 
@@ -212,7 +245,9 @@ public class EmployeeCertificationService {
                 .institution(institution)
                 .certNumber(req.getCertNumber())
                 .certDate(req.getCertDate())
-                .processType(req.getProcessType())
+                .processType(
+                        req.getProcessType() != null ? req.getProcessType()
+                                : EmployeeCertification.ProcessType.SERTIFIKASI)
                 .jobPositionTitle(employee.getJobPosition() != null
                         ? employee.getJobPosition().getName()
                         : null)
@@ -228,6 +263,9 @@ public class EmployeeCertificationService {
 
         EmployeeCertification saved = repo.save(ec);
         historyService.snapshot(saved, ActionType.CREATED);
+
+        // ✅ reset counters kalau ini sertifikasi baru (manual create)
+        maybeResetCounters(saved);
 
         return toResponse(saved);
     }
@@ -259,7 +297,14 @@ public class EmployeeCertificationService {
 
         ec.setCertNumber(req.getCertNumber());
         ec.setCertDate(req.getCertDate());
-        ec.setProcessType(req.getProcessType());
+        if (req.getProcessType() != null) {
+            ec.setProcessType(req.getProcessType());
+        }
+        // refresh snapshot job title jika kosong
+        if (ec.getJobPositionTitle() == null || ec.getJobPositionTitle().isBlank()) {
+            var jp = ec.getEmployee().getJobPosition();
+            ec.setJobPositionTitle(jp != null ? jp.getName() : null);
+        }
         ec.setUpdatedAt(Instant.now());
 
         updateValidity(ec);
@@ -267,6 +312,9 @@ public class EmployeeCertificationService {
 
         EmployeeCertification saved = repo.save(ec);
         historyService.snapshot(saved, ActionType.UPDATED);
+
+        // ✅ reset counters kalau ini sertifikasi valid (manual update)
+        maybeResetCounters(saved);
 
         return toResponse(saved);
     }
@@ -307,8 +355,8 @@ public class EmployeeCertificationService {
         }
 
         ec.setUpdatedAt(Instant.now());
-        updateValidity(ec); // ⬅️ penting: hitung ulang validity (kasus batch snapshot null)
-        updateStatus(ec); // ⬅️ tentukan status setelah validity benar
+        updateValidity(ec); // hitung ulang validity (kalau snapshot null, fallback ke rule)
+        updateStatus(ec); // tentukan status setelah validity benar
 
         EmployeeCertification saved = repo.save(ec);
         historyService.snapshot(saved, actionType);

@@ -1,3 +1,4 @@
+// src/main/java/com/bankmega/certification/repository/EmployeeEligibilityRepository.java
 package com.bankmega.certification.repository;
 
 import com.bankmega.certification.entity.EmployeeEligibility;
@@ -11,35 +12,35 @@ import java.util.Optional;
 import java.util.Set;
 
 public interface EmployeeEligibilityRepository
-        extends JpaRepository<EmployeeEligibility, Long>, JpaSpecificationExecutor<EmployeeEligibility> {
+                extends JpaRepository<EmployeeEligibility, Long>, JpaSpecificationExecutor<EmployeeEligibility> {
 
-    // ==== Find by Employee + Rule + Source (baru, lebih spesifik) ====
-    Optional<EmployeeEligibility> findByEmployeeAndCertificationRuleAndSource(
-            Employee employee,
-            CertificationRule rule,
-            EmployeeEligibility.EligibilitySource source);
+        Optional<EmployeeEligibility> findByEmployeeAndCertificationRuleAndSource(
+                        Employee employee, CertificationRule rule, EmployeeEligibility.EligibilitySource source);
 
-    List<EmployeeEligibility> findByCertificationRule_IdAndIsActiveTrueAndDeletedAtIsNull(Long certRuleId);
+        List<EmployeeEligibility> findByCertificationRule_IdAndIsActiveTrueAndDeletedAtIsNull(Long certRuleId);
 
-    // ==== Employee based ====
-    List<EmployeeEligibility> findByEmployeeAndDeletedAtIsNull(Employee employee);
+        List<EmployeeEligibility> findByEmployeeAndDeletedAtIsNull(Employee employee);
 
-    List<EmployeeEligibility> findByEmployeeIdAndDeletedAtIsNull(Long employeeId);
+        List<EmployeeEligibility> findByEmployeeIdAndDeletedAtIsNull(Long employeeId);
 
-    List<EmployeeEligibility> findByEmployeeIdInAndDeletedAtIsNull(Set<Long> employeeIds);
+        List<EmployeeEligibility> findByEmployeeIdInAndDeletedAtIsNull(Set<Long> employeeIds);
 
-    // ==== Rule based ====
-    List<EmployeeEligibility> findByCertificationRuleAndDeletedAtIsNull(CertificationRule rule);
+        List<EmployeeEligibility> findByCertificationRuleAndDeletedAtIsNull(CertificationRule rule);
 
-    List<EmployeeEligibility> findByCertificationRuleIdAndDeletedAtIsNull(Long ruleId);
+        List<EmployeeEligibility> findByCertificationRuleIdAndDeletedAtIsNull(Long ruleId);
 
-    // ==== Active status ====
-    List<EmployeeEligibility> findByIsActiveTrueAndDeletedAtIsNull();
+        List<EmployeeEligibility> findByIsActiveTrueAndDeletedAtIsNull();
 
-    List<EmployeeEligibility> findByIsActiveFalseAndDeletedAtIsNull();
+        List<EmployeeEligibility> findByIsActiveFalseAndDeletedAtIsNull();
 
-    // ==== Default (not deleted) ====
-    List<EmployeeEligibility> findByDeletedAtIsNull();
+        List<EmployeeEligibility> findByDeletedAtIsNull();
 
-    List<EmployeeEligibility> findByEmployee_IdAndDeletedAtIsNull(Long employeeId);
+        List<EmployeeEligibility> findByEmployee_IdAndDeletedAtIsNull(Long employeeId);
+
+        // ✅ NEW: single row by employee & rule (not deleted)
+        Optional<EmployeeEligibility> findByEmployee_IdAndCertificationRule_IdAndDeletedAtIsNull(Long employeeId,
+                        Long ruleId);
+
+        List<EmployeeEligibility> findByEmployee_IdInAndCertificationRule_IdAndDeletedAtIsNull(List<Long> employeeIds,
+                        Long ruleId);
 }

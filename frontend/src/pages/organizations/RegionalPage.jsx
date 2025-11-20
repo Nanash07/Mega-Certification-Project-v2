@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from "react";
 import toast from "react-hot-toast";
 import { fetchRegionals, toggleRegional } from "../../services/regionalService";
 import Pagination from "../../components/common/Pagination";
+import { ChevronDown } from "lucide-react";
 
 export default function RegionalPage() {
     const [rows, setRows] = useState([]);
@@ -13,6 +14,9 @@ export default function RegionalPage() {
 
     const [totalPages, setTotalPages] = useState(0);
     const [totalElements, setTotalElements] = useState(0);
+
+    // floating menu untuk ganti status (Active/Nonactive)
+    const [statusMenu, setStatusMenu] = useState(null);
 
     const apiParams = useMemo(
         () => ({ q: q?.trim() || undefined, page: page - 1, size: rowsPerPage }),
@@ -37,10 +41,54 @@ export default function RegionalPage() {
         load();
     }, [apiParams]);
 
-    async function onToggle(id) {
+    // helper style status (badge + menu button)
+    function getStatusStyle(isActive) {
+        if (isActive) {
+            return {
+                label: "Active",
+                badgeCls: "badge-success",
+                btnCls: "btn-success",
+            };
+        }
+        return {
+            label: "Nonactive",
+            badgeCls: "badge-warning",
+            btnCls: "btn-warning",
+        };
+    }
+
+    // badge status yang bisa diklik (kayak di BatchPage)
+    function renderStatusBadge(row) {
+        const { label, badgeCls } = getStatusStyle(row.isActive);
+
+        return (
+            <button
+                type="button"
+                className={`badge badge-sm whitespace-nowrap cursor-pointer flex items-center gap-1 ${badgeCls} text-white`}
+                onClick={(e) => {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    setStatusMenu({
+                        row,
+                        x: rect.left,
+                        y: rect.bottom + 4,
+                    });
+                }}
+            >
+                {/* cuma huruf depan yang kapital */}
+                <span>{label}</span>
+                <ChevronDown className="w-3 h-3" />
+            </button>
+        );
+    }
+
+    // ganti status dari floating menu
+    async function handleChangeStatus(row, newIsActive) {
+        if (row.isActive === newIsActive) return;
+
         try {
-            await toggleRegional(id);
-            toast.success("✅ Status regional berhasil diperbarui");
+            // toggleRegional diasumsikan flip status
+            await toggleRegional(row.id);
+            toast.success(`✅ Regional berhasil di${newIsActive ? "aktifkan" : "nonaktifkan"}`);
             load();
         } catch (err) {
             toast.error(err?.response?.data?.message || "❌ Gagal update status regional");
@@ -76,19 +124,18 @@ export default function RegionalPage() {
                             <th>Nama Regional</th>
                             <th>Status</th>
                             <th>Updated At</th>
-                            <th>Aksi</th>
                         </tr>
                     </thead>
                     <tbody className="text-xs">
                         {loading ? (
                             <tr>
-                                <td colSpan={5} className="text-center py-10">
+                                <td colSpan={4} className="text-center py-10">
                                     <span className="loading loading-dots loading-md" />
                                 </td>
                             </tr>
                         ) : rows.length === 0 ? (
                             <tr>
-                                <td colSpan={5} className="text-center text-gray-400 py-10">
+                                <td colSpan={4} className="text-center text-gray-400 py-10">
                                     Tidak ada data
                                 </td>
                             </tr>
@@ -97,13 +144,7 @@ export default function RegionalPage() {
                                 <tr key={r.id}>
                                     <td>{startIdx + idx}</td>
                                     <td>{r.name}</td>
-                                    <td>
-                                        {r.isActive ? (
-                                            <span className="badge badge-sm badge-success text-white">ACTIVE</span>
-                                        ) : (
-                                            <span className="badge badge-sm badge-warning text-white">NONACTIVE</span>
-                                        )}
-                                    </td>
+                                    <td>{renderStatusBadge(r)}</td>
                                     <td>
                                         {r.createdAt
                                             ? new Date(r.createdAt).toLocaleDateString("id-ID", {
@@ -112,18 +153,6 @@ export default function RegionalPage() {
                                                   year: "numeric",
                                               })
                                             : "-"}
-                                    </td>
-                                    <td>
-                                        <button
-                                            className={`btn btn-xs ${
-                                                r.isActive
-                                                    ? "btn-warning btn-soft border-warning"
-                                                    : "btn-success btn-soft border-success"
-                                            }`}
-                                            onClick={() => onToggle(r.id)}
-                                        >
-                                            {r.isActive ? "Nonaktifkan" : "Aktifkan"}
-                                        </button>
                                     </td>
                                 </tr>
                             ))
@@ -144,6 +173,35 @@ export default function RegionalPage() {
                     setPage(1);
                 }}
             />
+
+            {/* Floating status menu */}
+            {statusMenu && (
+                <div className="fixed inset-0 z-[999]" onClick={() => setStatusMenu(null)}>
+                    <div
+                        className="absolute"
+                        style={{ top: statusMenu.y, left: statusMenu.x }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="bg-base-100 shadow-xl rounded-2xl p-3 text-xs flex flex-col gap-2">
+                            {[true, false].map((val) => {
+                                const { label, btnCls } = getStatusStyle(val);
+                                return (
+                                    <button
+                                        key={String(val)}
+                                        className={`btn btn-xs ${btnCls} text-white rounded-full w-full justify-center`}
+                                        onClick={async () => {
+                                            await handleChangeStatus(statusMenu.row, val);
+                                            setStatusMenu(null);
+                                        }}
+                                    >
+                                        {label}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
