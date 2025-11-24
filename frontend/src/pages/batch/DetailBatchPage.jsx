@@ -63,6 +63,7 @@ export default function DetailBatchPage() {
             CERTIFICATION: { label: "Sertifikasi", cls: "badge-info" },
             TRAINING: { label: "Training", cls: "badge-primary" },
             REFRESHMENT: { label: "Refreshment", cls: "badge-secondary" },
+            EXTENSION: { label: "Perpanjang", cls: "badge-success" }, // 🔹 baru
         };
         const m = map[type] || { label: type, cls: "badge-neutral" };
         return <span className={`badge badge-sm ${m.cls}`}>{m.label}</span>;
@@ -245,7 +246,7 @@ export default function DetailBatchPage() {
                             <div>{batch.batchName}</div>
                         </div>
 
-                        {/* JENIS BATCH (baru) */}
+                        {/* JENIS BATCH */}
                         <div>
                             <span className="font-bold">Jenis Batch:</span>
                             <div>{renderTypeBadge(batch.type)}</div>

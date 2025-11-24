@@ -105,6 +105,7 @@ public class EmployeeCertification {
     public enum ProcessType {
         SERTIFIKASI,
         REFRESHMENT,
-        TRAINING
+        TRAINING,
+        EXTENSION
     }
 }

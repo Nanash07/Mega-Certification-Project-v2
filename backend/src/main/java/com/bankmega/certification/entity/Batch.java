@@ -82,6 +82,7 @@ public class Batch {
     public enum BatchType {
         CERTIFICATION,
         TRAINING,
-        REFRESHMENT
+        REFRESHMENT,
+        EXTENSION
     }
 }

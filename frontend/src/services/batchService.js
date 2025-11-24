@@ -34,7 +34,7 @@ export async function fetchBatches(params) {
         const { data } = await api.get(`${BASE}/paged`, { params: buildParams(params) });
         return data || { content: [], totalPages: 0, totalElements: 0 };
     } catch (err) {
-        console.error("❌ fetchBatches error:", err);
+        console.error("fetchBatches error:", err);
         return { content: [], totalPages: 0, totalElements: 0 };
     }
 }
@@ -45,7 +45,7 @@ export async function createBatch(payload) {
         const { data } = await api.post(BASE, payload);
         return data;
     } catch (err) {
-        console.error("❌ createBatch error:", err);
+        console.error("createBatch error:", err);
         throw err;
     }
 }
@@ -56,7 +56,7 @@ export async function updateBatch(id, payload) {
         const { data } = await api.put(`${BASE}/${id}`, payload);
         return data;
     } catch (err) {
-        console.error("❌ updateBatch error:", err);
+        console.error("updateBatch error:", err);
         throw err;
     }
 }
@@ -67,7 +67,7 @@ export async function deleteBatch(id) {
         await api.delete(`${BASE}/${id}`);
         return true;
     } catch (err) {
-        console.error("❌ deleteBatch error:", err);
+        console.error("deleteBatch error:", err);
         throw err;
     }
 }
@@ -80,7 +80,7 @@ export async function searchBatches({ search, page = 0, size = 20 }) {
         });
         return data || { content: [], totalPages: 0, totalElements: 0 };
     } catch (err) {
-        console.error("❌ searchBatches error:", err);
+        console.error("searchBatches error:", err);
         return { content: [], totalPages: 0, totalElements: 0 };
     }
 }
@@ -91,7 +91,7 @@ export async function fetchBatchById(id) {
         const { data } = await api.get(`${BASE}/${id}`);
         return data || null;
     } catch (err) {
-        console.error("❌ fetchBatchById error:", err);
+        console.error("fetchBatchById error:", err);
         return null;
     }
 }
@@ -104,7 +104,7 @@ export async function sendBatchNotifications(batchId, { status } = {}) {
         });
         return typeof data === "number" ? data : data?.sent ?? 0;
     } catch (err) {
-        console.error("❌ sendBatchNotifications error:", err);
+        console.error("sendBatchNotifications error:", err);
         throw err;
     }
 }

@@ -10,9 +10,13 @@ import com.bankmega.certification.repository.BatchRepository;
 import com.bankmega.certification.repository.EmployeeBatchRepository;
 import com.bankmega.certification.repository.EmployeeCertificationRepository;
 import com.bankmega.certification.repository.NotificationRepository;
+import com.bankmega.certification.specification.NotificationSpecification;
+
 import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.mail.javamail.JavaMailSenderImpl;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
@@ -23,6 +27,8 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 @Slf4j
 @Service
@@ -85,6 +91,22 @@ public class NotificationService {
             String relatedEntity,
             Long relatedEntityId) {
         return sendNotification(userId, email, title, message, message, type, relatedEntity, relatedEntityId);
+    }
+
+    public Page<Notification> searchNotifications(
+            Long userId,
+            Boolean unread,
+            LocalDateTime from,
+            LocalDateTime to,
+            String type,
+            Pageable pageable) {
+        Specification<Notification> spec = Specification.where(NotificationSpecification.byUser(userId))
+                .and(NotificationSpecification.unreadOnly(unread))
+                .and(NotificationSpecification.createdFrom(from))
+                .and(NotificationSpecification.createdTo(to))
+                .and(NotificationSpecification.byType(type));
+
+        return notificationRepository.findAll(spec, pageable);
     }
 
     @Async("mailExecutor")
@@ -317,8 +339,12 @@ public class NotificationService {
         return list != null ? list : Collections.<Notification>emptyList();
     }
 
-    public void markAsRead(Long notificationId) {
+    public void markAsRead(Long notificationId, Long currentUserId) {
         notificationRepository.findById(notificationId).ifPresent(n -> {
+            if (!Objects.equals(n.getUserId(), currentUserId)) {
+                throw new AccessDeniedException("Tidak boleh mengubah notifikasi user lain");
+            }
+
             if (!n.isRead()) {
                 n.setRead(true);
                 n.setReadAt(LocalDateTime.now());

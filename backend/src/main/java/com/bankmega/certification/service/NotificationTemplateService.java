@@ -30,7 +30,7 @@ public class NotificationTemplateService {
 
     private final NotificationTemplateRepository repository;
 
-    private static final Locale ID_LOCALE = new Locale("id", "ID");
+    private static final Locale ID_LOCALE = Locale.forLanguageTag("id-ID");
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("d MMMM yyyy", ID_LOCALE);
 
     // ================== LIST ==================

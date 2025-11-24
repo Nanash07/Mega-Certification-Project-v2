@@ -41,4 +41,5 @@ public class EmployeeEligibilityResponse {
 
     private Integer trainingCount;
     private Integer refreshmentCount;
+    private Integer extensionCount;
 }

@@ -27,6 +27,7 @@ export default function EditBatchModal({ open, data, onClose, onSaved }) {
         { value: "CERTIFICATION", label: "Sertifikasi" },
         { value: "TRAINING", label: "Training" },
         { value: "REFRESHMENT", label: "Refreshment" },
+        { value: "EXTENSION", label: "Perpanjang" }, // 🔹 baru
     ];
 
     // helper: normalize ISO date or Date -> yyyy-MM-dd

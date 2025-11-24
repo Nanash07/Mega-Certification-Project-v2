@@ -1,5 +1,7 @@
+// src/components/Sidebar.jsx
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
+
 import {
     LayoutDashboard,
     User,
@@ -13,17 +15,14 @@ import {
     Settings,
 } from "lucide-react";
 
-// ================== MENU MASTER ==================
+// ================== MASTER MENU ==================
 export const MENU = [
-    // 1. Dashboard
     {
         label: "Dashboard",
         icon: <LayoutDashboard size={18} />,
         href: "/dashboard",
         key: "dashboard",
     },
-
-    // 2. Employee
     {
         label: "Pegawai",
         icon: <User size={18} />,
@@ -35,24 +34,18 @@ export const MENU = [
             { label: "Sertifikat Pegawai", href: "/employee/certification" },
         ],
     },
-
-    // 3. Batch Sertifikasi
     {
         label: "Batch",
         icon: <ClipboardList size={18} />,
         href: "/batch",
         key: "batch",
     },
-
-    // 4. Mapping (langsung klik, tanpa submenu)
     {
         label: "Mapping",
         icon: <ListChecks size={18} />,
         href: "/mapping/job-certification",
         key: "mapping",
     },
-
-    // 5. Master Sertifikasi
     {
         label: "Sertifikat",
         icon: <BadgeCheck size={18} />,
@@ -65,8 +58,6 @@ export const MENU = [
             { label: "Lembaga", href: "/sertifikat/lembaga" },
         ],
     },
-
-    // 6. Organization
     {
         label: "Organisasi",
         icon: <Users size={18} />,
@@ -78,16 +69,12 @@ export const MENU = [
             { label: "Job Position", href: "/organization/job-position" },
         ],
     },
-
-    // 7. User Management
     {
         label: "User",
         icon: <Settings size={18} />,
         href: "/user",
         key: "user",
     },
-
-    // 8. Settings / Notification
     {
         label: "Notifikasi",
         icon: <Bell size={18} />,
@@ -99,16 +86,21 @@ export const MENU = [
     },
 ];
 
-// ======== ROLE-BASED FILTERING ========
-const filterMenuByRole = (menu, roleRaw) => {
+// =========================================
+//   ROLE-BASED FILTERING (EXPORTED)
+// =========================================
+export const filterMenuByRole = (menu, roleRaw) => {
     const role = (roleRaw || "").toUpperCase();
+
+    // 🔵 SUPERADMIN → semua menu
     if (role === "SUPERADMIN") return menu;
 
+    // 🟣 PIC → hide menu user + limit Sertifikat submenu
     if (role === "PIC") {
         return menu
-            .filter((item) => item.key !== "user") // hide Manajemen User untuk PIC
+            .filter((item) => item.key !== "user")
             .map((item) => {
-                if (item.key === "sertifikasi") {
+                if (item.key === "sertifikat") {
                     return {
                         ...item,
                         subMenu: item.subMenu.filter((sub) => sub.label !== "Jenjang" && sub.label !== "Jenis"),
@@ -118,22 +110,38 @@ const filterMenuByRole = (menu, roleRaw) => {
             });
     }
 
-    // Default (PEGAWAI / unknown): cuma menu personal
+    // 🟢 EMPLOYEE / PEGAWAI → Dashboard, Pegawai, + Notifikasi personal
+    if (role === "EMPLOYEE" || role === "PEGAWAI") {
+        const employeeMenu = menu.filter((item) => item.key === "dashboard" || item.key === "employee");
+
+        return [
+            ...employeeMenu,
+            {
+                label: "Notifikasi",
+                icon: <Bell size={18} />,
+                href: "/notifications",
+                key: "notifications",
+            },
+        ];
+    }
+
+    // Default fallback behaves like employee (safe)
     return menu.filter((item) => item.key === "dashboard" || item.key === "employee");
 };
 
+// =========================================
+//               SIDEBAR
+// =========================================
 export default function Sidebar({ open, setOpen }) {
     const location = useLocation();
     const [openMenu, setOpenMenu] = useState("");
 
-    // Ambil role dari storage
     const role = (JSON.parse(localStorage.getItem("user") || "{}").role || localStorage.getItem("role") || "")
         .toString()
         .toUpperCase();
 
     const visibleMenu = filterMenuByRole(MENU, role);
 
-    // Auto expand submenu yang aktif
     useEffect(() => {
         const parent = visibleMenu.find(
             (m) => m.subMenu && m.subMenu.some((s) => location.pathname.startsWith(s.href))
@@ -142,27 +150,29 @@ export default function Sidebar({ open, setOpen }) {
     }, [location.pathname, visibleMenu]);
 
     const handleMenuClick = (key) => setOpenMenu((prev) => (prev === key ? "" : key));
-
     const handleLinkClick = () => {
         if (window.innerWidth < 1024) setOpen(false);
     };
 
     const isActive = (href) => location.pathname === href || location.pathname.startsWith(href + "/");
+
     const isParentActive = (submenu) => submenu.some((sub) => isActive(sub.href));
-    const isMenuActive = (item) =>
-        item.subMenu ? openMenu === item.key || isParentActive(item.subMenu) : isActive(item.href);
+
+    const isMenuActive = (item) => (item.subMenu ? isParentActive(item.subMenu) : isActive(item.href));
 
     return (
         <>
+            {/* overlay mobile */}
             {open && <div className="fixed inset-0 z-30 lg:hidden" onClick={() => setOpen(false)} />}
+
             <aside
                 className={`
-          fixed z-40 top-0 left-0 h-full w-56 bg-white shadow-sm
-          flex flex-col transition-transform duration-300
-          ${open ? "translate-x-0" : "-translate-x-full"}
-          border-r border-gray-200
-          lg:translate-x-0 lg:static
-        `}
+                    fixed z-40 top-0 left-0 h-full w-56 bg-white shadow-sm
+                    flex flex-col transition-transform duration-300
+                    ${open ? "translate-x-0" : "-translate-x-full"}
+                    border-r border-gray-200
+                    lg:translate-x-0 lg:static
+                `}
             >
                 <div className="flex items-center h-20 px-6 border-b border-gray-200">
                     <Link to="/dashboard" className="font-bold text-2xl" onClick={handleLinkClick}>

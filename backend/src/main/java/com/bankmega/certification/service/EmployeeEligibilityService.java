@@ -84,6 +84,7 @@ public class EmployeeEligibilityService {
                 .updatedAt(e.getUpdatedAt())
                 .trainingCount(e.getTrainingCount())
                 .refreshmentCount(e.getRefreshmentCount())
+                .extensionCount(e.getExtensionCount())
                 .build();
     }
 

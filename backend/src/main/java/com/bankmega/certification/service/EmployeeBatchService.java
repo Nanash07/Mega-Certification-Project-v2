@@ -60,11 +60,11 @@ public class EmployeeBatchService {
                 .batchId(eb.getBatch() != null ? eb.getBatch().getId() : null)
                 .batchName(eb.getBatch() != null ? eb.getBatch().getBatchName() : null)
                 .status(eb.getStatus())
-                .processType(eb.getProcessType()) // ⬅️ dikembalikan
+                .processType(eb.getProcessType())
                 .registrationDate(eb.getRegistrationDate())
                 .attendedAt(eb.getAttendedAt())
                 .resultDate(eb.getResultDate())
-                .score(eb.getScore()) // ⬅️ dikembalikan
+                .score(eb.getScore())
                 .notes(eb.getNotes())
                 .createdAt(eb.getCreatedAt())
                 .updatedAt(eb.getUpdatedAt())
@@ -250,7 +250,8 @@ public class EmployeeBatchService {
 
                 switch (batch.getType()) {
                     case TRAINING -> {
-                        /* semua eligible boleh */ }
+                        // semua eligible boleh
+                    }
                     case REFRESHMENT -> {
                         if (!alreadyCert) {
                             throw new IllegalStateException("Syarat refreshment: harus sudah memiliki sertifikat.");
@@ -264,6 +265,12 @@ public class EmployeeBatchService {
                         if (alreadyCert && (t < 1 && r < 1)) {
                             throw new IllegalStateException(
                                     "Sertifikasi ulang: minimal training ATAU refreshment di siklus berjalan.");
+                        }
+                    }
+                    case EXTENSION -> {
+                        if (!alreadyCert) {
+                            throw new IllegalStateException(
+                                    "Syarat extension: pegawai harus sudah memiliki sertifikat.");
                         }
                     }
                 }
@@ -354,8 +361,17 @@ public class EmployeeBatchService {
                 case TRAINING -> incrementTraining(saved);
                 case REFRESHMENT -> incrementRefreshment(saved);
                 case CERTIFICATION -> {
+                    // behavior lama: buat/update sertifikat sebagai SERTIFIKASI + reset
+                    // training/refreshment
                     createOrUpdateCertification(saved);
                     resetCounters(saved);
+                }
+                case EXTENSION -> {
+                    // extension: update masa berlaku sertifikat + naikkan extensionCount
+                    createOrUpdateCertificationExtension(saved);
+                    incrementExtension(saved);
+                    // tidak reset training/refreshment, karena siklusnya tetap; reset akan terjadi
+                    // saat CERTIFICATION
                 }
             }
         }
@@ -382,7 +398,8 @@ public class EmployeeBatchService {
         return toResponse(repo.save(eb));
     }
 
-    // ================== CERT CREATOR (untuk CERTIFICATION) ==================
+    // ================== CERT CREATOR (CERTIFICATION - behavior lama)
+    // ==================
     private void createOrUpdateCertification(EmployeeBatch eb) {
         Employee emp = eb.getEmployee();
         CertificationRule rule = eb.getBatch().getCertificationRule();
@@ -455,6 +472,81 @@ public class EmployeeBatchService {
                         : EmployeeCertificationHistory.ActionType.UPDATED);
     }
 
+    // ================== CERT UPDATER UNTUK EXTENSION ==================
+    private void createOrUpdateCertificationExtension(EmployeeBatch eb) {
+        Employee emp = eb.getEmployee();
+        CertificationRule rule = eb.getBatch().getCertificationRule();
+        Institution institution = eb.getBatch().getInstitution();
+
+        EmployeeCertification ec = certificationRepo
+                .findFirstByEmployeeIdAndCertificationRuleIdAndDeletedAtIsNull(emp.getId(), rule.getId())
+                .orElse(null);
+
+        boolean isNew = false;
+        LocalDate passDate = eb.getResultDate() != null ? eb.getResultDate() : LocalDate.now();
+
+        if (ec == null) {
+            // Secara normal gak kejadian karena gate EXTENSION minta sudah punya sertifikat
+            ec = EmployeeCertification.builder()
+                    .employee(emp)
+                    .certificationRule(rule)
+                    .institution(institution)
+                    .certDate(passDate)
+                    .processType(EmployeeCertification.ProcessType.EXTENSION)
+                    .status(EmployeeCertification.Status.PENDING)
+                    .ruleValidityMonths(rule != null ? rule.getValidityMonths() : null)
+                    .ruleReminderMonths(rule != null ? rule.getReminderMonths() : null)
+                    .createdAt(Instant.now())
+                    .updatedAt(Instant.now())
+                    .build();
+            isNew = true;
+        } else {
+            // EXTENSION: update tanggal & masa berlaku, tidak ubah certNumber/file
+            ec.setCertDate(passDate);
+            ec.setProcessType(EmployeeCertification.ProcessType.EXTENSION);
+            ec.setUpdatedAt(Instant.now());
+            ec.setStatus((ec.getCertNumber() == null || ec.getCertNumber().isBlank())
+                    ? EmployeeCertification.Status.PENDING
+                    : EmployeeCertification.Status.ACTIVE);
+
+            if (ec.getRuleValidityMonths() == null && rule != null) {
+                ec.setRuleValidityMonths(rule.getValidityMonths());
+            }
+            if (ec.getRuleReminderMonths() == null && rule != null) {
+                ec.setRuleReminderMonths(rule.getReminderMonths());
+            }
+        }
+
+        if (ec.getCertDate() != null) {
+            ec.setValidFrom(ec.getCertDate());
+            Integer v = ec.getRuleValidityMonths() != null ? ec.getRuleValidityMonths()
+                    : (rule != null ? rule.getValidityMonths() : null);
+            Integer r = ec.getRuleReminderMonths() != null ? ec.getRuleReminderMonths()
+                    : (rule != null ? rule.getReminderMonths() : null);
+
+            if (v != null) {
+                ec.setValidUntil(ec.getCertDate().plusMonths(v));
+            } else {
+                ec.setValidUntil(null);
+            }
+
+            if (ec.getValidUntil() != null && r != null) {
+                ec.setReminderDate(ec.getValidUntil().minusMonths(r));
+            } else {
+                ec.setReminderDate(null);
+            }
+        } else {
+            ec.setValidFrom(null);
+            ec.setValidUntil(null);
+            ec.setReminderDate(null);
+        }
+
+        EmployeeCertification saved = certificationRepo.save(ec);
+        historyService.snapshot(saved,
+                isNew ? EmployeeCertificationHistory.ActionType.CREATED
+                        : EmployeeCertificationHistory.ActionType.UPDATED);
+    }
+
     // ================== COUNTERS ==================
     private void incrementTraining(EmployeeBatch eb) {
         EmployeeEligibility ee = getActiveEligibilityOrThrow(eb.getEmployee(), eb.getBatch().getCertificationRule());
@@ -470,10 +562,20 @@ public class EmployeeBatchService {
         eligibilityRepo.save(ee);
     }
 
+    private void incrementExtension(EmployeeBatch eb) {
+        EmployeeEligibility ee = getActiveEligibilityOrThrow(eb.getEmployee(), eb.getBatch().getCertificationRule());
+        ee.setExtensionCount((ee.getExtensionCount() == null ? 0 : ee.getExtensionCount()) + 1);
+        ee.setUpdatedAt(Instant.now());
+        eligibilityRepo.save(ee);
+    }
+
     private void resetCounters(EmployeeBatch eb) {
         EmployeeEligibility ee = getActiveEligibilityOrThrow(eb.getEmployee(), eb.getBatch().getCertificationRule());
         ee.setTrainingCount(0);
         ee.setRefreshmentCount(0);
+        // extensionCount sengaja TIDAK di-reset di sini; kalau mau reset saat
+        // CERTIFICATION,
+        // lo bisa tambahin: ee.setExtensionCount(0);
         ee.setUpdatedAt(Instant.now());
         eligibilityRepo.save(ee);
     }
@@ -524,6 +626,7 @@ public class EmployeeBatchService {
                         int r = e.getRefreshmentCount() == null ? 0 : e.getRefreshmentCount();
                         yield hasCert ? (t >= 1 || r >= 1) : (t >= 1);
                     }
+                    case EXTENSION -> hasCertEmpIds.contains(e.getEmployee().getId());
                 })
                 .map(this::toEligibilityResponse)
                 .toList();
@@ -535,6 +638,7 @@ public class EmployeeBatchService {
             case CERTIFICATION -> EmployeeBatch.ProcessType.CERTIFICATION;
             case TRAINING -> EmployeeBatch.ProcessType.TRAINING;
             case REFRESHMENT -> EmployeeBatch.ProcessType.REFRESHMENT;
+            case EXTENSION -> EmployeeBatch.ProcessType.EXTENSION;
         };
     }
 
@@ -547,7 +651,8 @@ public class EmployeeBatchService {
 
         switch (batch.getType()) {
             case TRAINING -> {
-                /* semua eligible boleh */ }
+                // semua eligible boleh
+            }
             case REFRESHMENT -> {
                 if (!hasCert)
                     throw new IllegalStateException(
@@ -561,6 +666,12 @@ public class EmployeeBatchService {
                 if (hasCert && (t < 1 && r < 1)) {
                     throw new IllegalStateException(
                             "Syarat sertifikasi ulang: minimal sudah training ATAU refreshment di siklus berjalan.");
+                }
+            }
+            case EXTENSION -> {
+                if (!hasCert) {
+                    throw new IllegalStateException(
+                            "Syarat ikut extension: pegawai harus sudah memiliki sertifikat untuk rule ini.");
                 }
             }
         }

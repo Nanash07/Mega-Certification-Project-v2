@@ -209,7 +209,10 @@ export default function EmployeeDashboard() {
                                             paddingAngle={2}
                                         >
                                             {donutData.map((entry, index) => (
-                                                <Cell key={`cell-${entry.name}`} fill={DONUT_COLORS[index % DONUT_COLORS.length]} />
+                                                <Cell
+                                                    key={`cell-${entry.name}`}
+                                                    fill={DONUT_COLORS[index % DONUT_COLORS.length]}
+                                                />
                                             ))}
                                         </Pie>
                                     </PieChart>
@@ -219,11 +222,17 @@ export default function EmployeeDashboard() {
                         {!loading && (
                             <div className="grid grid-cols-2 gap-2 text-sm">
                                 <div className="flex items-center gap-2">
-                                    <span className="w-3 h-3 rounded-full" style={{ backgroundColor: DONUT_COLORS[0] }} />
+                                    <span
+                                        className="w-3 h-3 rounded-full"
+                                        style={{ backgroundColor: DONUT_COLORS[0] }}
+                                    />
                                     Tersertifikasi • {certStats.ACTIVE}
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <span className="w-3 h-3 rounded-full" style={{ backgroundColor: DONUT_COLORS[1] }} />
+                                    <span
+                                        className="w-3 h-3 rounded-full"
+                                        style={{ backgroundColor: DONUT_COLORS[1] }}
+                                    />
                                     Butuh Aksi • {certStats.NON_ACTIVE}
                                 </div>
                             </div>
@@ -235,11 +244,7 @@ export default function EmployeeDashboard() {
                     <div className="card-body p-4 md:p-5">
                         <div className="flex items-center justify-between">
                             <h2 className="card-title text-base md:text-lg">Batch Berjalan</h2>
-                            {!loading && (
-                                <span className="badge badge-outline">
-                                    {ongoingBatches.length} batch
-                                </span>
-                            )}
+                            {!loading && <span className="badge badge-outline">{ongoingBatches.length} batch</span>}
                         </div>
                         {loading ? (
                             <div className="space-y-3 mt-4">
@@ -257,7 +262,9 @@ export default function EmployeeDashboard() {
                                         className="rounded-xl border p-3 flex flex-col gap-1"
                                     >
                                         <div className="flex items-center justify-between gap-2">
-                                            <p className="font-semibold text-sm">{batch.batchName || batch.name || `Batch #${idx + 1}`}</p>
+                                            <p className="font-semibold text-sm">
+                                                {batch.batchName || batch.name || `Batch #${idx + 1}`}
+                                            </p>
                                             <span className="badge badge-outline">{batch.normalizedStatus}</span>
                                         </div>
                                         <p className="text-xs opacity-70">{buildRule(batch)}</p>
@@ -313,7 +320,9 @@ export default function EmployeeDashboard() {
                                                 <td className="whitespace-nowrap">
                                                     {must.certificationLevel?.level ?? must.level ?? "-"}
                                                 </td>
-                                                <td className="whitespace-nowrap">{must.subFieldName || must.subFieldCode || "-"}</td>
+                                                <td className="whitespace-nowrap">
+                                                    {must.subFieldName || must.subFieldCode || "-"}
+                                                </td>
                                             </tr>
                                         ))
                                     )}
@@ -356,7 +365,9 @@ export default function EmployeeDashboard() {
                                     ) : (
                                         completedBatches.map((batch, idx) => (
                                             <tr key={`${batch.id || batch.batchId || idx}-completed`}>
-                                                <td className="whitespace-nowrap">{batch.batchName || batch.name || "-"}</td>
+                                                <td className="whitespace-nowrap">
+                                                    {batch.batchName || batch.name || "-"}
+                                                </td>
                                                 <td className="whitespace-nowrap">{buildRule(batch)}</td>
                                                 <td className="whitespace-nowrap">
                                                     {fmtID(batch.startDate)} – {fmtID(batch.endDate)}

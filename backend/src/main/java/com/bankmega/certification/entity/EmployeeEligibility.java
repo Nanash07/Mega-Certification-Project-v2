@@ -73,6 +73,10 @@ public class EmployeeEligibility {
     @Column(name = "refreshment_count", nullable = false)
     private Integer refreshmentCount = 0;
 
+    @Builder.Default
+    @Column(name = "extension_count", nullable = false)
+    private Integer extensionCount = 0;
+
     // 🔹 Audit
     @CreatedDate
     @Column(name = "created_at", updatable = false)

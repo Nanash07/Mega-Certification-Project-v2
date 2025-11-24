@@ -52,6 +52,7 @@ export default function BatchPage() {
             CERTIFICATION: { label: "Sertifikasi", cls: "badge-info text-white" },
             TRAINING: { label: "Training", cls: "badge-primary text-white" },
             REFRESHMENT: { label: "Refreshment", cls: "badge-secondary text-white" },
+            EXTENSION: { label: "Perpanjang", cls: "badge-success text-white" }, // 🔹 baru
         };
         const m = map[type] || { label: type, cls: "badge-neutral" };
         return <span className={`badge badge-sm ${m.cls}`}>{m.label}</span>;

@@ -21,6 +21,7 @@ const Login = () => {
             localStorage.setItem("token", res.data.token);
             localStorage.setItem("username", res.data.username || "");
             localStorage.setItem("email", res.data.email || "");
+            localStorage.setItem("employeeId", res.data.employeeId || "");
             // Role bisa array atau string, cek responsenya
             if (res.data.roles) {
                 localStorage.setItem("role", res.data.roles[0]);

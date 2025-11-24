@@ -75,6 +75,6 @@ public class EmployeeBatch {
     }
 
     public enum ProcessType {
-        CERTIFICATION, TRAINING, REFRESHMENT
+        CERTIFICATION, TRAINING, REFRESHMENT, EXTENSION
     }
 }

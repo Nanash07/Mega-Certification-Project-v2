@@ -8,7 +8,7 @@ export async function fetchEmployeeEligibilityPaged(params) {
         const { data } = await api.get(`${BASE_URL}/paged`, { params });
         return data || { content: [], totalPages: 0, totalElements: 0 };
     } catch (err) {
-        console.error("❌ fetchEmployeeEligibilityPaged error:", err);
+        console.error("fetchEmployeeEligibilityPaged error:", err);
         return { content: [], totalPages: 0, totalElements: 0 };
     }
 }
@@ -19,7 +19,7 @@ export async function fetchEligibilityByEmployee(employeeId) {
         const { data } = await api.get(`${BASE_URL}/employee/${employeeId}`);
         return Array.isArray(data) ? data : [];
     } catch (err) {
-        console.error("❌ fetchEligibilityByEmployee error:", err);
+        console.error("fetchEligibilityByEmployee error:", err);
         return [];
     }
 }
@@ -30,8 +30,7 @@ export async function refreshEmployeeEligibility() {
         await api.post(`${BASE_URL}/refresh`);
         return true;
     } catch (err) {
-        console.error("❌ refreshEmployeeEligibility error:", err);
+        console.error("refreshEmployeeEligibility error:", err);
         throw err;
     }
 }
-  

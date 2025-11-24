@@ -22,6 +22,7 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(@RequestBody LoginRequest request) {
+
         User user = userRepository.findByUsernameAndDeletedAtIsNull(request.getUsername())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Username not found"));
 
@@ -33,18 +34,28 @@ public class AuthController {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Password salah");
         }
 
+        // --- ambil role dan employeeId
         Role role = user.getRole();
         String roleName = role != null ? role.getName() : null;
 
-        String token = JwtUtil.generateToken(user.getUsername(), roleName);
+        Long employeeId = user.getEmployee() != null ? user.getEmployee().getId() : null;
 
+        // --- generate JWT BARU (lengkap)
+        String token = JwtUtil.generateToken(
+                user.getUsername(),
+                roleName,
+                user.getId(),
+                employeeId);
+
+        // --- login response lengkap ke FE
         LoginResponse resp = LoginResponse.builder()
                 .id(user.getId())
                 .username(user.getUsername())
-                .role(roleName)
                 .email(user.getEmail())
-                .isFirstLogin(user.getIsFirstLogin())
+                .role(roleName)
+                .employeeId(employeeId)
                 .isActive(user.getIsActive())
+                .isFirstLogin(user.getIsFirstLogin())
                 .token(token)
                 .build();
 

@@ -13,8 +13,12 @@ import java.util.List;
 @Getter
 public class UserPrincipal implements UserDetails {
 
-    private final User user;  // 🔑 simpan entity User biar bisa diakses di controller
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    private final User user;
+
     private final Long id;
+    private final Long employeeId; // ✅ DITAMBAHKAN
+
     private final String username;
     private final String password;
     private final String email;
@@ -22,13 +26,16 @@ public class UserPrincipal implements UserDetails {
     private final Boolean isActive;
 
     public UserPrincipal(User user) {
-        this.user = user;  // simpan entity
+        this.user = user;
         this.id = user.getId();
         this.username = user.getUsername();
         this.password = user.getPassword();
         this.email = user.getEmail();
         this.role = user.getRole();
         this.isActive = user.getIsActive();
+
+        // 🔥 Ambil employeeId dari relasi User → Employee
+        this.employeeId = user.getEmployee() != null ? user.getEmployee().getId() : null;
     }
 
     @Override
@@ -40,20 +47,22 @@ public class UserPrincipal implements UserDetails {
     }
 
     @Override
-    public String getPassword() { return password; }
+    public boolean isAccountNonExpired() {
+        return true;
+    }
 
     @Override
-    public String getUsername() { return username; }
+    public boolean isAccountNonLocked() {
+        return true;
+    }
 
     @Override
-    public boolean isAccountNonExpired() { return true; }
+    public boolean isCredentialsNonExpired() {
+        return true;
+    }
 
     @Override
-    public boolean isAccountNonLocked() { return true; }
-
-    @Override
-    public boolean isCredentialsNonExpired() { return true; }
-
-    @Override
-    public boolean isEnabled() { return Boolean.TRUE.equals(isActive); }
+    public boolean isEnabled() {
+        return Boolean.TRUE.equals(isActive);
+    }
 }

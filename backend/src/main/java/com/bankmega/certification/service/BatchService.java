@@ -150,8 +150,8 @@ public class BatchService {
                 : (existingOrNull != null ? existingOrNull.getType() : Batch.BatchType.CERTIFICATION);
 
         CertificationRule rule = null;
-        if (type == Batch.BatchType.CERTIFICATION) {
-            // untuk CERTIFICATION rule wajib
+        if (type == Batch.BatchType.CERTIFICATION || type == Batch.BatchType.EXTENSION) {
+            // untuk CERTIFICATION & EXTENSION rule wajib
             rule = certificationRuleRepository.findById(request.getCertificationRuleId())
                     .orElseThrow(() -> new NotFoundException("CertificationRule not found"));
         } else if (request.getCertificationRuleId() != null) {
@@ -258,11 +258,16 @@ public class BatchService {
     }
 
     private void validateRuleByType(Batch.BatchType type, Long ruleId, boolean isCreate) {
-        if (type == Batch.BatchType.CERTIFICATION && ruleId == null && isCreate) {
-            throw new IllegalArgumentException("CertificationRule wajib diisi untuk batch tipe CERTIFICATION");
+        if (type == null)
+            return;
+
+        if ((type == Batch.BatchType.CERTIFICATION || type == Batch.BatchType.EXTENSION)
+                && ruleId == null && isCreate) {
+            throw new IllegalArgumentException(
+                    "CertificationRule wajib diisi untuk batch tipe " + type.name());
         }
-        // Untuk update: jika target type CERTIFICATION tapi ruleId null, kita pakai
-        // existing (divalidasi di resolver).
+        // Untuk update: jika target type CERTIFICATION/EXTENSION tapi ruleId null,
+        // kita pakai existing (divalidasi di resolver).
     }
 
     private void validateBatchStatusTransition(Batch.Status current, Batch.Status next) {
@@ -283,17 +288,19 @@ public class BatchService {
 
     /**
      * Resolve rule untuk update sesuai target type.
-     * - CERTIFICATION: wajib ada rule (pakai request kalau ada; kalau tidak, pakai
+     * - CERTIFICATION / EXTENSION: wajib ada rule (pakai request kalau ada; kalau
+     * tidak, pakai
      * existing; kalau tetap null → error).
      * - TRAINING/REFRESHMENT: rule opsional (boleh null).
      */
     private CertificationRule resolveRuleForUpdate(Batch.BatchType targetType, Batch existing, Long requestedRuleId) {
-        if (targetType == Batch.BatchType.CERTIFICATION) {
+        if (targetType == Batch.BatchType.CERTIFICATION || targetType == Batch.BatchType.EXTENSION) {
             Long ruleId = requestedRuleId != null
                     ? requestedRuleId
                     : (existing.getCertificationRule() != null ? existing.getCertificationRule().getId() : null);
             if (ruleId == null) {
-                throw new IllegalArgumentException("CertificationRule wajib diisi untuk batch tipe CERTIFICATION");
+                throw new IllegalArgumentException(
+                        "CertificationRule wajib diisi untuk batch tipe " + targetType.name());
             }
             return certificationRuleRepository.findById(ruleId)
                     .orElseThrow(() -> new NotFoundException("CertificationRule not found"));

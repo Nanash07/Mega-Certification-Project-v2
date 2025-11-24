@@ -1,3 +1,4 @@
+// src/App.jsx
 import React from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
@@ -51,8 +52,9 @@ import DetailBatchPage from "./pages/batch/DetailBatchPage";
 import UserPage from "./pages/users/UserPage";
 
 // ================= SETTINGS / NOTIFICATIONS =================
-import EmailConfigPage from "./pages/Notification/EmailConfigPage";
-import NotificationSettingsPage from "./pages/Notification/NotificationSettingsPage";
+import EmailConfigPage from "./pages/notifications/EmailConfigPage";
+import NotificationSettingsPage from "./pages/notifications/NotificationSettingsPage";
+import NotificationPage from "./pages/notifications/NotificationPage";
 
 export default function App() {
     return (
@@ -257,7 +259,7 @@ export default function App() {
                     }
                 />
 
-                {/* ===== SERTIFIKAT (MASTER) – disesuaikan dengan MENU baru ===== */}
+                {/* ===== SERTIFIKAT (MASTER) ===== */}
                 <Route
                     path="/sertifikat/jenis"
                     element={
@@ -348,6 +350,16 @@ export default function App() {
                         <ProtectedRoute roles={["SUPERADMIN"]}>
                             <MainLayout>
                                 <NotificationSettingsPage />
+                            </MainLayout>
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/notifications"
+                    element={
+                        <ProtectedRoute>
+                            <MainLayout>
+                                <NotificationPage />
                             </MainLayout>
                         </ProtectedRoute>
                     }

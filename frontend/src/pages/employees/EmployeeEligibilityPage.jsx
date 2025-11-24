@@ -393,7 +393,7 @@ export default function EmployeeEligibilityPage() {
                                     </td>
                                     <td className="text-center">{r.trainingCount ?? 0}</td>
                                     <td className="text-center">{r.refreshmentCount ?? 0}</td>
-                                    <td className="text-center">{r.perpanjangCount ?? 0}</td>
+                                    <td className="text-center">{r.extensionCount ?? 0}</td>
                                 </tr>
                             ))
                         )}

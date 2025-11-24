@@ -1,3 +1,4 @@
+// src/pages/employees/EmployeeDetailPage.jsx
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
@@ -7,57 +8,10 @@ import { getEmployeeDetail } from "../../services/employeeService";
 import { fetchCertifications } from "../../services/employeeCertificationService";
 import { fetchEmployeeHistories } from "../../services/employeeHistoryService";
 import { fetchEligibilityByEmployee } from "../../services/employeeEligibilityService";
-import { fetchNotifications, fetchUnreadCount, markNotificationAsRead } from "../../services/notificationService";
 
 import ViewEmployeeCertificationModal from "../../components/employee-certifications/ViewEmployeeCertificationModal";
 import UploadCertificationModal from "../../components/employee-certifications/UploadEmployeeCertificationModal";
 import EditCertificationModal from "../../components/employee-certifications/EditEmployeeCertificationModal";
-
-// ==== HELPER: AMBIL USER LOGIN DARI LOCALSTORAGE / JWT ====
-// - Coba baca "user" (kalau lo simpan object LoginResponse di situ)
-// - Kalau nggak ada, decode JWT dari "token"
-function getCurrentUser() {
-    // 1) coba object user langsung
-    try {
-        const rawUser = localStorage.getItem("user");
-        if (rawUser) {
-            const parsed = JSON.parse(rawUser);
-            if (parsed && parsed.role) {
-                return parsed;
-            }
-        }
-    } catch (e) {
-        console.error("Failed to parse localStorage.user:", e);
-    }
-
-    // 2) fallback: decode JWT dari localStorage.token
-    try {
-        const token = localStorage.getItem("token");
-        if (!token) return null;
-
-        const parts = token.split(".");
-        if (parts.length !== 3) return null;
-
-        const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
-        const jsonPayload = decodeURIComponent(
-            atob(base64)
-                .split("")
-                .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
-                .join("")
-        );
-        const payload = JSON.parse(jsonPayload);
-
-        return {
-            id: payload.userId ?? null,
-            username: payload.sub ?? payload.username ?? null,
-            role: payload.role ?? null,
-            token,
-        };
-    } catch (e) {
-        console.error("Failed to decode JWT from localStorage.token:", e);
-        return null;
-    }
-}
 
 export default function EmployeeDetailPage() {
     const { id } = useParams();
@@ -69,25 +23,12 @@ export default function EmployeeDetailPage() {
     const [eligibilities, setEligibilities] = useState([]);
 
     const [loading, setLoading] = useState(true);
-    const [tab, setTab] = useState("certifications"); // certifications | history | eligibility | notifications
+    const [tab, setTab] = useState("certifications"); // certifications | history | eligibility
 
     const [viewData, setViewData] = useState(null);
     const [uploadData, setUploadData] = useState(null);
     const [editData, setEditData] = useState(null);
 
-    // NOTIF STATE
-    const [notifData, setNotifData] = useState(null);
-    const [notifLoading, setNotifLoading] = useState(false);
-    const [notifUnreadCount, setNotifUnreadCount] = useState(0);
-    const [notifPage, setNotifPage] = useState(0);
-    const notifPageSize = 10;
-
-    const currentUser = getCurrentUser();
-    const canSeeNotifications = currentUser?.role === "PEGAWAI";
-
-    console.log("currentUser:", currentUser, "canSeeNotifications:", canSeeNotifications);
-
-    // ---------- LOAD DATA PEGAWAI ----------
     const loadData = async () => {
         try {
             setLoading(true);
@@ -110,56 +51,10 @@ export default function EmployeeDetailPage() {
     };
 
     useEffect(() => {
-        if (id) loadData();
+        loadData();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [id]);
 
-    // ---------- LOAD NOTIFIKASI USER LOGIN ----------
-    const loadNotifications = async (page = 0) => {
-        if (!canSeeNotifications) return;
-        try {
-            setNotifLoading(true);
-            const [pageData, unreadCount] = await Promise.all([
-                fetchNotifications({ page, size: notifPageSize }),
-                fetchUnreadCount(),
-            ]);
-            setNotifData(pageData);
-            setNotifUnreadCount(unreadCount);
-        } catch (err) {
-            console.error("loadNotifications error:", err);
-            toast.error("Gagal memuat notifikasi");
-        } finally {
-            setNotifLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        if (tab === "notifications" && canSeeNotifications) {
-            loadNotifications(notifPage);
-        }
-    }, [tab, notifPage, canSeeNotifications]);
-
-    const handleNotifClick = async (notif) => {
-        if (!canSeeNotifications) return;
-        if (notif.read) return;
-
-        try {
-            await markNotificationAsRead(notif.id);
-            setNotifData((prev) =>
-                !prev
-                    ? prev
-                    : {
-                          ...prev,
-                          content: prev.content.map((n) => (n.id === notif.id ? { ...n, read: true } : n)),
-                      }
-            );
-            setNotifUnreadCount((prev) => Math.max(0, prev - 1));
-        } catch (err) {
-            console.error("markNotificationAsRead error:", err);
-            toast.error("Gagal menandai notifikasi");
-        }
-    };
-
-    // ---------- HELPERS ----------
     const formatDate = (date) => {
         if (!date) return "-";
         return new Date(date).toLocaleDateString("id-ID", {
@@ -169,23 +64,11 @@ export default function EmployeeDetailPage() {
         });
     };
 
-    const formatDateTime = (date) => {
-        if (!date) return "-";
-        return new Date(date).toLocaleString("id-ID", {
-            day: "2-digit",
-            month: "short",
-            year: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-        });
-    };
-
     const translateGender = (gender) => {
         if (!gender) return "-";
         return gender === "F" ? "Perempuan" : gender === "M" ? "Laki-laki" : gender;
     };
 
-    // ---------- RENDER ----------
     if (loading) {
         return (
             <div className="flex justify-center items-center h-64">
@@ -209,11 +92,13 @@ export default function EmployeeDetailPage() {
 
     return (
         <div className="space-y-6">
-            {/* Back */}
-            <button className="btn btn-sm btn-accent mb-2 flex items-center gap-2" onClick={() => navigate(-1)}>
-                <ArrowLeft size={16} />
-                Kembali
-            </button>
+            {/* Tombol Back */}
+            <div>
+                <button className="btn btn-sm btn-accent mb-2 flex items-center gap-2" onClick={() => navigate(-1)}>
+                    <ArrowLeft size={16} />
+                    Kembali
+                </button>
+            </div>
 
             {/* Informasi Pribadi */}
             <div className="card bg-base-100 shadow p-5">
@@ -273,19 +158,6 @@ export default function EmployeeDetailPage() {
                 >
                     Eligibility
                 </button>
-                {canSeeNotifications && (
-                    <button
-                        className={`tab ${tab === "notifications" ? "tab-active" : ""}`}
-                        onClick={() => setTab("notifications")}
-                    >
-                        Notifikasi
-                        {notifUnreadCount > 0 && (
-                            <span className="badge badge-xs badge-warning text-white ml-2">
-                                {notifUnreadCount > 9 ? "9+" : notifUnreadCount}
-                            </span>
-                        )}
-                    </button>
-                )}
             </div>
 
             {/* ===== TAB: CERTIFICATIONS ===== */}
@@ -488,75 +360,6 @@ export default function EmployeeDetailPage() {
                                 </tbody>
                             </table>
                         </div>
-                    )}
-                </div>
-            )}
-
-            {/* ===== TAB: NOTIFICATIONS ===== */}
-            {tab === "notifications" && canSeeNotifications && (
-                <div className="card bg-base-100 shadow p-5">
-                    <h2 className="font-bold text-lg mb-4">Notifikasi</h2>
-
-                    {notifLoading ? (
-                        <div className="flex justify-center items-center h-32">
-                            <span className="loading loading-dots loading-md" />
-                        </div>
-                    ) : !notifData || notifData.content.length === 0 ? (
-                        <p className="text-gray-400 text-sm">Belum ada notifikasi.</p>
-                    ) : (
-                        <>
-                            <div className="space-y-2 max-h-96 overflow-y-auto">
-                                {notifData.content.map((n) => (
-                                    <button
-                                        key={n.id}
-                                        onClick={() => handleNotifClick(n)}
-                                        className={`w-full text-left border rounded-lg p-3 transition ${
-                                            n.read ? "bg-base-100 border-base-200" : "bg-amber-50 border-amber-300"
-                                        }`}
-                                    >
-                                        <div className="flex justify-between items-start gap-2">
-                                            <div>
-                                                <p className="font-semibold text-sm">{n.title}</p>
-                                                <p className="text-xs text-gray-600 mt-1">{n.message}</p>
-                                                <p className="text-[11px] text-gray-400 mt-1">
-                                                    {formatDateTime(n.createdAt)}
-                                                </p>
-                                            </div>
-                                            {!n.read && (
-                                                <span className="badge badge-xs badge-warning text-white mt-1">
-                                                    Baru
-                                                </span>
-                                            )}
-                                        </div>
-                                    </button>
-                                ))}
-                            </div>
-
-                            <div className="mt-4 flex items-center justify-between">
-                                <span className="text-xs text-gray-500">
-                                    Halaman {notifData.number + 1} dari {notifData.totalPages || 1}
-                                </span>
-                                <div className="join">
-                                    <button
-                                        className="btn btn-xs join-item"
-                                        disabled={notifPage === 0}
-                                        onClick={() => setNotifPage((p) => Math.max(0, p - 1))}
-                                    >
-                                        «
-                                    </button>
-                                    <button className="btn btn-xs join-item" disabled>
-                                        {notifPage + 1}
-                                    </button>
-                                    <button
-                                        className="btn btn-xs join-item"
-                                        disabled={notifData.last}
-                                        onClick={() => setNotifPage((p) => p + 1)}
-                                    >
-                                        »
-                                    </button>
-                                </div>
-                            </div>
-                        </>
                     )}
                 </div>
             )}
