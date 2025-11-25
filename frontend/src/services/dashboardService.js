@@ -79,16 +79,16 @@ function mapSummaryToAggregate(summary) {
 
 /** Aggregate builder: panggil beberapa endpoint BE dan gabungkan */
 export async function fetchDashboardAggregate(params = {}) {
-    const { year, page, size, ...filters } = params;
+    // year udah gak dipakai di BE, jadi kita abaikan aja di sini
+    const { page, size, ...filters } = params;
     const q = cleanParams(filters);
-    const yr = Number(year ?? new Date().getFullYear());
     const pg = Number.isInteger(page) ? Number(page) : 0;
     const sz = Number.isInteger(size) ? Number(size) : 10;
 
     try {
         const [summaryRes, monthlyRes, ongoingRes, priorityRes] = await Promise.all([
             api.get(`/dashboard/summary`, { params: q }),
-            api.get(`/dashboard/monthly`, { params: cleanParams({ year: yr, ...q }) }),
+            api.get(`/dashboard/monthly`, { params: q }), // kirim filter apa adanya (bisa ada startDate/endDate/batchType)
             api.get(`/dashboard/ongoing-batches`, { params: q }),
             api.get(`/dashboard/priority`, { params: q }),
         ]);
@@ -102,8 +102,11 @@ export async function fetchDashboardAggregate(params = {}) {
         const start = pg * sz;
         const content = list.slice(start, start + sz);
 
-        const dueTop = priorityRes?.data?.dueTop10 ?? [];
-        const expiredTop = priorityRes?.data?.expiredTop10 ?? [];
+        const priorityData = priorityRes?.data ?? {};
+        const dueTop = priorityData.dueTop10 ?? priorityData.due ?? [];
+        const expiredTop = priorityData.expiredTop10 ?? priorityData.expired ?? [];
+        // kalau nanti butuh notYet:
+        // const notYetTop = priorityData.notYet ?? [];
 
         return {
             computedAt: new Date().toISOString(),
@@ -144,13 +147,20 @@ export async function fetchDashboardSummary(params = {}) {
             api.get(`/dashboard/priority`, { params: cleanParams(filters) }),
         ]);
         const { summary, kpiStatus, composition } = mapSummaryToAggregate(summaryRes?.data);
+
+        const priorityData = priorityRes?.data ?? {};
+        const dueTop = priorityData.dueTop10 ?? priorityData.due ?? [];
+        const expiredTop = priorityData.expiredTop10 ?? priorityData.expired ?? [];
+        const notYetTop = priorityData.notYetTop ?? priorityData.notYet ?? [];
+
         return {
             computedAt: new Date().toISOString(),
             summary,
             kpiStatus,
             composition,
-            dueTop: priorityRes?.data?.dueTop10 ?? [],
-            expiredTop: priorityRes?.data?.expiredTop10 ?? [],
+            dueTop,
+            expiredTop,
+            notYetTop,
         };
     } catch (e) {
         console.error("API error: GET /dashboard/summary or /priority", e);
@@ -166,6 +176,7 @@ export async function fetchDashboardSummary(params = {}) {
             composition: [],
             dueTop: [],
             expiredTop: [],
+            notYetTop: [],
         };
     }
 }
@@ -198,10 +209,9 @@ export async function fetchOngoingBatchesPaged(params = {}) {
 }
 
 export async function fetchMonthlyCertificationTrend(params = {}) {
-    const { year, ...filters } = params;
-    const yr = Number(year ?? new Date().getFullYear());
+    // year udah gak relevan, tapi kalau masih dikirim dari caller akan diabaikan oleh BE
     try {
-        const { data } = await api.get(`/dashboard/monthly`, { params: cleanParams({ year: yr, ...filters }) });
+        const { data } = await api.get(`/dashboard/monthly`, { params: cleanParams(params) });
         return normalizeMonthly(data);
     } catch (e) {
         console.error("API error: monthly", e);

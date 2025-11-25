@@ -1,5 +1,6 @@
 package com.bankmega.certification.dto.dashboard;
 
+import java.time.LocalDate;
 import java.util.List;
 
 import lombok.*;
@@ -17,7 +18,10 @@ public class DashboardFilters {
     private Long levelId;
     private Long subFieldId;
 
-    private Integer year; // default-in di service kalau null
-
     private List<Long> allowedCertificationIds;
+
+    /** filter tanggal untuk data yang pakai tabel batches */
+    private LocalDate startDate;
+    private LocalDate endDate;
+    private String batchType;
 }

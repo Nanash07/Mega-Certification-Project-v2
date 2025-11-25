@@ -101,9 +101,14 @@ public class JdbcDashboardRepository implements DashboardRepository {
 
     private MapSqlParameterSource baseParams(DashboardFilters f) {
         MapSqlParameterSource p = new MapSqlParameterSource();
-        if (f.getYear() != null) {
-            p.addValue("startYear", LocalDate.of(f.getYear(), 1, 1));
-            p.addValue("endYear", LocalDate.of(f.getYear() + 1, 1, 1));
+        if (f.getStartDate() != null) {
+            p.addValue("startDate", f.getStartDate());
+        }
+        if (f.getEndDate() != null) {
+            p.addValue("endDate", f.getEndDate());
+        }
+        if (f.getBatchType() != null) {
+            p.addValue("batchType", f.getBatchType());
         }
         return p;
     }
@@ -196,23 +201,33 @@ public class JdbcDashboardRepository implements DashboardRepository {
     @Override
     public List<MonthlyPoint> fetchMonthly(DashboardFilters f) {
         MapSqlParameterSource p = baseParams(f);
-        String empWhere = whereEmployee("e", f, p);
         String ruleWhere = whereRule("cr", f, p);
 
+        StringBuilder dateClause = new StringBuilder();
+        if (f.getStartDate() != null) {
+            dateClause.append(" AND b.start_date >= :startDate");
+        }
+        if (f.getEndDate() != null) {
+            dateClause.append(" AND b.start_date <= :endDate");
+        }
+
+        String typeClause = "";
+        if (f.getBatchType() != null) {
+            typeClause = " AND b.type = :batchType";
+        }
+
         String sql = """
-                SELECT EXTRACT(MONTH FROM ec.valid_from)::int AS m, COUNT(*) AS c
-                FROM employee_certifications ec
-                JOIN employees e ON e.id = ec.employee_id
-                JOIN certification_rules cr ON cr.id = ec.certification_rule_id
-                WHERE ec.deleted_at IS NULL
-                  AND ec.valid_from >= :startYear AND ec.valid_from < :endYear
-                  AND ec.status IN ('ACTIVE','DUE')
-                  AND e.deleted_at IS NULL
+                SELECT EXTRACT(MONTH FROM b.start_date)::int AS m, COUNT(*) AS c
+                FROM batches b
+                JOIN certification_rules cr ON cr.id = b.certification_rule_id
+                WHERE b.deleted_at IS NULL
+                  AND b.status IN ('ONGOING','FINISHED')
+                  %s
                   %s
                   %s
                 GROUP BY m
                 ORDER BY m;
-                """.formatted(empWhere, ruleWhere);
+                """.formatted(ruleWhere, dateClause.toString(), typeClause);
 
         return jdbc.query(sql, p, (rs, i) -> new MonthlyPoint(rs.getInt("m"), rs.getLong("c")));
     }
@@ -223,6 +238,14 @@ public class JdbcDashboardRepository implements DashboardRepository {
         String ruleWhere = whereRule("cr", f, p);
         String empRaw = whereEmployeeRaw("e", f, p);
         String empBlock = empRaw.isEmpty() ? "" : " AND (e.id IS NULL OR (" + empRaw + "))";
+
+        StringBuilder dateClause = new StringBuilder();
+        if (f.getStartDate() != null) {
+            dateClause.append(" AND b.start_date >= :startDate");
+        }
+        if (f.getEndDate() != null) {
+            dateClause.append(" AND b.start_date <= :endDate");
+        }
 
         String sql = """
                 SELECT b.id, b.batch_name, b.type, b.status, b.start_date, b.end_date, b.quota,
@@ -242,11 +265,12 @@ public class JdbcDashboardRepository implements DashboardRepository {
                 WHERE b.status = 'ONGOING'
                   %s
                   %s
+                  %s
                 GROUP BY b.id, b.batch_name, b.type, b.status, b.start_date, b.end_date, b.quota,
                          c.code, cl.level, sf.code
                 ORDER BY b.start_date DESC, b.id DESC
                 LIMIT 10;
-                """.formatted(ruleWhere, empBlock);
+                """.formatted(ruleWhere, empBlock, dateClause.toString());
 
         return jdbc.query(sql, p, (rs, i) -> new BatchCard(
                 rs.getLong("id"),
@@ -271,13 +295,6 @@ public class JdbcDashboardRepository implements DashboardRepository {
         String ruleWhere = whereRule("cr", f, p);
 
         String base = """
-                WITH latest_ec AS (
-                  SELECT DISTINCT ON (ec.employee_id, ec.certification_rule_id)
-                         ec.*
-                  FROM employee_certifications ec
-                  WHERE ec.deleted_at IS NULL
-                  ORDER BY ec.employee_id, ec.certification_rule_id, COALESCE(ec.updated_at, ec.created_at) DESC
-                )
                 SELECT
                     e.nip,
                     e.name,
@@ -285,49 +302,61 @@ public class JdbcDashboardRepository implements DashboardRepository {
                     cl.level AS rule_level,
                     sf.code  AS sub_field_code,
                     CONCAT_WS('-', c.code, cl.level::text, sf.code) AS rule_code,
-                    lec.status,
-                    lec.valid_until,
-                    (lec.valid_until - CURRENT_DATE) AS days_left
-                FROM latest_ec lec
-                JOIN employees e            ON e.id = lec.employee_id AND e.deleted_at IS NULL
-                JOIN certification_rules cr ON cr.id = lec.certification_rule_id
+                    elg.status,
+                    elg.due_date AS valid_until,
+                    (elg.due_date - CURRENT_DATE) AS days_left
+                FROM employee_eligibilities elg
+                JOIN employees e            ON e.id = elg.employee_id AND e.deleted_at IS NULL
+                JOIN certification_rules cr ON cr.id = elg.certification_rule_id
                 LEFT JOIN certifications c        ON c.id  = cr.certification_id
                 LEFT JOIN certification_levels cl ON cl.id = cr.certification_level_id
                 LEFT JOIN sub_fields sf           ON sf.id = cr.sub_field_id
-                WHERE 1=1
+                WHERE elg.deleted_at IS NULL
                   %s
                   %s
-                  AND lec.status = :wantedStatus
-                ORDER BY lec.valid_until %s
-                LIMIT 10;
+                  AND elg.status = :wantedStatus
+                ORDER BY %s;
                 """;
 
         Map<String, List<PriorityRow>> out = new HashMap<>();
 
-        // DUE
-        p.addValue("wantedStatus", "DUE");
-        String dueSql = base.formatted(empWhere, ruleWhere, "ASC");
-        List<PriorityRow> due = jdbc.query(dueSql, p, (rs, i) -> new PriorityRow(
+        // NOT_YET_CERTIFIED (Belum memiliki sertifikat) → urut nama
+        p.addValue("wantedStatus", "NOT_YET_CERTIFIED");
+        String notYetSql = base.formatted(empWhere, ruleWhere, "e.name ASC");
+        List<PriorityRow> notYet = jdbc.query(notYetSql, p, (rs, i) -> new PriorityRow(
+                rs.getString("nip"),
+                rs.getString("name"),
+                rs.getString("rule_code"),
+                "NOT_YET_CERTIFIED",
+                rs.getDate("valid_until") == null ? null : rs.getDate("valid_until").toLocalDate(),
+                toLong(rs.getObject("days_left"))));
+        out.put("notYet", notYet);
+
+        // DUE → paling dekat dulu
+        MapSqlParameterSource p2 = new MapSqlParameterSource(p.getValues());
+        p2.addValue("wantedStatus", "DUE");
+        String dueSql = base.formatted(empWhere, ruleWhere, "elg.due_date ASC NULLS LAST");
+        List<PriorityRow> due = jdbc.query(dueSql, p2, (rs, i) -> new PriorityRow(
                 rs.getString("nip"),
                 rs.getString("name"),
                 rs.getString("rule_code"),
                 "DUE",
                 rs.getDate("valid_until") == null ? null : rs.getDate("valid_until").toLocalDate(),
                 toLong(rs.getObject("days_left"))));
-        out.put("dueTop10", due);
+        out.put("due", due);
 
-        // EXPIRED
-        MapSqlParameterSource p2 = new MapSqlParameterSource(p.getValues());
-        p2.addValue("wantedStatus", "EXPIRED");
-        String expSql = base.formatted(empWhere, ruleWhere, "DESC");
-        List<PriorityRow> expired = jdbc.query(expSql, p2, (rs, i) -> new PriorityRow(
+        // EXPIRED → paling lama expired dulu
+        MapSqlParameterSource p3 = new MapSqlParameterSource(p.getValues());
+        p3.addValue("wantedStatus", "EXPIRED");
+        String expSql = base.formatted(empWhere, ruleWhere, "elg.due_date DESC NULLS LAST");
+        List<PriorityRow> expired = jdbc.query(expSql, p3, (rs, i) -> new PriorityRow(
                 rs.getString("nip"),
                 rs.getString("name"),
                 rs.getString("rule_code"),
                 "EXPIRED",
                 rs.getDate("valid_until") == null ? null : rs.getDate("valid_until").toLocalDate(),
                 toLong(rs.getObject("days_left"))));
-        out.put("expiredTop10", expired);
+        out.put("expired", expired);
 
         return out;
     }
@@ -348,6 +377,7 @@ public class JdbcDashboardRepository implements DashboardRepository {
                 (rs, i) -> new FilterOption(rs.getLong("id"), rs.getString("name")));
         List<FilterOption> subs = jdbc.query(opt.formatted("sub_fields"),
                 (rs, i) -> new FilterOption(rs.getLong("id"), rs.getString("name")));
+
         return new FiltersResponse(regionals, divisions, units, certs, levels, subs);
     }
 }

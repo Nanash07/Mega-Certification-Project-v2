@@ -30,6 +30,7 @@ import {
     YAxis,
     CartesianGrid,
 } from "recharts";
+import PaginationSimple from "../../components/common/PaginationSimple";
 
 /* ========= utils ========= */
 const toDate = (d) => (d ? new Date(d) : null);
@@ -190,6 +191,18 @@ export default function SuperadminDashboard() {
     const [levelOptions, setLevelOptions] = useState([]);
     const [subFieldOptions, setSubFieldOptions] = useState([]);
 
+    // ===== filter tanggal & jenis batch
+    const [startDate, setStartDate] = useState("");
+    const [endDate, setEndDate] = useState("");
+    const batchTypeOptions = [
+        { value: "", label: "Semua Jenis" },
+        { value: "CERTIFICATION", label: "Batch Sertifikasi" },
+        { value: "TRAINING", label: "Training" },
+        { value: "REFRESHMENT", label: "Refreshment" },
+        { value: "EXTENSION", label: "Perpanjangan" },
+    ];
+    const [batchType, setBatchType] = useState(batchTypeOptions[0]);
+
     // ===== summary/kpi
     const [summary, setSummary] = useState(null);
     const [kpi, setKpi] = useState(null);
@@ -198,27 +211,34 @@ export default function SuperadminDashboard() {
     // ===== peringatan
     const [dueList, setDueList] = useState([]);
     const [expiredList, setExpiredList] = useState([]);
+    const [notYetList, setNotYetList] = useState([]);
     const [loadingAlert, setLoadingAlert] = useState(true);
 
-    // ===== batch ONGOING
+    // paging priority
+    const [notYetPage, setNotYetPage] = useState(1);
+    const [notYetRowsPerPage, setNotYetRowsPerPage] = useState(10);
+    const [duePage, setDuePage] = useState(1);
+    const [dueRowsPerPage, setDueRowsPerPage] = useState(10);
+    const [expiredPage, setExpiredPage] = useState(1);
+    const [expiredRowsPerPage, setExpiredRowsPerPage] = useState(10);
+
+    // ===== batch ONGOING (paging)
     const [batches, setBatches] = useState([]);
-    const [batchPage, setBatchPage] = useState(0);
-    const [batchHasMore, setBatchHasMore] = useState(true);
+    const [batchPage, setBatchPage] = useState(1);
+    const [batchRows, setBatchRows] = useState(10);
+    const [batchTotalPages, setBatchTotalPages] = useState(1);
+    const [batchTotalElements, setBatchTotalElements] = useState(0);
     const [loadingBatch, setLoadingBatch] = useState(false);
 
-    // ===== batch FINISHED
+    // ===== batch FINISHED (paging seperti ONGOING)
     const [finishedBatches, setFinishedBatches] = useState([]);
-    const [finishedPage, setFinishedPage] = useState(0);
-    const [finishedHasMore, setFinishedHasMore] = useState(true);
+    const [finishedPage, setFinishedPage] = useState(1);
+    const [finishedRows, setFinishedRows] = useState(10);
+    const [finishedTotalPages, setFinishedTotalPages] = useState(1);
+    const [finishedTotalElements, setFinishedTotalElements] = useState(0);
     const [loadingFinished, setLoadingFinished] = useState(false);
 
     // ===== bulanan
-    const nowYear = new Date().getFullYear();
-    const yearOptions = Array.from({ length: 6 }).map((_, i) => ({
-        value: nowYear - i,
-        label: String(nowYear - i),
-    }));
-    const [year, setYear] = useState(yearOptions[0]);
     const [monthly, setMonthly] = useState(MONTHS.map((label, i) => ({ month: i + 1, label, count: 0 })));
 
     /* ===== masters ===== */
@@ -278,6 +298,9 @@ export default function SuperadminDashboard() {
         certificationId: certSel?.value,
         levelId: levelSel?.value,
         subFieldId: subSel?.value,
+        startDate: startDate || undefined,
+        endDate: endDate || undefined,
+        batchType: batchType?.value || undefined,
     });
 
     const params = currentFilters;
@@ -295,52 +318,56 @@ export default function SuperadminDashboard() {
             const s = await fetchDashboardSummary({ ...params(), sections: "priority" });
             setDueList(Array.isArray(s?.dueTop) ? s.dueTop : []);
             setExpiredList(Array.isArray(s?.expiredTop) ? s.expiredTop : []);
+            setNotYetList(Array.isArray(s?.notYetTop) ? s.notYetTop : []);
+
+            setNotYetPage(1);
+            setDuePage(1);
+            setExpiredPage(1);
         } catch {
             setDueList([]);
             setExpiredList([]);
+            setNotYetList([]);
         } finally {
             setLoadingAlert(false);
         }
     }
 
-    async function loadBatches(reset = false) {
-        if (loadingBatch) return;
+    async function loadBatches(page = 1) {
         setLoadingBatch(true);
         try {
-            const page = reset ? 0 : batchPage;
             const agg = await fetchDashboardAggregate({
                 ...params(),
                 sections: "batches",
-                batchPage: page,
-                batchSize: 10,
+                batchPage: page - 1, // BE zero-based
+                batchSize: batchRows,
             });
-            const res = agg.ongoingBatchesPage || { content: [], totalPages: 0 };
-            const next = Array.isArray(res.content) ? res.content : [];
-            setBatches((prev) => (reset ? next : [...prev, ...next]));
-            setBatchHasMore(page + 1 < (res.totalPages ?? 0));
-            setBatchPage(page + 1);
+            const res = agg.ongoingBatchesPage || { content: [], totalPages: 0, totalElements: 0 };
+            const list = Array.isArray(res.content) ? res.content : [];
+            setBatches(list);
+            setBatchTotalPages(res.totalPages || 1);
+            setBatchTotalElements(res.totalElements || list.length || 0);
+            setBatchPage(page);
         } finally {
             setLoadingBatch(false);
         }
     }
 
-    async function loadFinishedBatches(reset = false) {
-        if (loadingFinished) return;
+    async function loadFinishedBatches(page = 1) {
         setLoadingFinished(true);
         try {
-            const page = reset ? 0 : finishedPage;
             const { data } = await api.get("/batches/paged", {
                 params: {
                     status: "FINISHED",
-                    page,
-                    size: 10,
+                    page: page - 1, // BE zero-based
+                    size: finishedRows,
                     sort: "endDate,desc",
                 },
             });
             const content = Array.isArray(data?.content) ? data.content : [];
-            setFinishedBatches((prev) => (reset ? content : [...prev, ...content]));
-            setFinishedHasMore(page + 1 < (data?.totalPages ?? 0));
-            setFinishedPage(page + 1);
+            setFinishedBatches(content);
+            setFinishedTotalPages(data?.totalPages || 1);
+            setFinishedTotalElements(data?.totalElements || content.length || 0);
+            setFinishedPage(page);
         } finally {
             setLoadingFinished(false);
         }
@@ -349,7 +376,6 @@ export default function SuperadminDashboard() {
     async function loadMonthly() {
         const data = await fetchMonthlyCertificationTrend({
             ...params(),
-            year: year?.value,
             sections: "monthly",
         });
         setMonthly(data);
@@ -360,22 +386,20 @@ export default function SuperadminDashboard() {
             await loadSummaryAndKpi();
             await loadPriority();
 
-            // ONGOING
-            setBatchPage(0);
+            // ONGOING (reset ke page 1)
+            setBatchPage(1);
             setBatches([]);
-            setBatchHasMore(true);
-            await loadBatches(true);
+            await loadBatches(1);
 
-            // FINISHED
-            setFinishedPage(0);
+            // FINISHED (reset ke page 1)
+            setFinishedPage(1);
             setFinishedBatches([]);
-            setFinishedHasMore(true);
-            await loadFinishedBatches(true);
+            await loadFinishedBatches(1);
 
             await loadMonthly();
         })();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [divisionSel, regionalSel, unitSel, certSel, levelSel, subSel, year]);
+    }, [divisionSel, regionalSel, unitSel, certSel, levelSel, subSel, startDate, endDate, batchType]);
 
     /* ===== computed ===== */
     const eligibleTotal = useMemo(() => {
@@ -384,22 +408,56 @@ export default function SuperadminDashboard() {
         return (s.active ?? 0) + (s.due ?? 0) + (s.expired ?? 0) + (s.notYetCertified ?? 0);
     }, [summary, kpi]);
 
+    // Breakdown realisasi: hitung dari Summary (biar konsisten sama kartu)
     const real = useMemo(() => {
-        const s = kpi || {};
-        const activeOnly = s.active ?? 0;
-        const total = (s.active ?? 0) + (s.due ?? 0) + (s.expired ?? 0) + (s.notYetCertified ?? 0);
-        const nonActive = Math.max(total - activeOnly, 0);
-        const pct = total > 0 ? Math.round((activeOnly / total) * 1000) / 10 : 0;
-        return { active: activeOnly, nonActive, total, pct };
-    }, [kpi]);
+        const cert = summary?.certifications || {};
+        const k = kpi || {};
 
-    const pieData = useMemo(
-        () => [
-            { name: "Tersertifikasi", value: real.active },
-            { name: "Tidak bersertifikat", value: real.nonActive },
-        ],
-        [real]
-    );
+        // di Summary card: "Tersertifikasi" = ACTIVE + DUE
+        const activePlusDue = Number(cert.active ?? 0);
+        const due = Number(cert.due ?? 0);
+        const expired = Number(cert.expired ?? 0);
+
+        // ACTIVE only = (ACTIVE + DUE) - DUE
+        const activeOnly = Math.max(activePlusDue - due, 0);
+
+        // Summary nggak punya "belum bersertifikat", ambil dari kpi
+        const notYet = Number(k.notYetCertified ?? 0);
+
+        const certifiedIncDue = activePlusDue;
+        const total = activeOnly + due + expired + notYet;
+        const pct = total > 0 ? Math.round((certifiedIncDue / total) * 1000) / 10 : 0;
+
+        return {
+            activeOnly,
+            due,
+            expired,
+            notYet,
+            certifiedIncDue,
+            total,
+            pct,
+        };
+    }, [summary, kpi]);
+
+    // paging priority sliced
+    const notYetTotalPages = Math.max(1, Math.ceil(notYetList.length / notYetRowsPerPage));
+    const dueTotalPages = Math.max(1, Math.ceil(dueList.length / dueRowsPerPage));
+    const expiredTotalPages = Math.max(1, Math.ceil(expiredList.length / expiredRowsPerPage));
+
+    const notYetPaged = useMemo(() => {
+        const start = (notYetPage - 1) * notYetRowsPerPage;
+        return notYetList.slice(start, start + notYetRowsPerPage);
+    }, [notYetList, notYetPage, notYetRowsPerPage]);
+
+    const duePaged = useMemo(() => {
+        const start = (duePage - 1) * dueRowsPerPage;
+        return dueList.slice(start, start + dueRowsPerPage);
+    }, [dueList, duePage, dueRowsPerPage]);
+
+    const expiredPaged = useMemo(() => {
+        const start = (expiredPage - 1) * expiredRowsPerPage;
+        return expiredList.slice(start, start + expiredRowsPerPage);
+    }, [expiredList, expiredPage, expiredRowsPerPage]);
 
     // Kartu ringkas
     const cardConfigs = useMemo(() => {
@@ -535,6 +593,36 @@ export default function SuperadminDashboard() {
                 </div>
             </div>
 
+            {/* Filter tanggal + jenis batch */}
+            <div className="grid grid-cols-1 md:grid-cols-6 gap-2">
+                <div className="tooltip tooltip-top" data-tip="Tanggal Mulai Batch" title="Tanggal Mulai Batch">
+                    <div className="form-control w-full">
+                        <label className="label py-1">
+                            <span className="label-text text-xs">Tanggal Mulai Batch</span>
+                        </label>
+                        <input
+                            type="date"
+                            className="input input-sm input-bordered w-full"
+                            value={startDate || ""}
+                            onChange={(e) => setStartDate(e.target.value || "")}
+                        />
+                    </div>
+                </div>
+                <div className="tooltip tooltip-top" data-tip="Tanggal Selesai Batch" title="Tanggal Selesai Batch">
+                    <div className="form-control w-full">
+                        <label className="label py-1">
+                            <span className="label-text text-xs">Tanggal Selesai Batch</span>
+                        </label>
+                        <input
+                            type="date"
+                            className="input input-sm input-bordered w-full"
+                            value={endDate || ""}
+                            onChange={(e) => setEndDate(e.target.value || "")}
+                        />
+                    </div>
+                </div>
+            </div>
+
             {/* Kartu ringkas */}
             <div className="grid grid-cols-2 md:grid-cols-6 gap-3 md:gap-4">
                 {!summary
@@ -573,8 +661,10 @@ export default function SuperadminDashboard() {
                                         <PieChart>
                                             <Pie
                                                 data={[
-                                                    { name: "Tersertifikasi", value: real.active },
-                                                    { name: "Tidak bersertifikat", value: real.nonActive },
+                                                    { name: "Aktif", value: real.activeOnly },
+                                                    { name: "Jatuh Tempo", value: real.due },
+                                                    { name: "Kadaluarsa", value: real.expired },
+                                                    { name: "Belum Bersertifikat", value: real.notYet },
                                                 ]}
                                                 dataKey="value"
                                                 nameKey="name"
@@ -582,8 +672,14 @@ export default function SuperadminDashboard() {
                                                 outerRadius={85}
                                                 label
                                             >
+                                                {/* Aktif */}
                                                 <Cell fill="#16a34a" />
+                                                {/* Due */}
+                                                <Cell fill="#f97316" />
+                                                {/* Expired */}
                                                 <Cell fill="#ef4444" />
+                                                {/* Belum */}
+                                                <Cell fill="#0ea5e9" />
                                             </Pie>
                                             <ReTooltip />
                                         </PieChart>
@@ -598,18 +694,40 @@ export default function SuperadminDashboard() {
                                             className="inline-block w-3 h-3 rounded-sm"
                                             style={{ background: "#16a34a" }}
                                         />
-                                        <span>Tersertifikasi</span>
-                                        <span className="font-semibold ml-auto">{real.active}</span>
+                                        <span>Aktif</span>
+                                        <span className="font-semibold ml-auto">{real.activeOnly}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span
+                                            className="inline-block w-3 h-3 rounded-sm"
+                                            style={{ background: "#f97316" }}
+                                        />
+                                        <span>Jatuh Tempo</span>
+                                        <span className="font-semibold ml-auto">{real.due}</span>
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <span
                                             className="inline-block w-3 h-3 rounded-sm"
                                             style={{ background: "#ef4444" }}
                                         />
-                                        <span>Tidak bersertifikat</span>
-                                        <span className="font-semibold ml-auto">{real.nonActive}</span>
+                                        <span>Kadaluarsa</span>
+                                        <span className="font-semibold ml-auto">{real.expired}</span>
                                     </div>
-                                    <div className="pt-2 text-xs opacity-70">Total populasi: {real.total}</div>
+                                    <div className="flex items-center gap-2">
+                                        <span
+                                            className="inline-block w-3 h-3 rounded-sm"
+                                            style={{ background: "#0ea5e9" }}
+                                        />
+                                        <span>Belum Bersertifikat</span>
+                                        <span className="font-semibold ml-auto">{real.notYet}</span>
+                                    </div>
+                                    <div className="pt-2 text-xs opacity-70">
+                                        Total populasi: {real.total}
+                                        <br />
+                                        <span className="opacity-70">
+                                            Tersertifikasi (aktif + jatuh tempo): {real.certifiedIncDue}
+                                        </span>
+                                    </div>
                                 </div>
                             </div>
                         )}
@@ -620,9 +738,16 @@ export default function SuperadminDashboard() {
                 <div className="card bg-base-100 border rounded-2xl shadow-sm">
                     <div className="card-body p-4 md:p-5">
                         <div className="flex items-center justify-between gap-2">
-                            <h2 className="card-title text-base md:text-lg">Total Sertifikasi / Bulan</h2>
-                            <div className="min-w-[120px]">
-                                <SelectTop options={yearOptions} value={year} onChange={setYear} placeholder="Tahun" />
+                            <h2 className="card-title text-base md:text-lg">Pelaksanaan Batch</h2>
+                            <div className="min-w-[160px]">
+                                <SelectTop
+                                    options={batchTypeOptions}
+                                    value={batchType}
+                                    onChange={(v) => setBatchType(v || batchTypeOptions[0])}
+                                    placeholder="Jenis Batch"
+                                    isClearable={false}
+                                    isSearchable={false}
+                                />
                             </div>
                         </div>
                         <div className="h-64">
@@ -630,7 +755,7 @@ export default function SuperadminDashboard() {
                                 <div className="skeleton h-full w-full rounded-xl" />
                             ) : (
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={monthly} key={year?.value || "y0"}>
+                                    <BarChart data={monthly}>
                                         <CartesianGrid strokeDasharray="3 3" />
                                         <XAxis dataKey="label" />
                                         <YAxis allowDecimals={false} />
@@ -644,7 +769,7 @@ export default function SuperadminDashboard() {
                 </div>
             </div>
 
-            {/* ====== 3 kolom: Berjalan | Selesai | Due+Kadaluarsa ====== */}
+            {/* ====== Batch Berjalan & Selesai ====== */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                 {/* Kolom 1 - ONGOING (pakai judul) */}
                 <div className="card bg-base-100 border rounded-2xl shadow-sm">
@@ -710,21 +835,27 @@ export default function SuperadminDashboard() {
                             )}
                         </div>
 
-                        {batchHasMore && (
-                            <div className="pt-3">
-                                <button
-                                    className="btn btn-sm w-full"
-                                    onClick={() => loadBatches(false)}
-                                    disabled={loadingBatch}
-                                >
-                                    {loadingBatch ? "Memuat..." : "Muat lebih banyak"}
-                                </button>
-                            </div>
+                        {batchTotalElements > 0 && (
+                            <PaginationSimple
+                                page={batchPage}
+                                totalPages={batchTotalPages}
+                                totalElements={batchTotalElements}
+                                rowsPerPage={batchRows}
+                                onPageChange={(p) => {
+                                    if (p !== batchPage) {
+                                        loadBatches(p);
+                                    }
+                                }}
+                                onRowsPerPageChange={(n) => {
+                                    setBatchRows(n);
+                                    loadBatches(1);
+                                }}
+                            />
                         )}
                     </div>
                 </div>
 
-                {/* Kolom 2 - FINISHED (pakai judul) */}
+                {/* Kolom 2 - FINISHED (pakai judul, pakai PaginationSimple juga) */}
                 <div className="card bg-base-100 border rounded-2xl shadow-sm">
                     <div className="card-body p-4 md:p-5">
                         <div className="flex items-center justify-between">
@@ -753,7 +884,7 @@ export default function SuperadminDashboard() {
                                         return (
                                             <li key={b.id} className="!p-0">
                                                 <button
-                                                    className="w-full text-left hover:bg-base-2 00 rounded-xl p-2"
+                                                    className="w-full text-left hover:bg-base-200 rounded-xl p-2"
                                                     onClick={() => navigate(`/batch/${b.id}`)}
                                                 >
                                                     <div className="min-w-0">
@@ -782,153 +913,245 @@ export default function SuperadminDashboard() {
                             )}
                         </div>
 
-                        {finishedHasMore && (
-                            <div className="pt-3">
-                                <button
-                                    className="btn btn-sm w-full"
-                                    onClick={() => loadFinishedBatches(false)}
-                                    disabled={loadingFinished}
-                                >
-                                    {loadingFinished ? "Memuat..." : "Muat lebih banyak"}
-                                </button>
-                            </div>
+                        {finishedTotalElements > 0 && (
+                            <PaginationSimple
+                                page={finishedPage}
+                                totalPages={finishedTotalPages}
+                                totalElements={finishedTotalElements}
+                                rowsPerPage={finishedRows}
+                                onPageChange={(p) => {
+                                    if (p !== finishedPage) {
+                                        loadFinishedBatches(p);
+                                    }
+                                }}
+                                onRowsPerPageChange={(n) => {
+                                    setFinishedRows(n);
+                                    loadFinishedBatches(1);
+                                }}
+                            />
+                        )}
+                    </div>
+                </div>
+                {/* Belum Bersertifikat */}
+                <div className="card bg-base-100 border rounded-2xl shadow-sm">
+                    <div className="card-body p-4 md:p-5">
+                        <div className="flex items-center justify-between">
+                            <h2 className="card-title text-base md:text-lg text-sky-600">Belum Bersertifikat</h2>
+                        </div>
+                        <div className="overflow-auto max-h-96">
+                            <table className="table table-xs md:table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>NIP</th>
+                                        <th>Nama</th>
+                                        <th>Rule</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {loadingAlert ? (
+                                        Array.from({ length: 6 }).map((_, i) => (
+                                            <tr key={i}>
+                                                <td colSpan={3}>
+                                                    <div className="skeleton h-5 w-full" />
+                                                </td>
+                                            </tr>
+                                        ))
+                                    ) : notYetList.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={3} className="text-sm opacity-60">
+                                                Tidak ada data
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        notYetPaged.map((x, idx) => (
+                                            <tr
+                                                key={idx}
+                                                className="hover cursor-pointer"
+                                                onClick={(e) => {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    navigate(getPriorityPath(x));
+                                                }}
+                                            >
+                                                <td className="whitespace-nowrap">{x.nip}</td>
+                                                <td className="whitespace-nowrap">{x.employeeName ?? x.name}</td>
+                                                <td className="whitespace-nowrap">{getRuleCode(x)}</td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {notYetList.length > 0 && (
+                            <PaginationSimple
+                                page={notYetPage}
+                                totalPages={notYetTotalPages}
+                                totalElements={notYetList.length}
+                                rowsPerPage={notYetRowsPerPage}
+                                onPageChange={setNotYetPage}
+                                onRowsPerPageChange={(n) => {
+                                    setNotYetRowsPerPage(n);
+                                    setNotYetPage(1);
+                                }}
+                            />
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            {/* ====== Due | Kadaluarsa (kesamping) ====== */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {/* Due */}
+                <div className="card bg-base-100 border rounded-2xl shadow-sm">
+                    <div className="card-body p-4 md:p-5">
+                        <div className="flex items-center justify_between">
+                            <h2 className="card-title text-base md:text-lg text-amber-600">Jatuh Tempo</h2>
+                        </div>
+                        <div className="overflow-auto max-h-96">
+                            <table className="table table-xs md:table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>NIP</th>
+                                        <th>Nama</th>
+                                        <th>Rule</th>
+                                        <th>Jatuh Tempo</th>
+                                        <th>Sisa</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {loadingAlert ? (
+                                        Array.from({ length: 6 }).map((_, i) => (
+                                            <tr key={i}>
+                                                <td colSpan={5}>
+                                                    <div className="skeleton h-5 w-full" />
+                                                </td>
+                                            </tr>
+                                        ))
+                                    ) : dueList.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={5} className="text-sm opacity-60">
+                                                Tidak ada data
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        duePaged.map((x, idx) => {
+                                            const deadline = getDeadline(x);
+                                            const sisa = deadline ? daysBetween(deadline, new Date()) : null;
+                                            return (
+                                                <tr
+                                                    key={idx}
+                                                    className="hover cursor-pointer"
+                                                    onClick={(e) => {
+                                                        e.preventDefault();
+                                                        e.stopPropagation();
+                                                        navigate(getPriorityPath(x));
+                                                    }}
+                                                >
+                                                    <td className="whitespace-nowrap">{x.nip}</td>
+                                                    <td className="whitespace-nowrap">{x.employeeName ?? x.name}</td>
+                                                    <td className="whitespace-nowrap">{getRuleCode(x)}</td>
+                                                    <td className="whitespace-nowrap">{fmtID(deadline)}</td>
+                                                    <td className="whitespace-nowrap text-amber-600">
+                                                        {sisa != null ? `Tinggal ${sisa} hari` : "-"}
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {dueList.length > 0 && (
+                            <PaginationSimple
+                                page={duePage}
+                                totalPages={dueTotalPages}
+                                totalElements={dueList.length}
+                                rowsPerPage={dueRowsPerPage}
+                                onPageChange={setDuePage}
+                                onRowsPerPageChange={(n) => {
+                                    setDueRowsPerPage(n);
+                                    setDuePage(1);
+                                }}
+                            />
                         )}
                     </div>
                 </div>
 
-                {/* Kolom 3 - Due (atas) + Kadaluarsa (bawah) */}
-                <div className="flex flex-col gap-4">
-                    {/* Due */}
-                    <div className="card bg-base-100 border rounded-2xl shadow-sm">
-                        <div className="card-body p-4 md:p-5">
-                            <div className="flex items-center justify-between">
-                                <h2 className="card-title text-base md:text-lg text-amber-600">
-                                    Jatuh Tempo (10 Teratas)
-                                </h2>
-                            </div>
-                            <div className="overflow-auto max-h-96">
-                                <table className="table table-xs md:table-sm">
-                                    <thead>
-                                        <tr>
-                                            <th>NIP</th>
-                                            <th>Nama</th>
-                                            <th>Rule</th>
-                                            <th>Jatuh Tempo</th>
-                                            <th>Sisa</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {loadingAlert ? (
-                                            Array.from({ length: 6 }).map((_, i) => (
-                                                <tr key={i}>
-                                                    <td colSpan={5}>
-                                                        <div className="skeleton h-5 w-full" />
-                                                    </td>
-                                                </tr>
-                                            ))
-                                        ) : dueList.length === 0 ? (
-                                            <tr>
-                                                <td colSpan={5} className="text-sm opacity-60">
-                                                    Tidak ada data
+                {/* Kadaluarsa */}
+                <div className="card bg-base-100 border rounded-2xl shadow-sm">
+                    <div className="card-body p-4 md:p-5">
+                        <div className="flex items-center justify-between">
+                            <h2 className="card-title text-base md:text-lg text-red-600">Kadaluarsa</h2>
+                        </div>
+                        <div className="overflow-auto max-h-96">
+                            <table className="table table-xs md:table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>NIP</th>
+                                        <th>Nama</th>
+                                        <th>Rule</th>
+                                        <th>Jatuh Tempo</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {loadingAlert ? (
+                                        Array.from({ length: 6 }).map((_, i) => (
+                                            <tr key={i}>
+                                                <td colSpan={4}>
+                                                    <div className="skeleton h-5 w-full" />
                                                 </td>
                                             </tr>
-                                        ) : (
-                                            dueList.map((x, idx) => {
-                                                const deadline = getDeadline(x);
-                                                const sisa = deadline ? daysBetween(deadline, new Date()) : null;
-                                                return (
-                                                    <tr
-                                                        key={idx}
-                                                        className="hover cursor-pointer"
-                                                        onClick={(e) => {
-                                                            e.preventDefault();
-                                                            e.stopPropagation();
-                                                            navigate(getPriorityPath(x));
-                                                        }}
-                                                    >
-                                                        <td className="whitespace-nowrap">{x.nip}</td>
-                                                        <td className="whitespace-nowrap">
-                                                            {x.employeeName ?? x.name}
-                                                        </td>
-                                                        <td className="whitespace-nowrap">{getRuleCode(x)}</td>
-                                                        <td className="whitespace-nowrap">{fmtID(deadline)}</td>
-                                                        <td className="whitespace-nowrap text-amber-600">
-                                                            {sisa != null ? `Tinggal ${sisa} hari` : "-"}
-                                                        </td>
-                                                    </tr>
-                                                );
-                                            })
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
+                                        ))
+                                    ) : expiredList.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={4} className="text-sm opacity-60">
+                                                Tidak ada data
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        expiredPaged.map((x, idx) => {
+                                            const deadline = getDeadline(x);
+                                            return (
+                                                <tr
+                                                    key={idx}
+                                                    className="hover cursor-pointer"
+                                                    onClick={(e) => {
+                                                        e.preventDefault();
+                                                        e.stopPropagation();
+                                                        navigate(getPriorityPath(x));
+                                                    }}
+                                                >
+                                                    <td className="whitespace-nowrap">{x.nip}</td>
+                                                    <td className="whitespace-nowrap">{x.employeeName ?? x.name}</td>
+                                                    <td className="whitespace-nowrap">{getRuleCode(x)}</td>
+                                                    <td className="whitespace-nowrap">{fmtID(deadline)}</td>
+                                                </tr>
+                                            );
+                                        })
+                                    )}
+                                </tbody>
+                            </table>
                         </div>
-                    </div>
 
-                    {/* Kadaluarsa */}
-                    <div className="card bg-base-100 border rounded-2xl shadow-sm">
-                        <div className="card-body p-4 md:p-5">
-                            <div className="flex items-center justify-between">
-                                <h2 className="card-title text-base md:text-lg text-red-600">
-                                    Kadaluarsa (10 Teratas)
-                                </h2>
-                            </div>
-                            <div className="overflow-auto max-h-96">
-                                <table className="table table-xs md:table-sm">
-                                    <thead>
-                                        <tr>
-                                            <th>NIP</th>
-                                            <th>Nama</th>
-                                            <th>Rule</th>
-                                            <th>Jatuh Tempo</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {loadingAlert ? (
-                                            Array.from({ length: 6 }).map((_, i) => (
-                                                <tr key={i}>
-                                                    <td colSpan={4}>
-                                                        <div className="skeleton h-5 w-full" />
-                                                    </td>
-                                                </tr>
-                                            ))
-                                        ) : expiredList.length === 0 ? (
-                                            <tr>
-                                                <td colSpan={4} className="text-sm opacity-60">
-                                                    Tidak ada data
-                                                </td>
-                                            </tr>
-                                        ) : (
-                                            expiredList.map((x, idx) => {
-                                                const deadline = getDeadline(x);
-                                                return (
-                                                    <tr
-                                                        key={idx}
-                                                        className="hover cursor-pointer"
-                                                        onClick={(e) => {
-                                                            e.preventDefault();
-                                                            e.stopPropagation();
-                                                            navigate(getPriorityPath(x));
-                                                        }}
-                                                    >
-                                                        <td className="whitespace-nowrap">{x.nip}</td>
-                                                        <td className="whitespace-nowrap">
-                                                            {x.employeeName ?? x.name}
-                                                        </td>
-                                                        <td className="whitespace-nowrap">{getRuleCode(x)}</td>
-                                                        <td className="whitespace-nowrap">{fmtID(deadline)}</td>
-                                                    </tr>
-                                                );
-                                            })
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
+                        {expiredList.length > 0 && (
+                            <PaginationSimple
+                                page={expiredPage}
+                                totalPages={expiredTotalPages}
+                                totalElements={expiredList.length}
+                                rowsPerPage={expiredRowsPerPage}
+                                onPageChange={setExpiredPage}
+                                onRowsPerPageChange={(n) => {
+                                    setExpiredRowsPerPage(n);
+                                    setExpiredPage(1);
+                                }}
+                            />
+                        )}
                     </div>
                 </div>
             </div>
-            {/* end 3 kolom */}
+            {/* end sections */}
         </div>
     );
 }

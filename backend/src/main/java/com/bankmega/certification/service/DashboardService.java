@@ -4,7 +4,6 @@ import com.bankmega.certification.dto.dashboard.*;
 import com.bankmega.certification.repository.DashboardRepository;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
@@ -18,7 +17,7 @@ public class DashboardService {
     }
 
     public SummaryDTO getSummary(DashboardFilters f) {
-        DashboardFilters fx = ensureYear(f);
+        DashboardFilters fx = ensureFilters(f);
         SummaryCounts c = repo.fetchSummaryCounts(fx);
         double pct = c.getEligiblePopulation() == 0 ? 0.0
                 : (c.getCertifiedCount() * 100.0 / c.getEligiblePopulation());
@@ -36,38 +35,24 @@ public class DashboardService {
     }
 
     public List<MonthlyPoint> getMonthly(DashboardFilters f) {
-        return repo.fetchMonthly(ensureYear(f));
+        return repo.fetchMonthly(ensureFilters(f));
     }
 
     public List<BatchCard> getOngoingBatches(DashboardFilters f) {
-        return repo.fetchOngoingBatches(ensureYear(f));
+        return repo.fetchOngoingBatches(ensureFilters(f));
     }
 
     public Map<String, List<PriorityRow>> getPriority(DashboardFilters f) {
-        return repo.fetchPriorityTop10(ensureYear(f));
+        return repo.fetchPriorityTop10(ensureFilters(f));
     }
 
     public FiltersResponse getFilters() {
         return repo.fetchFilterOptions();
     }
 
-    private DashboardFilters ensureYear(DashboardFilters f) {
-        if (f == null) {
-            return DashboardFilters.builder()
-                    .year(LocalDate.now().getYear())
-                    .build();
-        }
-        return f.getYear() == null
-                ? DashboardFilters.builder()
-                        .regionalId(f.getRegionalId())
-                        .divisionId(f.getDivisionId())
-                        .unitId(f.getUnitId())
-                        .certificationId(f.getCertificationId())
-                        .levelId(f.getLevelId())
-                        .subFieldId(f.getSubFieldId())
-                        .allowedCertificationIds(f.getAllowedCertificationIds())
-                        .year(LocalDate.now().getYear())
-                        .build()
+    private DashboardFilters ensureFilters(DashboardFilters f) {
+        return f == null
+                ? DashboardFilters.builder().build()
                 : f;
     }
 }

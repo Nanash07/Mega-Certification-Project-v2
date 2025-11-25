@@ -319,7 +319,19 @@ public class EmployeeEligibilityService {
         Instant now = Instant.now();
         for (EmployeeEligibility ee : existingElig) {
             Long ruleId = ee.getCertificationRule() != null ? ee.getCertificationRule().getId() : null;
+
             if (ruleId == null || !requiredIds.contains(ruleId)) {
+
+                // 🔒 FIX:
+                // Jangan matikan eligibility yang sudah pernah punya sertifikat
+                // (status != NOT_YET_CERTIFIED),
+                // supaya data lama yang aktif/telah tersertifikasi tidak "hilang"
+                // hanya karena mapping job berubah.
+                if (ee.getStatus() != null
+                        && ee.getStatus() != EmployeeEligibility.EligibilityStatus.NOT_YET_CERTIFIED) {
+                    continue;
+                }
+
                 ee.setIsActive(false);
                 ee.setDeletedAt(now);
                 toSave.add(ee);

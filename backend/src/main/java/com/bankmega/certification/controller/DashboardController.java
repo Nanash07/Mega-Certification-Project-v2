@@ -5,11 +5,13 @@ import com.bankmega.certification.entity.PicCertificationScope;
 import com.bankmega.certification.repository.PicCertificationScopeRepository;
 import com.bankmega.certification.service.DashboardService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.lang.reflect.Method;
+import java.time.LocalDate;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -26,7 +28,8 @@ public class DashboardController {
     /* ================= helpers ================= */
 
     private DashboardFilters toFilters(Long regionalId, Long divisionId, Long unitId,
-            Long certificationId, Long levelId, Long subFieldId, Integer year) {
+            Long certificationId, Long levelId, Long subFieldId,
+            LocalDate startDate, LocalDate endDate, String batchType) {
         return DashboardFilters.builder()
                 .regionalId(regionalId)
                 .divisionId(divisionId)
@@ -34,7 +37,9 @@ public class DashboardController {
                 .certificationId(certificationId)
                 .levelId(levelId)
                 .subFieldId(subFieldId)
-                .year(year)
+                .startDate(startDate)
+                .endDate(endDate)
+                .batchType(batchType)
                 .build();
     }
 
@@ -110,23 +115,29 @@ public class DashboardController {
             @RequestParam(required = false) Long subFieldId,
             Authentication auth,
             @AuthenticationPrincipal(expression = "id") Long userId) {
-        DashboardFilters f = toFilters(regionalId, divisionId, unitId, certificationId, levelId, subFieldId, null);
+        DashboardFilters f = toFilters(regionalId, divisionId, unitId,
+                certificationId, levelId, subFieldId,
+                null, null, null);
         f = applyPicScope(f, auth, userId);
         return svc.getSummary(f);
     }
 
     @GetMapping("/monthly")
     public List<MonthlyPoint> monthly(
-            @RequestParam Integer year,
             @RequestParam(required = false) Long regionalId,
             @RequestParam(required = false) Long divisionId,
             @RequestParam(required = false) Long unitId,
             @RequestParam(required = false) Long certificationId,
             @RequestParam(required = false) Long levelId,
             @RequestParam(required = false) Long subFieldId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(required = false) String batchType,
             Authentication auth,
             @AuthenticationPrincipal(expression = "id") Long userId) {
-        DashboardFilters f = toFilters(regionalId, divisionId, unitId, certificationId, levelId, subFieldId, year);
+        DashboardFilters f = toFilters(regionalId, divisionId, unitId,
+                certificationId, levelId, subFieldId,
+                startDate, endDate, batchType);
         f = applyPicScope(f, auth, userId);
         return svc.getMonthly(f);
     }
@@ -139,9 +150,14 @@ public class DashboardController {
             @RequestParam(required = false) Long certificationId,
             @RequestParam(required = false) Long levelId,
             @RequestParam(required = false) Long subFieldId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(required = false) String batchType,
             Authentication auth,
             @AuthenticationPrincipal(expression = "id") Long userId) {
-        DashboardFilters f = toFilters(regionalId, divisionId, unitId, certificationId, levelId, subFieldId, null);
+        DashboardFilters f = toFilters(regionalId, divisionId, unitId,
+                certificationId, levelId, subFieldId,
+                startDate, endDate, batchType);
         f = applyPicScope(f, auth, userId);
         return svc.getOngoingBatches(f);
     }
@@ -156,7 +172,9 @@ public class DashboardController {
             @RequestParam(required = false) Long subFieldId,
             Authentication auth,
             @AuthenticationPrincipal(expression = "id") Long userId) {
-        DashboardFilters f = toFilters(regionalId, divisionId, unitId, certificationId, levelId, subFieldId, null);
+        DashboardFilters f = toFilters(regionalId, divisionId, unitId,
+                certificationId, levelId, subFieldId,
+                null, null, null);
         f = applyPicScope(f, auth, userId);
         return svc.getPriority(f);
     }
