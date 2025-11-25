@@ -5,7 +5,12 @@ import Select from "react-select";
 import AsyncSelect from "react-select/async";
 import Pagination from "../../components/common/Pagination";
 import { Plus, Pencil, Trash2, Eye, ChevronDown, Eraser } from "lucide-react";
-import { fetchBatches, deleteBatch, searchBatches } from "../../services/batchService";
+import {
+    fetchBatches,
+    deleteBatch,
+    searchBatches,
+    updateBatch, // 🔹 DITAMBAH: import updateBatch
+} from "../../services/batchService";
 import { fetchCertificationRules } from "../../services/certificationRuleService";
 import CreateBatchModal from "../../components/batches/CreateBatchModal";
 import EditBatchModal from "../../components/batches/EditBatchModal";
@@ -84,8 +89,7 @@ export default function BatchPage() {
     function renderStatusBadge(row) {
         if (!row.status) return "-";
 
-        const { label } = getStatusStyle(row.status);
-        const badgeCls = getStatusStyle(row.status).badgeCls;
+        const { label, badgeCls } = getStatusStyle(row.status);
 
         return (
             <button
@@ -190,19 +194,27 @@ export default function BatchPage() {
         }
     }
 
-    // 🔹 Ubah status batch (sementara update di frontend, lo bisa sambungin ke API)
+    // 🔹 Ubah status batch → sekarang call API updateBatch
     async function handleChangeStatus(batch, newStatus) {
         if (batch.status === newStatus) return;
 
         try {
-            // TODO: sambungkan ke API update status batch, contoh:
-            // await updateBatchStatus(batch.id, newStatus);
+            const payload = {
+                status: newStatus,
+                // Field lain dibiarkan undefined/null → di backend lo
+                // nggak akan dioverwrite karena pakai pattern:
+                // existing.setX(req.getX() != null ? req.getX() : existing.getX());
+            };
 
-            // Untuk sekarang, update state lokal biar UI ke-refresh
-            setRows((prev) => prev.map((r) => (r.id === batch.id ? { ...r, status: newStatus } : r)));
+            await updateBatch(batch.id, payload);
+
+            // reload dari server supaya data konsisten
+            await load();
+
             toast.success(`Status diubah ke ${formatStatusLabel(newStatus)}`);
-        } catch {
-            toast.error("Gagal mengubah status batch");
+        } catch (err) {
+            console.error("handleChangeStatus error:", err);
+            toast.error(err?.response?.data?.message || "Gagal mengubah status batch");
         }
     }
 
