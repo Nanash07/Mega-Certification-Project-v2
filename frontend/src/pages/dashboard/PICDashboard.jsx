@@ -701,7 +701,7 @@ export default function PicDashboard() {
                                                 {/* Expired */}
                                                 <Cell fill="#ef4444" />
                                                 {/* Belum */}
-                                                <Cell fill="#0ea5e9" />
+                                                <Cell fill="#717171" />
                                             </Pie>
                                             <ReTooltip />
                                         </PieChart>
@@ -738,7 +738,7 @@ export default function PicDashboard() {
                                     <div className="flex items-center gap-2">
                                         <span
                                             className="inline-block w-3 h-3 rounded-sm"
-                                            style={{ background: "#0ea5e9" }}
+                                            style={{ background: "#717171" }}
                                         />
                                         <span>Belum Bersertifikat</span>
                                         <span className="font-semibold ml-auto">{real.notYet}</span>

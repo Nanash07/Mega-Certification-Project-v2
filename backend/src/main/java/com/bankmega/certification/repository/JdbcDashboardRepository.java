@@ -5,7 +5,6 @@ import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
 
-import java.time.LocalDate;
 import java.util.*;
 
 @Repository
@@ -20,8 +19,9 @@ public class JdbcDashboardRepository implements DashboardRepository {
     /* ====================== helpers ====================== */
 
     private void add(MapSqlParameterSource p, String key, Object val) {
-        if (val != null)
+        if (val != null) {
             p.addValue(key, val);
+        }
     }
 
     private Long toLong(Object o) {
@@ -35,6 +35,13 @@ public class JdbcDashboardRepository implements DashboardRepository {
     /** WHERE untuk employee alias (e) */
     private String whereEmployee(String alias, DashboardFilters f, MapSqlParameterSource p) {
         List<String> cond = new ArrayList<>();
+
+        // 🔹 scope khusus dashboard pegawai
+        if (f.getEmployeeId() != null) {
+            add(p, "employeeId", f.getEmployeeId());
+            cond.add(alias + ".id = :employeeId");
+        }
+
         if (f.getRegionalId() != null) {
             add(p, "regionalId", f.getRegionalId());
             cond.add(alias + ".regional_id = :regionalId");
@@ -84,6 +91,13 @@ public class JdbcDashboardRepository implements DashboardRepository {
     /** versi raw (tanpa "AND ") untuk blok OR */
     private String whereEmployeeRaw(String alias, DashboardFilters f, MapSqlParameterSource p) {
         List<String> cond = new ArrayList<>();
+
+        // 🔹 scope khusus dashboard pegawai
+        if (f.getEmployeeId() != null) {
+            add(p, "employeeId", f.getEmployeeId());
+            cond.add(alias + ".id = :employeeId");
+        }
+
         if (f.getRegionalId() != null) {
             add(p, "regionalId", f.getRegionalId());
             cond.add(alias + ".regional_id = :regionalId");
@@ -94,7 +108,7 @@ public class JdbcDashboardRepository implements DashboardRepository {
         }
         if (f.getUnitId() != null) {
             add(p, "unitId", f.getUnitId());
-            cond.add(alias + ".unit_id = :unitId");
+            cond.add(alias + ".unit_id = :UnitId");
         }
         return String.join(" AND ", cond);
     }
@@ -315,7 +329,8 @@ public class JdbcDashboardRepository implements DashboardRepository {
                   %s
                   %s
                   AND elg.status = :wantedStatus
-                ORDER BY %s;
+                ORDER BY %s
+                LIMIT 10
                 """;
 
         Map<String, List<PriorityRow>> out = new HashMap<>();

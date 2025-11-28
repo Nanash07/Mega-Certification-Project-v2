@@ -32,7 +32,7 @@ public class NotificationController {
             @RequestParam(required = false) String to,
             @RequestParam(required = false) String type,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(defaultValue = "5") int size) {
 
         LocalDateTime fromDt = from != null ? LocalDateTime.parse(from + "T00:00:00") : null;
         LocalDateTime toDt = to != null ? LocalDateTime.parse(to + "T23:59:59") : null;
@@ -54,7 +54,32 @@ public class NotificationController {
 
         List<NotificationResponse> result = notificationService
                 .getUserNotifications(principal.getEmployeeId())
-                .stream().map(this::toResponse).toList();
+                .stream()
+                .map(this::toResponse)
+                .toList();
+
+        return ResponseEntity.ok(result);
+    }
+
+    // 🔔 dipakai navbar: /api/notifications/latest?limit=5
+    @GetMapping("/latest")
+    public ResponseEntity<List<NotificationResponse>> getLatestNotifications(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @RequestParam(name = "limit", defaultValue = "5") int limit) {
+
+        // simple guard biar gak aneh-aneh
+        if (limit <= 0) {
+            limit = 5;
+        } else if (limit > 50) {
+            limit = 50;
+        }
+
+        List<NotificationResponse> result = notificationService
+                .getUserNotifications(principal.getEmployeeId())
+                .stream()
+                .limit(limit)
+                .map(this::toResponse)
+                .toList();
 
         return ResponseEntity.ok(result);
     }

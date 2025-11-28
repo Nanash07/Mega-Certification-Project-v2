@@ -24,4 +24,6 @@ public class DashboardFilters {
     private LocalDate startDate;
     private LocalDate endDate;
     private String batchType;
+
+    private Long employeeId;
 }

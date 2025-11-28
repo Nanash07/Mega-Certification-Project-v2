@@ -4,7 +4,11 @@ import { Menu, Bell } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import ProfileDropdown from "./ProfileDropdown";
-import { fetchUnreadCount, fetchLatestNotifications } from "../services/notificationService";
+import {
+    fetchUnreadCount,
+    fetchLatestNotifications,
+    markNotificationAsRead, // ⬅️ tambahan
+} from "../services/notificationService";
 import { MENU, filterMenuByRole } from "./Sidebar";
 
 // Ambil title dari menu yang sudah difilter by role
@@ -45,6 +49,7 @@ export default function Navbar({ onMenuClick }) {
     // support EMPLOYEE/PEGAWAI (jaga-jaga backend campur bahasa)
     const isEmployee = rawRole === "EMPLOYEE" || rawRole === "PEGAWAI";
 
+    // ==== NOTIFICATION LOGIC ====
     useEffect(() => {
         if (!isEmployee) return;
 
@@ -57,13 +62,13 @@ export default function Navbar({ onMenuClick }) {
 
     const loadNotif = async () => {
         try {
-            const count = await fetchUnreadCount();
-            const latestList = await fetchLatestNotifications(5);
+            // fire dua-duanya paralel
+            const [count, latestList] = await Promise.all([fetchUnreadCount(), fetchLatestNotifications(5)]);
 
             setUnreadCount(count || 0);
             setLatest(latestList || []);
-        } catch {
-            console.warn("Gagal ambil notifikasi navbar");
+        } catch (err) {
+            console.warn("Gagal ambil notifikasi navbar", err);
         }
     };
 
@@ -78,7 +83,19 @@ export default function Navbar({ onMenuClick }) {
         return () => document.removeEventListener("mousedown", handleClick);
     }, []);
 
-    const openFullNotification = (notifId) => {
+    const openFullNotification = async (notifId) => {
+        try {
+            // tandai sebagai read di backend
+            await markNotificationAsRead(notifId);
+
+            // update state lokal biar badge & list langsung reflect
+            setLatest((prev) => prev.map((n) => (n.id === notifId ? { ...n, read: true } : n)));
+            setUnreadCount((prev) => (prev > 0 ? prev - 1 : 0));
+        } catch (err) {
+            console.warn("Gagal menandai notifikasi sebagai terbaca", err);
+            // kalau gagal, tetap lanjut navigate aja
+        }
+
         navigate(`/notifications?open=${notifId}`);
         setNotifOpen(false);
     };

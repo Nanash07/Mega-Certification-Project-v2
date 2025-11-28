@@ -225,7 +225,7 @@ export default function SuperadminDashboard() {
     // ===== batch ONGOING (paging)
     const [batches, setBatches] = useState([]);
     const [batchPage, setBatchPage] = useState(1);
-    const [batchRows, setBatchRows] = useState(10);
+    const [batchRows, setBatchRows] = useState(5);
     const [batchTotalPages, setBatchTotalPages] = useState(1);
     const [batchTotalElements, setBatchTotalElements] = useState(0);
     const [loadingBatch, setLoadingBatch] = useState(false);
@@ -233,7 +233,7 @@ export default function SuperadminDashboard() {
     // ===== batch FINISHED (paging seperti ONGOING)
     const [finishedBatches, setFinishedBatches] = useState([]);
     const [finishedPage, setFinishedPage] = useState(1);
-    const [finishedRows, setFinishedRows] = useState(10);
+    const [finishedRows, setFinishedRows] = useState(5);
     const [finishedTotalPages, setFinishedTotalPages] = useState(1);
     const [finishedTotalElements, setFinishedTotalElements] = useState(0);
     const [loadingFinished, setLoadingFinished] = useState(false);
@@ -679,7 +679,7 @@ export default function SuperadminDashboard() {
                                                 {/* Expired */}
                                                 <Cell fill="#ef4444" />
                                                 {/* Belum */}
-                                                <Cell fill="#0ea5e9" />
+                                                <Cell fill="#717171" />
                                             </Pie>
                                             <ReTooltip />
                                         </PieChart>
@@ -716,18 +716,12 @@ export default function SuperadminDashboard() {
                                     <div className="flex items-center gap-2">
                                         <span
                                             className="inline-block w-3 h-3 rounded-sm"
-                                            style={{ background: "#0ea5e9" }}
+                                            style={{ background: "#717171" }}
                                         />
                                         <span>Belum Bersertifikat</span>
                                         <span className="font-semibold ml-auto">{real.notYet}</span>
                                     </div>
-                                    <div className="pt-2 text-xs opacity-70">
-                                        Total populasi: {real.total}
-                                        <br />
-                                        <span className="opacity-70">
-                                            Tersertifikasi (aktif + jatuh tempo): {real.certifiedIncDue}
-                                        </span>
-                                    </div>
+                                    <div className="pt-2 text-xs opacity-70">Total populasi: {real.total}</div>
                                 </div>
                             </div>
                         )}

@@ -43,6 +43,19 @@ public class DashboardController {
                 .build();
     }
 
+    /** helper khusus untuk pegawai */
+    private DashboardFilters toEmployeeFilters(Long employeeId,
+            LocalDate startDate,
+            LocalDate endDate,
+            String batchType) {
+        return DashboardFilters.builder()
+                .employeeId(employeeId)
+                .startDate(startDate)
+                .endDate(endDate)
+                .batchType(batchType)
+                .build();
+    }
+
     /** true kalau authority mengandung ROLE_PIC / PIC */
     private boolean isPic(Authentication auth) {
         return auth != null && auth.getAuthorities().stream().anyMatch(a -> {
@@ -65,7 +78,29 @@ public class DashboardController {
             if (v instanceof Number)
                 return ((Number) v).longValue();
         } catch (Exception ignore) {
-            /* fallthrough */ }
+            /* fallthrough */
+        }
+        return null;
+    }
+
+    /**
+     * ambil employeeId dari principal (mendukung CustomUserDetails#getEmployeeId)
+     */
+    private Long extractEmployeeId(Authentication auth, Long injectedEmployeeId) {
+        if (injectedEmployeeId != null)
+            return injectedEmployeeId;
+        if (auth == null)
+            return null;
+
+        Object principal = auth.getPrincipal();
+        try {
+            Method m = principal.getClass().getMethod("getEmployeeId");
+            Object v = m.invoke(principal);
+            if (v instanceof Number)
+                return ((Number) v).longValue();
+        } catch (Exception ignore) {
+            /* fallthrough */
+        }
         return null;
     }
 
@@ -103,7 +138,7 @@ public class DashboardController {
         return f;
     }
 
-    /* ================= endpoints ================= */
+    /* ================= endpoints existing (Superadmin / PIC) ================= */
 
     @GetMapping("/summary")
     public SummaryDTO summary(
@@ -202,5 +237,84 @@ public class DashboardController {
             }
         }
         return res;
+    }
+
+    /* ================= endpoints khusus Pegawai ================= */
+
+    @GetMapping("/employee/summary")
+    public SummaryDTO employeeSummary(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(required = false) String batchType,
+            Authentication auth,
+            @AuthenticationPrincipal(expression = "employeeId") Long employeeIdFromPrincipal) {
+
+        Long employeeId = extractEmployeeId(auth, employeeIdFromPrincipal);
+        if (employeeId == null) {
+            // amanin: kalau nggak ada mapping employee, balikin kosong
+            return svc.getSummary(
+                    DashboardFilters.builder()
+                            .employeeId(-1L)
+                            .build());
+        }
+
+        DashboardFilters f = toEmployeeFilters(employeeId, startDate, endDate, batchType);
+        // NOTE: tidak pakai applyPicScope, karena ini mode pegawai (scope by
+        // employeeId)
+        return svc.getSummary(f);
+    }
+
+    @GetMapping("/employee/monthly")
+    public List<MonthlyPoint> employeeMonthly(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(required = false) String batchType,
+            Authentication auth,
+            @AuthenticationPrincipal(expression = "employeeId") Long employeeIdFromPrincipal) {
+
+        Long employeeId = extractEmployeeId(auth, employeeIdFromPrincipal);
+        if (employeeId == null) {
+            return List.of();
+        }
+
+        DashboardFilters f = toEmployeeFilters(employeeId, startDate, endDate, batchType);
+        return svc.getMonthly(f);
+    }
+
+    @GetMapping("/employee/ongoing-batches")
+    public List<BatchCard> employeeOngoingBatches(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(required = false) String batchType,
+            Authentication auth,
+            @AuthenticationPrincipal(expression = "employeeId") Long employeeIdFromPrincipal) {
+
+        Long employeeId = extractEmployeeId(auth, employeeIdFromPrincipal);
+        if (employeeId == null) {
+            return List.of();
+        }
+
+        DashboardFilters f = toEmployeeFilters(employeeId, startDate, endDate, batchType);
+        return svc.getOngoingBatches(f);
+    }
+
+    @GetMapping("/employee/priority")
+    public Map<String, List<PriorityRow>> employeePriority(
+            Authentication auth,
+            @AuthenticationPrincipal(expression = "employeeId") Long employeeIdFromPrincipal) {
+
+        Long employeeId = extractEmployeeId(auth, employeeIdFromPrincipal);
+        if (employeeId == null) {
+            return Map.of(
+                    "notYet", List.of(),
+                    "due", List.of(),
+                    "expired", List.of());
+        }
+
+        DashboardFilters f = DashboardFilters.builder()
+                .employeeId(employeeId)
+                .build();
+
+        return svc.getPriority(f);
     }
 }

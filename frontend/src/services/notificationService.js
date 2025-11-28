@@ -34,9 +34,12 @@ export async function markNotificationAsRead(id) {
         throw error;
     }
 }
+
 export async function fetchLatestNotifications(limit = 5) {
     try {
-        const { data } = await api.get(`/notifications/latest?limit=${limit}`);
+        const { data } = await api.get(`${BASE_URL}/latest`, {
+            params: { limit },
+        });
         return data;
     } catch (error) {
         console.error("[Notification] Gagal mengambil notifikasi terbaru:", error);

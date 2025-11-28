@@ -15,20 +15,20 @@ import com.bankmega.certification.specification.NotificationSpecification;
 import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.mail.javamail.JavaMailSenderImpl;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 
 @Slf4j
 @Service
@@ -39,15 +39,10 @@ public class NotificationService {
     private final EmployeeCertificationRepository employeeCertificationRepository;
     private final EmployeeBatchRepository employeeBatchRepository;
     private final BatchRepository batchRepository;
-    private final EmailConfigService emailConfigService; // masih disuntik, ga dipakai di sini (opsional dipakai nanti)
+    private final EmailConfigService emailConfigService;
     private final NotificationTemplateService templateService;
     private final JavaMailSenderImpl reusableMailSender;
 
-    // =========================================================================
-    // SAVE NOTIFICATION + EMAIL
-    // =========================================================================
-
-    /** Overload baru: simpan plain ke DB, email kirim versi HTML. */
     public Notification sendNotification(
             Long userId,
             String email,
@@ -73,15 +68,11 @@ public class NotificationService {
         notificationRepository.save(notif);
 
         if (!isBlank(email)) {
-            sendEmailAsync(email, title, messageEmailHtml); // email: HTML (bold)
+            sendEmailAsync(email, title, messageEmailHtml);
         }
         return notif;
     }
 
-    /**
-     * Back-compat: kalau dipanggil versi lama, email & in-app sama-sama pakai
-     * plain.
-     */
     public Notification sendNotification(
             Long userId,
             String email,
@@ -111,7 +102,6 @@ public class NotificationService {
 
     @Async("mailExecutor")
     protected void sendEmailAsync(String to, String subject, String htmlContent) {
-        // 1 kali retry ringan sudah cukup biar gak nge-blok lama
         for (int attempt = 1; attempt <= 2; attempt++) {
             try {
                 final MimeMessage message = reusableMailSender.createMimeMessage();
@@ -122,7 +112,6 @@ public class NotificationService {
                 helper.setTo(to);
                 helper.setSubject(subject);
 
-                // wrapper HTML: newline di body sudah dikonversi ke <br/> di builder kita
                 final String html = "<div style='font-family:Arial,sans-serif;line-height:1.6;font-size:14px'>"
                         + htmlContent
                         + "<br><p style='font-size:12px;color:gray;margin-top:8px;'>--<br>"
@@ -141,9 +130,6 @@ public class NotificationService {
         }
     }
 
-    // =========================================================================
-    // CERT REMINDER
-    // =========================================================================
     public void sendCertificationReminder(Employee employee, EmployeeCertification cert) {
         if (employee == null || isBlank(employee.getEmail()))
             return;
@@ -199,9 +185,6 @@ public class NotificationService {
         }
     }
 
-    // =========================================================================
-    // CERT EXPIRED
-    // =========================================================================
     public void sendCertificationExpired(Employee employee, EmployeeCertification cert) {
         if (employee == null || isBlank(employee.getEmail()))
             return;
@@ -234,7 +217,6 @@ public class NotificationService {
     public void processCertExpired() {
         final LocalDate today = LocalDate.now();
 
-        // <= today (bukan H+1)
         final List<EmployeeCertification> expired = employeeCertificationRepository
                 .findByValidUntilLessThanEqualAndDeletedAtIsNull(today);
 
@@ -258,10 +240,6 @@ public class NotificationService {
         }
     }
 
-    // =========================================================================
-    // BATCH NOTIFICATION
-    // =========================================================================
-    /** Kirim notifikasi ke semua peserta dalam 1 batch (boleh filter by status). */
     public int notifyParticipantsByBatch(Long batchId, EmployeeBatch.Status onlyStatus) {
         final Batch batch = batchRepository.findByIdAndDeletedAtIsNull(batchId)
                 .orElseThrow(() -> new RuntimeException("Batch not found with id " + batchId));
@@ -275,7 +253,6 @@ public class NotificationService {
         if (participants.isEmpty())
             return 0;
 
-        // hindari double-send bila ada duplikasi employee
         final Set<Long> uniqueEmployeeIds = new LinkedHashSet<Long>();
         int sent = 0;
 
@@ -292,10 +269,6 @@ public class NotificationService {
         return sent;
     }
 
-    /**
-     * Kirim notifikasi batch untuk 1 peserta, menggunakan template
-     * BATCH_NOTIFICATION + extras.
-     */
     public void sendBatchNotification(Employee employee, Batch batch) {
         if (employee == null || isBlank(employee.getEmail()))
             return;
@@ -305,14 +278,13 @@ public class NotificationService {
         final Map<String, Object> extras = new LinkedHashMap<String, Object>();
         extras.put("{{namaBatch}}", batch.getBatchName());
         extras.put("{{mulaiTanggal}}", batch.getStartDate());
-        extras.put("{{jenisBatch}}", mapJenisBatch(batch.getType())); // training / sertifikasi / refreshment
+        extras.put("{{jenisBatch}}", mapJenisBatch(batch.getType()));
 
         final String subject = templateService.generateTitle(
                 NotificationTemplate.Code.BATCH_NOTIFICATION, employee, extras);
         final String bodyPlain = templateService.generateMessage(
                 NotificationTemplate.Code.BATCH_NOTIFICATION, employee, extras);
 
-        // Build HTML bold
         Map<String, String> vars = buildCommonVars(employee);
         vars.put("{{namaBatch}}", Objects.toString(extras.get("{{namaBatch}}"), "-"));
         vars.put("{{mulaiTanggal}}", formatDateId((LocalDate) extras.get("{{mulaiTanggal}}")));
@@ -331,12 +303,25 @@ public class NotificationService {
                 batch.getId());
     }
 
-    // =========================================================================
-    // PUBLIC API UNTUK CONTROLLER / UI
-    // =========================================================================
     public List<Notification> getUserNotifications(Long userId) {
         final List<Notification> list = notificationRepository.findByUserIdOrderByCreatedAtDesc(userId);
         return list != null ? list : Collections.<Notification>emptyList();
+    }
+
+    public List<Notification> getLatestNotifications(Long userId, int limit) {
+        if (limit <= 0) {
+            limit = 5;
+        } else if (limit > 50) {
+            limit = 50; // guard biar gak kebanyakan
+        }
+
+        final List<Notification> list = notificationRepository.findByUserIdOrderByCreatedAtDesc(userId);
+        if (list == null || list.isEmpty()) {
+            return Collections.<Notification>emptyList();
+        }
+        return list.stream()
+                .limit(limit)
+                .toList();
     }
 
     public void markAsRead(Long notificationId, Long currentUserId) {
@@ -364,7 +349,6 @@ public class NotificationService {
                 + "Kalau Anda menerima email ini, berarti konfigurasi SMTP sudah berfungsi dengan baik.\n\n"
                 + "Salam,\nDivisi Learning & Development\nBank Mega";
 
-        // biar konsisten, bold-kan nilai statis 'Bank Mega' saja sebagai contoh
         Map<String, String> vars = new LinkedHashMap<>();
         vars.put("{{dummy}}", ""); // no-op
         final String bodyHtml = buildHtmlWithBold(bodyPlain, Map.of());
@@ -372,9 +356,6 @@ public class NotificationService {
         sendEmailAsync(to, "Test Email dari Mega Certification System", bodyHtml);
     }
 
-    // =========================================================================
-    // HELPERS
-    // =========================================================================
     private String mapJenisBatch(Batch.BatchType type) {
         if (type == null)
             return "-";
@@ -408,15 +389,12 @@ public class NotificationService {
 
     private Map<String, String> buildCommonVars(Employee emp) {
         Map<String, String> m = new LinkedHashMap<>();
-        // key harus sama dengan yang dipakai di template ({{nama}}, {{sapaan}}, dst)
         m.put("{{sapaan}}", computeSalutation(emp));
         m.put("{{nama}}", emp != null ? nullSafe(emp.getName()) : "-");
         return m;
     }
 
     private String computeSalutation(Employee emp) {
-        // Kalau ada field gender di entity, lo bisa refine:
-        // return "M".equalsIgnoreCase(emp.getGender()) ? "Bapak" : "Ibu";
         return "Bapak/Ibu";
     }
 
@@ -431,10 +409,6 @@ public class NotificationService {
         return date.format(fmt);
     }
 
-    /**
-     * Escape HTML sederhana, lalu bold-kan setiap nilai variabel, lalu \n -> <br/>
-     * .
-     */
     private String buildHtmlWithBold(String plain, Map<String, String> variables) {
         String html = htmlEscape(Objects.toString(plain, ""));
         // bold-kan tiap nilai variabel (setelah di-escape supaya aman)
@@ -445,7 +419,6 @@ public class NotificationService {
             String escapedVal = htmlEscape(val);
             html = html.replace(escapedVal, "<b>" + escapedVal + "</b>");
         }
-        // newline ke <br/>
         html = html.replace("\r\n", "\n").replace("\n", "<br/>");
         return html;
     }
