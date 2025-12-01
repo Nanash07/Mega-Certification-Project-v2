@@ -5,6 +5,8 @@ import com.bankmega.certification.entity.Employee;
 import com.bankmega.certification.entity.JobPosition;
 import com.bankmega.certification.entity.Regional;
 import com.bankmega.certification.entity.Unit;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
@@ -15,14 +17,13 @@ import java.util.Set;
 
 public interface EmployeeRepository extends JpaRepository<Employee, Long>, JpaSpecificationExecutor<Employee> {
 
-    // ==== Projection buat ambil NIP doang ====
     interface NipOnly {
         String getNip();
     }
 
     List<NipOnly> findAllBy();
 
-    // ==== Soft Delete Aware Queries ====
+    // active only
     List<Employee> findByDeletedAtIsNull();
 
     Optional<Employee> findByIdAndDeletedAtIsNull(Long id);
@@ -31,16 +32,27 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long>, JpaSp
 
     boolean existsByNipAndDeletedAtIsNull(String nip);
 
-    // ✅ Tambahin ini biar bisa dipake di import resign detection
     List<Employee> findByNipInAndDeletedAtIsNull(Set<String> nips);
 
-    // ==== Hard find (termasuk yg soft deleted) ====
+    List<Employee> findByNipNotInAndDeletedAtIsNull(Collection<String> nips);
+
+    List<Employee> findByIdInAndDeletedAtIsNull(List<Long> ids);
+
+    // all (active + resigned)
     Optional<Employee> findByNip(String nip);
 
-    // ==== Batch Operations ====
     List<Employee> findByNipIn(Set<String> nips);
 
-    // ==== Constraints (dipakai sebelum delete master data) ====
+    List<Employee> findByNipIn(Collection<String> nips);
+
+    // resigned only
+    List<Employee> findByDeletedAtIsNotNull();
+
+    Page<Employee> findByDeletedAtIsNotNull(Pageable pageable);
+
+    List<Employee> findByIdInAndDeletedAtIsNotNull(List<Long> ids);
+
+    // constraints
     boolean existsByRegional(Regional regional);
 
     boolean existsByDivision(Division division);
@@ -48,11 +60,4 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long>, JpaSp
     boolean existsByUnit(Unit unit);
 
     boolean existsByJobPosition(JobPosition jobPosition);
-
-    List<Employee> findByNipNotInAndDeletedAtIsNull(Collection<String> nips);
-
-    List<Employee> findByNipIn(Collection<String> nips);
-
-    List<Employee> findByIdInAndDeletedAtIsNull(List<Long> ids);
-
 }

@@ -1,8 +1,11 @@
+// src/main/java/com/bankmega/certification/controller/BatchController.java
 package com.bankmega.certification.controller;
 
 import com.bankmega.certification.dto.BatchRequest;
 import com.bankmega.certification.dto.BatchResponse;
 import com.bankmega.certification.entity.Batch;
+import com.bankmega.certification.entity.PicCertificationScope;
+import com.bankmega.certification.repository.PicCertificationScopeRepository;
 import com.bankmega.certification.service.BatchService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -10,9 +13,13 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.lang.reflect.Method;
 import java.time.LocalDate;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/batches")
@@ -20,6 +27,44 @@ import java.time.LocalDate;
 public class BatchController {
 
     private final BatchService batchService;
+    private final PicCertificationScopeRepository scopeRepo;
+
+    // ==== helpers PIC / principal ====
+
+    private boolean isPic(Authentication auth) {
+        return auth != null && auth.getAuthorities().stream().anyMatch(a -> {
+            String r = a.getAuthority();
+            return "PIC".equalsIgnoreCase(r) || "ROLE_PIC".equalsIgnoreCase(r);
+        });
+    }
+
+    private Long extractUserId(Authentication auth, Long injectedUserId) {
+        if (injectedUserId != null)
+            return injectedUserId;
+        if (auth == null)
+            return null;
+        Object principal = auth.getPrincipal();
+        try {
+            Method m = principal.getClass().getMethod("getId");
+            Object v = m.invoke(principal);
+            if (v instanceof Number)
+                return ((Number) v).longValue();
+        } catch (Exception ignore) {
+        }
+        return null;
+    }
+
+    private List<Long> resolveAllowedCertIds(Authentication auth, Long userIdFromPrincipal) {
+        if (!isPic(auth))
+            return null;
+        Long uid = extractUserId(auth, userIdFromPrincipal);
+        if (uid == null)
+            return List.of(-1L); // sentinel kosong
+        return scopeRepo.findByUser_Id(uid).stream()
+                .map(PicCertificationScope::getCertification)
+                .map(c -> c.getId())
+                .collect(Collectors.toList());
+    }
 
     // 🔹 Create
     @PostMapping
@@ -30,7 +75,7 @@ public class BatchController {
         return ResponseEntity.ok(batchService.create(request, username));
     }
 
-    // 🔹 Search + Filter + Paging
+    // 🔹 Search + Filter + Paging (Superadmin + PIC + Dashboard)
     @GetMapping("/paged")
     public ResponseEntity<Page<BatchResponse>> search(
             @RequestParam(required = false) String search,
@@ -38,11 +83,65 @@ public class BatchController {
             @RequestParam(required = false) Batch.BatchType type,
             @RequestParam(required = false) Long certificationRuleId,
             @RequestParam(required = false) Long institutionId,
+            // filter dashboard tambahan:
+            @RequestParam(required = false) Long regionalId,
+            @RequestParam(required = false) Long divisionId,
+            @RequestParam(required = false) Long unitId,
+            @RequestParam(required = false) Long certificationId,
+            @RequestParam(required = false) Long levelId,
+            @RequestParam(required = false) Long subFieldId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
-            Pageable pageable) {
+            Pageable pageable,
+            Authentication auth,
+            @AuthenticationPrincipal(expression = "id") Long userId) {
+
+        List<Long> allowedCertIds = resolveAllowedCertIds(auth, userId);
+
         Page<BatchResponse> result = batchService.search(
-                search, status, type, certificationRuleId, institutionId, startDate, endDate, pageable);
+                search,
+                status,
+                type,
+                certificationRuleId,
+                institutionId,
+                regionalId,
+                divisionId,
+                unitId,
+                certificationId,
+                levelId,
+                subFieldId,
+                startDate,
+                endDate,
+                allowedCertIds,
+                null, // employeeId (khusus endpoint employee)
+                pageable);
+
+        return ResponseEntity.ok(result);
+    }
+
+    // 🔹 Batch berjalan khusus Pegawai (self)
+    @GetMapping("/employee/ongoing-paged")
+    public ResponseEntity<Page<BatchResponse>> employeeOngoing(
+            @AuthenticationPrincipal(expression = "employeeId") Long employeeId,
+            Pageable pageable) {
+
+        if (employeeId == null) {
+            return ResponseEntity.ok(Page.empty(pageable));
+        }
+
+        Page<BatchResponse> result = batchService.search(
+                null, // search
+                Batch.Status.ONGOING, // status
+                null, // type
+                null, // certificationRuleId
+                null, // institutionId
+                null, null, null, // regional/division/unit (scope employee sudah via join)
+                null, null, null, // cert/level/subfield
+                null, null, // startDate/endDate
+                null, // allowedCertIds (PIC nggak relevan di sini)
+                employeeId, // employeeId
+                pageable);
+
         return ResponseEntity.ok(result);
     }
 

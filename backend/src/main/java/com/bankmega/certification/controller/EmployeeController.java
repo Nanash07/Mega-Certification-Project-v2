@@ -18,7 +18,7 @@ public class EmployeeController {
 
     private final EmployeeService service;
 
-    // 🔹 Paging + Filter
+    // Active - Paging + Filter
     @GetMapping("/paged")
     public ResponseEntity<Page<EmployeeResponse>> getPaged(
             @RequestParam(required = false) List<Long> employeeIds,
@@ -28,35 +28,52 @@ public class EmployeeController {
             @RequestParam(required = false) List<Long> jobPositionIds,
             @RequestParam(required = false) String search,
             Pageable pageable) {
+
         return ResponseEntity.ok(
                 service.search(employeeIds, regionalIds, divisionIds, unitIds, jobPositionIds, search, pageable));
     }
 
-    // 🔹 All (for dropdown)
+    // Resigned - Paging + Filter (same shape as active)
+    @GetMapping("/resigned/paged")
+    public ResponseEntity<Page<EmployeeResponse>> getResignedPaged(
+            @RequestParam(required = false) List<Long> employeeIds,
+            @RequestParam(required = false) List<Long> regionalIds,
+            @RequestParam(required = false) List<Long> divisionIds,
+            @RequestParam(required = false) List<Long> unitIds,
+            @RequestParam(required = false) List<Long> jobPositionIds,
+            @RequestParam(required = false) String search,
+            Pageable pageable) {
+
+        return ResponseEntity.ok(
+                service.searchResigned(employeeIds, regionalIds, divisionIds, unitIds, jobPositionIds, search,
+                        pageable));
+    }
+
+    // All active (for dropdown)
     @GetMapping("/all")
     public ResponseEntity<List<EmployeeResponse>> getAllActive() {
         return ResponseEntity.ok(service.getAllActive());
     }
 
-    // 🔹 Detail
+    // Detail (active + resigned)
     @GetMapping("/{id}")
     public ResponseEntity<EmployeeResponse> getById(@PathVariable Long id) {
         return ResponseEntity.ok(service.getById(id));
     }
 
-    // 🔹 Create
+    // Create
     @PostMapping
     public ResponseEntity<EmployeeResponse> create(@RequestBody EmployeeRequest req) {
         return ResponseEntity.ok(service.create(req));
     }
 
-    // 🔹 Update
+    // Update (active only)
     @PutMapping("/{id}")
     public ResponseEntity<EmployeeResponse> update(@PathVariable Long id, @RequestBody EmployeeRequest req) {
         return ResponseEntity.ok(service.update(id, req));
     }
 
-    // 🔹 Soft delete
+    // Soft delete (to resigned)
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> softDelete(@PathVariable Long id) {
         service.softDelete(id);

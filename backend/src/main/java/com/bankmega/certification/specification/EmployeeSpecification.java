@@ -1,7 +1,6 @@
 package com.bankmega.certification.specification;
 
 import com.bankmega.certification.entity.Employee;
-
 import org.springframework.data.jpa.domain.Specification;
 
 import java.util.List;
@@ -10,6 +9,10 @@ public class EmployeeSpecification {
 
     public static Specification<Employee> notDeleted() {
         return (root, query, cb) -> cb.isNull(root.get("deletedAt"));
+    }
+
+    public static Specification<Employee> deleted() {
+        return (root, query, cb) -> cb.isNotNull(root.get("deletedAt"));
     }
 
     public static Specification<Employee> bySearch(String search) {
@@ -29,7 +32,7 @@ public class EmployeeSpecification {
     public static Specification<Employee> byEmployeeIds(List<Long> employeeIds) {
         return (root, query, cb) -> (employeeIds == null || employeeIds.isEmpty())
                 ? cb.conjunction()
-                : root.get("id").in(employeeIds); // ✅ FIX
+                : root.get("id").in(employeeIds);
     }
 
     public static Specification<Employee> byRegionalIds(List<Long> ids) {

@@ -1,3 +1,4 @@
+// src/services/batchService.js
 import api from "./api";
 
 const BASE = "/batches";
@@ -11,13 +12,29 @@ function buildParams(params = {}) {
         else q[k] = v;
     };
 
+    // paging
     set("page", params.page);
     set("size", params.size);
-    // filter
-    set("batchIds", params.batchIds);
+
+    // filter umum
+    set("batchIds", params.batchIds); // BE sekarang nggak pakai, tapi gak masalah kalau kepasang
     set("status", params.status);
+    set("type", params.type);
     set("certificationRuleId", params.certificationRuleId);
+    set("institutionId", params.institutionId);
     set("search", params.search);
+
+    // filter dashboard / organisasi / sertifikasi
+    set("regionalId", params.regionalId);
+    set("divisionId", params.divisionId);
+    set("unitId", params.unitId);
+    set("certificationId", params.certificationId);
+    set("levelId", params.levelId);
+    set("subFieldId", params.subFieldId);
+
+    // date range
+    set("startDate", params.startDate);
+    set("endDate", params.endDate);
 
     // sort: Spring format -> sort=field,direction
     if (params.sortField) {
@@ -28,11 +45,17 @@ function buildParams(params = {}) {
 
 // ================== BATCH CRUD ==================
 
-// 🔹 Paging + Filter + Search (tabel list)
-export async function fetchBatches(params) {
+// 🔹 Paging + Filter + Search (tabel list & dashboard)
+export async function fetchBatches(params = {}) {
     try {
         const { data } = await api.get(`${BASE}/paged`, { params: buildParams(params) });
-        return data || { content: [], totalPages: 0, totalElements: 0 };
+        return (
+            data || {
+                content: [],
+                totalPages: 0,
+                totalElements: 0,
+            }
+        );
     } catch (err) {
         console.error("fetchBatches error:", err);
         return { content: [], totalPages: 0, totalElements: 0 };
@@ -68,17 +91,23 @@ export async function deleteBatch(id) {
         return true;
     } catch (err) {
         console.error("deleteBatch error:", err);
-        throw err;
+        return false;
     }
 }
 
 // 🔹 Search batch (async select di dropdown)
-export async function searchBatches({ search, page = 0, size = 20 }) {
+export async function searchBatches({ search, page = 0, size = 20 } = {}) {
     try {
         const { data } = await api.get(`${BASE}/paged`, {
             params: buildParams({ search, page, size }),
         });
-        return data || { content: [], totalPages: 0, totalElements: 0 };
+        return (
+            data || {
+                content: [],
+                totalPages: 0,
+                totalElements: 0,
+            }
+        );
     } catch (err) {
         console.error("searchBatches error:", err);
         return { content: [], totalPages: 0, totalElements: 0 };
@@ -106,5 +135,24 @@ export async function sendBatchNotifications(batchId, { status } = {}) {
     } catch (err) {
         console.error("sendBatchNotifications error:", err);
         throw err;
+    }
+}
+
+// 🔹 Batch berjalan khusus Pegawai (self dashboard)
+export async function fetchEmployeeOngoingBatchesPaged({ page = 0, size = 10 } = {}) {
+    try {
+        const { data } = await api.get(`${BASE}/employee/ongoing-paged`, {
+            params: { page, size },
+        });
+        return (
+            data || {
+                content: [],
+                totalPages: 0,
+                totalElements: 0,
+            }
+        );
+    } catch (err) {
+        console.error("fetchEmployeeOngoingBatchesPaged error:", err);
+        return { content: [], totalPages: 0, totalElements: 0 };
     }
 }

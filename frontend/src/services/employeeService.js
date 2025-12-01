@@ -3,16 +3,13 @@ import api from "./api";
 const EMPLOYEE_BASE = "/employees";
 const IMPORT_BASE = "/employees/import";
 
-// =============================================================
-// 🧩 EMPLOYEE CRUD
-// =============================================================
+// ========== EMPLOYEE CRUD ==========
 
-// 🔹 Ambil data pegawai (paging + filter + sorting)
+// list active (paged + filter + sort)
 export async function fetchEmployees(params = {}) {
     try {
         const query = { ...params };
 
-        // 👉 Convert sortField & sortDirection ke format Spring: sort=field,direction
         if (params?.sortField) {
             query.sort = `${params.sortField},${params.sortDirection || "asc"}`;
             delete query.sortField;
@@ -27,7 +24,26 @@ export async function fetchEmployees(params = {}) {
     }
 }
 
-// 🔹 Ambil semua pegawai (non-paging) — hati-hati kalau datanya ribuan
+// list resigned (paged + filter + sort)
+export async function fetchResignedEmployees(params = {}) {
+    try {
+        const query = { ...params };
+
+        if (params?.sortField) {
+            query.sort = `${params.sortField},${params.sortDirection || "asc"}`;
+            delete query.sortField;
+            delete query.sortDirection;
+        }
+
+        const { data } = await api.get(`${EMPLOYEE_BASE}/resigned/paged`, { params: query });
+        return data || { content: [], totalPages: 0, totalElements: 0 };
+    } catch (err) {
+        console.error("fetchResignedEmployees error:", err);
+        return { content: [], totalPages: 0, totalElements: 0 };
+    }
+}
+
+// all active (dropdown)
 export async function fetchEmployeesAll() {
     try {
         const { data } = await api.get(`${EMPLOYEE_BASE}/all`);
@@ -38,7 +54,7 @@ export async function fetchEmployeesAll() {
     }
 }
 
-// 🔹 Search pegawai (paged)
+// simple search active (paged)
 export async function searchEmployees({ search = "", page = 0, size = 20 }) {
     try {
         const { data } = await api.get(`${EMPLOYEE_BASE}/paged`, {
@@ -51,7 +67,20 @@ export async function searchEmployees({ search = "", page = 0, size = 20 }) {
     }
 }
 
-// 🔹 Ambil detail pegawai
+// simple search resigned (paged)
+export async function searchResignedEmployees({ search = "", page = 0, size = 20 }) {
+    try {
+        const { data } = await api.get(`${EMPLOYEE_BASE}/resigned/paged`, {
+            params: { search, page, size },
+        });
+        return data || { content: [], totalPages: 0, totalElements: 0 };
+    } catch (err) {
+        console.error("searchResignedEmployees error:", err);
+        return { content: [], totalPages: 0, totalElements: 0 };
+    }
+}
+
+// detail (active + resigned)
 export async function getEmployeeDetail(id) {
     try {
         const { data } = await api.get(`${EMPLOYEE_BASE}/${id}`);
@@ -62,7 +91,7 @@ export async function getEmployeeDetail(id) {
     }
 }
 
-// 🔹 Hapus pegawai (soft delete)
+// soft delete (mark resigned)
 export async function deleteEmployee(id) {
     try {
         await api.delete(`${EMPLOYEE_BASE}/${id}`);
@@ -73,7 +102,6 @@ export async function deleteEmployee(id) {
     }
 }
 
-// 🔹 Tambah pegawai baru
 export async function createEmployee(payload) {
     try {
         const { data } = await api.post(EMPLOYEE_BASE, payload);
@@ -84,7 +112,6 @@ export async function createEmployee(payload) {
     }
 }
 
-// 🔹 Update data pegawai
 export async function updateEmployee(id, payload) {
     try {
         const { data } = await api.put(`${EMPLOYEE_BASE}/${id}`, payload);
@@ -95,11 +122,8 @@ export async function updateEmployee(id, payload) {
     }
 }
 
-// =============================================================
-// 📦 EMPLOYEE IMPORT (Excel Upload)
-// =============================================================
+// ========== EMPLOYEE IMPORT ==========
 
-// 🔹 Download template Excel pegawai
 export async function downloadEmployeeTemplate() {
     try {
         const res = await api.get(`${IMPORT_BASE}/template`, {
@@ -112,7 +136,6 @@ export async function downloadEmployeeTemplate() {
     }
 }
 
-// 🔹 Dry run import pegawai (cek dulu tanpa commit DB)
 export async function importEmployeesDryRun(formData) {
     try {
         const { data } = await api.post(`${IMPORT_BASE}/dry-run`, formData, {
@@ -125,7 +148,6 @@ export async function importEmployeesDryRun(formData) {
     }
 }
 
-// 🔹 Confirm import pegawai (commit ke DB)
 export async function importEmployeesConfirm(formData) {
     try {
         const { data } = await api.post(`${IMPORT_BASE}/confirm`, formData, {
@@ -138,7 +160,6 @@ export async function importEmployeesConfirm(formData) {
     }
 }
 
-// 🔹 Ambil semua logs import (admin)
 export async function fetchEmployeeImportLogs() {
     try {
         const { data } = await api.get(`${IMPORT_BASE}/logs`);
@@ -149,7 +170,6 @@ export async function fetchEmployeeImportLogs() {
     }
 }
 
-// 🔹 Ambil logs import berdasarkan user ID
 export async function fetchEmployeeImportLogsByUser(userId) {
     try {
         const { data } = await api.get(`${IMPORT_BASE}/logs/${userId}`);
@@ -160,11 +180,8 @@ export async function fetchEmployeeImportLogsByUser(userId) {
     }
 }
 
-// =============================================================
-// 🗂️ MASTER DATA (Dropdown Support)
-// =============================================================
+// ========== MASTER DATA (dropdown) ==========
 
-// 🔹 Ambil semua regional
 export async function fetchRegionals() {
     try {
         const { data } = await api.get("/regionals/all");
@@ -175,7 +192,6 @@ export async function fetchRegionals() {
     }
 }
 
-// 🔹 Ambil semua division
 export async function fetchDivisions() {
     try {
         const { data } = await api.get("/divisions/all");
@@ -186,7 +202,6 @@ export async function fetchDivisions() {
     }
 }
 
-// 🔹 Ambil semua unit
 export async function fetchUnits() {
     try {
         const { data } = await api.get("/units/all");
@@ -197,7 +212,6 @@ export async function fetchUnits() {
     }
 }
 
-// 🔹 Ambil semua job position
 export async function fetchJobPositions() {
     try {
         const { data } = await api.get("/job-positions/all");

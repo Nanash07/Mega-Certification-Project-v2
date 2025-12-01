@@ -7,6 +7,7 @@ import com.bankmega.certification.entity.Employee;
 import com.bankmega.certification.entity.EmployeeCertification;
 import com.bankmega.certification.entity.EmployeeCertificationHistory.ActionType;
 import com.bankmega.certification.entity.Institution;
+import com.bankmega.certification.event.EmployeeCertificationChangedEvent;
 import com.bankmega.certification.repository.CertificationRuleRepository;
 import com.bankmega.certification.repository.EmployeeCertificationRepository;
 import com.bankmega.certification.repository.EmployeeEligibilityRepository;
@@ -16,6 +17,7 @@ import com.bankmega.certification.specification.EmployeeCertificationSpecificati
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -28,6 +30,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -37,9 +40,10 @@ public class EmployeeCertificationService {
     private final EmployeeRepository employeeRepo;
     private final CertificationRuleRepository ruleRepo;
     private final InstitutionRepository institutionRepo;
-    private final EmployeeEligibilityRepository eligibilityRepo; // <-- NEW
+    private final EmployeeEligibilityRepository eligibilityRepo;
     private final FileStorageService fileStorageService;
     private final EmployeeCertificationHistoryService historyService;
+    private final ApplicationEventPublisher eventPublisher; // 🔹 NEW
 
     @PersistenceContext
     private EntityManager em;
@@ -95,7 +99,6 @@ public class EmployeeCertificationService {
      * null.
      */
     private void updateValidity(EmployeeCertification ec) {
-        // Fallback ke rule current kalau snapshot null (kasus record hasil batch lama)
         Integer validityMonths = ec.getRuleValidityMonths();
         if (validityMonths == null && ec.getCertificationRule() != null) {
             validityMonths = ec.getCertificationRule().getValidityMonths();
@@ -113,7 +116,6 @@ public class EmployeeCertificationService {
             if (validityMonths != null) {
                 ec.setValidUntil(ec.getCertDate().plusMonths(validityMonths));
             } else {
-                // non-expiring / lifetime
                 ec.setValidUntil(null);
             }
 
@@ -131,33 +133,28 @@ public class EmployeeCertificationService {
 
     /** Tentukan status berdasarkan kelengkapan dokumen dan validity. */
     private void updateStatus(EmployeeCertification ec) {
-        // Jangan auto-ubah kalau sudah INVALID
         if (ec.getStatus() == EmployeeCertification.Status.INVALID) {
             return;
         }
 
         LocalDate today = LocalDate.now();
 
-        // Dokumen belum lengkap => PENDING
         if (ec.getCertNumber() == null || ec.getCertNumber().isBlank()
                 || ec.getFileUrl() == null || ec.getFileUrl().isBlank()) {
             ec.setStatus(EmployeeCertification.Status.PENDING);
             return;
         }
 
-        // Belum ada tanggal sertifikat => NOT_YET_CERTIFIED
         if (ec.getCertDate() == null) {
             ec.setStatus(EmployeeCertification.Status.NOT_YET_CERTIFIED);
             return;
         }
 
-        // Non-expiring (validUntil null) => ACTIVE
         if (ec.getValidUntil() == null) {
             ec.setStatus(EmployeeCertification.Status.ACTIVE);
             return;
         }
 
-        // Ada masa berlaku
         if (today.isAfter(ec.getValidUntil())) {
             ec.setStatus(EmployeeCertification.Status.EXPIRED);
         } else if (ec.getReminderDate() != null && !today.isBefore(ec.getReminderDate())) {
@@ -197,14 +194,11 @@ public class EmployeeCertificationService {
         if (employeeId == null || ruleId == null)
             return;
 
-        // Karena repo belum punya finder spesifik, ambil semua milik employee lalu
-        // filter ruleId
         eligibilityRepo.findByEmployeeIdAndDeletedAtIsNull(employeeId).stream()
                 .filter(ee -> ee.getCertificationRule() != null &&
                         Objects.equals(ee.getCertificationRule().getId(), ruleId))
                 .findFirst()
                 .ifPresent(ee -> {
-                    // Pastikan kolom sdh ada di entity
                     ee.setTrainingCount(0);
                     ee.setRefreshmentCount(0);
                     ee.setUpdatedAt(Instant.now());
@@ -219,6 +213,22 @@ public class EmployeeCertificationService {
                 && ec.getCertDate() != null) {
             resetCountersFor(ec.getEmployee().getId(), ec.getCertificationRule().getId());
         }
+    }
+
+    // ================== EVENT HELPERS ==================
+    private void publishChangedEvent(EmployeeCertification ec) {
+        if (ec == null || ec.getEmployee() == null || ec.getEmployee().getId() == null)
+            return;
+        eventPublisher.publishEvent(new EmployeeCertificationChangedEvent(ec.getEmployee().getId()));
+    }
+
+    private void publishChangedEventsForEmployeeIds(Collection<Long> employeeIds) {
+        if (employeeIds == null || employeeIds.isEmpty())
+            return;
+        employeeIds.stream()
+                .filter(Objects::nonNull)
+                .distinct()
+                .forEach(id -> eventPublisher.publishEvent(new EmployeeCertificationChangedEvent(id)));
     }
 
     // ================== Create ==================
@@ -251,7 +261,6 @@ public class EmployeeCertificationService {
                 .jobPositionTitle(employee.getJobPosition() != null
                         ? employee.getJobPosition().getName()
                         : null)
-                // snapshot nilai rule saat create
                 .ruleValidityMonths(rule.getValidityMonths())
                 .ruleReminderMonths(rule.getReminderMonths())
                 .createdAt(Instant.now())
@@ -264,8 +273,8 @@ public class EmployeeCertificationService {
         EmployeeCertification saved = repo.save(ec);
         historyService.snapshot(saved, ActionType.CREATED);
 
-        // ✅ reset counters kalau ini sertifikasi baru (manual create)
         maybeResetCounters(saved);
+        publishChangedEvent(saved); // 🔹 trigger refresh eligibility
 
         return toResponse(saved);
     }
@@ -285,7 +294,6 @@ public class EmployeeCertificationService {
             CertificationRule rule = ruleRepo.findById(req.getCertificationRuleId())
                     .orElseThrow(() -> new RuntimeException("Certification Rule not found"));
             ec.setCertificationRule(rule);
-            // refresh snapshot saat ganti rule
             ec.setRuleValidityMonths(rule.getValidityMonths());
             ec.setRuleReminderMonths(rule.getReminderMonths());
         }
@@ -300,7 +308,6 @@ public class EmployeeCertificationService {
         if (req.getProcessType() != null) {
             ec.setProcessType(req.getProcessType());
         }
-        // refresh snapshot job title jika kosong
         if (ec.getJobPositionTitle() == null || ec.getJobPositionTitle().isBlank()) {
             var jp = ec.getEmployee().getJobPosition();
             ec.setJobPositionTitle(jp != null ? jp.getName() : null);
@@ -313,8 +320,8 @@ public class EmployeeCertificationService {
         EmployeeCertification saved = repo.save(ec);
         historyService.snapshot(saved, ActionType.UPDATED);
 
-        // ✅ reset counters kalau ini sertifikasi valid (manual update)
         maybeResetCounters(saved);
+        publishChangedEvent(saved); // 🔹 trigger refresh eligibility
 
         return toResponse(saved);
     }
@@ -331,6 +338,8 @@ public class EmployeeCertificationService {
 
         EmployeeCertification saved = repo.save(ec);
         historyService.snapshot(saved, ActionType.DELETED);
+
+        publishChangedEvent(saved); // 🔹 trigger refresh eligibility
     }
 
     // ================== Handle File Update ==================
@@ -355,11 +364,13 @@ public class EmployeeCertificationService {
         }
 
         ec.setUpdatedAt(Instant.now());
-        updateValidity(ec); // hitung ulang validity (kalau snapshot null, fallback ke rule)
-        updateStatus(ec); // tentukan status setelah validity benar
+        updateValidity(ec);
+        updateStatus(ec);
 
         EmployeeCertification saved = repo.save(ec);
         historyService.snapshot(saved, actionType);
+
+        publishChangedEvent(saved); // 🔹 trigger refresh eligibility
 
         return saved;
     }
@@ -462,6 +473,12 @@ public class EmployeeCertificationService {
 
             batchSave(changed);
             total += changed.size();
+
+            // 🔹 publish event utk employee2 terkait
+            publishChangedEventsForEmployeeIds(
+                    changed.stream()
+                            .map(c -> c.getEmployee().getId())
+                            .collect(Collectors.toSet()));
         }
         return total;
     }
@@ -498,6 +515,11 @@ public class EmployeeCertificationService {
 
             batchSave(changed);
             total += changed.size();
+
+            publishChangedEventsForEmployeeIds(
+                    changed.stream()
+                            .map(c -> c.getEmployee().getId())
+                            .collect(Collectors.toSet()));
         }
         return total;
     }
@@ -534,6 +556,11 @@ public class EmployeeCertificationService {
 
             batchSave(changed);
             total += changed.size();
+
+            publishChangedEventsForEmployeeIds(
+                    changed.stream()
+                            .map(c -> c.getEmployee().getId())
+                            .collect(Collectors.toSet()));
         }
         return total;
     }
@@ -560,6 +587,11 @@ public class EmployeeCertificationService {
             }
         }
         batchSave(changed);
+
+        if (!changed.isEmpty()) {
+            publishChangedEvent(changed.get(0)); // satu employeeId saja
+        }
+
         return changed.size();
     }
 

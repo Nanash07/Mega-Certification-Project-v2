@@ -177,68 +177,6 @@ public class DashboardController {
         return svc.getMonthly(f);
     }
 
-    @GetMapping("/ongoing-batches")
-    public List<BatchCard> ongoingBatches(
-            @RequestParam(required = false) Long regionalId,
-            @RequestParam(required = false) Long divisionId,
-            @RequestParam(required = false) Long unitId,
-            @RequestParam(required = false) Long certificationId,
-            @RequestParam(required = false) Long levelId,
-            @RequestParam(required = false) Long subFieldId,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
-            @RequestParam(required = false) String batchType,
-            Authentication auth,
-            @AuthenticationPrincipal(expression = "id") Long userId) {
-        DashboardFilters f = toFilters(regionalId, divisionId, unitId,
-                certificationId, levelId, subFieldId,
-                startDate, endDate, batchType);
-        f = applyPicScope(f, auth, userId);
-        return svc.getOngoingBatches(f);
-    }
-
-    @GetMapping("/priority")
-    public Map<String, List<PriorityRow>> priority(
-            @RequestParam(required = false) Long regionalId,
-            @RequestParam(required = false) Long divisionId,
-            @RequestParam(required = false) Long unitId,
-            @RequestParam(required = false) Long certificationId,
-            @RequestParam(required = false) Long levelId,
-            @RequestParam(required = false) Long subFieldId,
-            Authentication auth,
-            @AuthenticationPrincipal(expression = "id") Long userId) {
-        DashboardFilters f = toFilters(regionalId, divisionId, unitId,
-                certificationId, levelId, subFieldId,
-                null, null, null);
-        f = applyPicScope(f, auth, userId);
-        return svc.getPriority(f);
-    }
-
-    @GetMapping("/filters")
-    public FiltersResponse filters(
-            Authentication auth,
-            @AuthenticationPrincipal(expression = "id") Long userId) {
-        FiltersResponse res = svc.getFilters();
-
-        // Batasi daftar sertifikasi di response untuk PIC
-        if (isPic(auth)) {
-            Long uid = extractUserId(auth, userId);
-            if (uid != null) {
-                List<Long> allowed = scopeRepo.findByUser_Id(uid).stream()
-                        .map(s -> s.getCertification().getId())
-                        .toList();
-                // kalau kosong → kosongkan (FE akan menampilkan banner)
-                res.setCertifications(
-                        res.getCertifications().stream()
-                                .filter(c -> allowed.contains(c.getId()))
-                                .toList());
-            } else {
-                res.setCertifications(Collections.emptyList());
-            }
-        }
-        return res;
-    }
-
     /* ================= endpoints khusus Pegawai ================= */
 
     @GetMapping("/employee/summary")
@@ -279,42 +217,5 @@ public class DashboardController {
 
         DashboardFilters f = toEmployeeFilters(employeeId, startDate, endDate, batchType);
         return svc.getMonthly(f);
-    }
-
-    @GetMapping("/employee/ongoing-batches")
-    public List<BatchCard> employeeOngoingBatches(
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
-            @RequestParam(required = false) String batchType,
-            Authentication auth,
-            @AuthenticationPrincipal(expression = "employeeId") Long employeeIdFromPrincipal) {
-
-        Long employeeId = extractEmployeeId(auth, employeeIdFromPrincipal);
-        if (employeeId == null) {
-            return List.of();
-        }
-
-        DashboardFilters f = toEmployeeFilters(employeeId, startDate, endDate, batchType);
-        return svc.getOngoingBatches(f);
-    }
-
-    @GetMapping("/employee/priority")
-    public Map<String, List<PriorityRow>> employeePriority(
-            Authentication auth,
-            @AuthenticationPrincipal(expression = "employeeId") Long employeeIdFromPrincipal) {
-
-        Long employeeId = extractEmployeeId(auth, employeeIdFromPrincipal);
-        if (employeeId == null) {
-            return Map.of(
-                    "notYet", List.of(),
-                    "due", List.of(),
-                    "expired", List.of());
-        }
-
-        DashboardFilters f = DashboardFilters.builder()
-                .employeeId(employeeId)
-                .build();
-
-        return svc.getPriority(f);
     }
 }

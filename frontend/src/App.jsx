@@ -24,6 +24,7 @@ import EmployeeExceptionPage from "./pages/employees/EmployeeExceptionPage";
 import EmployeeCertificationPage from "./pages/employees/EmployeeCertificationPage";
 import EmployeeCertificationHistoryPage from "./pages/employees/EmployeeCertificationHistoryPage";
 import EmployeeHistoryPage from "./pages/employees/EmployeeHistoryPage";
+import EmployeeResignedPage from "./pages/employees/EmployeeResignedPage"; // 🔹 NEW
 
 // ================= ORGANIZATION =================
 import RegionalPage from "./pages/organizations/RegionalPage";
@@ -98,6 +99,17 @@ export default function App() {
                         <ProtectedRoute>
                             <MainLayout>
                                 <EmployeeDataPage />
+                            </MainLayout>
+                        </ProtectedRoute>
+                    }
+                />
+                {/* 🔹 Halaman pegawai resign */}
+                <Route
+                    path="/employee/resigned"
+                    element={
+                        <ProtectedRoute roles={["SUPERADMIN"]}>
+                            <MainLayout>
+                                <EmployeeResignedPage />
                             </MainLayout>
                         </ProtectedRoute>
                     }

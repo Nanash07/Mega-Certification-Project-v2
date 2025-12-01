@@ -20,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Objects;
 
 @Service
@@ -33,7 +34,7 @@ public class BatchService {
     private final EmployeeBatchRepository employeeBatchRepository;
 
     // ============================================================
-    // 🔹 CREATE
+    // CREATE
     // ============================================================
     public BatchResponse create(BatchRequest request, String createdBy) {
         Batch.BatchType type = request.getType() != null ? request.getType() : Batch.BatchType.CERTIFICATION;
@@ -41,11 +42,13 @@ public class BatchService {
         validateDates(request.getStartDate(), request.getEndDate());
         validateRuleByType(type, request.getCertificationRuleId(), true);
 
-        Batch batch = fromRequest(request, null); // create
-        if (batch.getStatus() == null)
+        Batch batch = fromRequest(request, null);
+        if (batch.getStatus() == null) {
             batch.setStatus(Batch.Status.PLANNED);
-        if (batch.getType() == null)
+        }
+        if (batch.getType() == null) {
             batch.setType(Batch.BatchType.CERTIFICATION);
+        }
 
         batch.setCreatedAt(Instant.now());
         batch.setUpdatedAt(Instant.now());
@@ -54,7 +57,7 @@ public class BatchService {
     }
 
     // ============================================================
-    // 🔹 UPDATE
+    // UPDATE
     // ============================================================
     public BatchResponse update(Long id, BatchRequest request, String updatedBy) {
         Batch existing = batchRepository.findByIdAndDeletedAtIsNull(id)
@@ -63,18 +66,18 @@ public class BatchService {
         validateQuota(request.getQuota());
         validateDates(request.getStartDate(), request.getEndDate());
 
-        // Tentukan tipe target (pakai request kalau ada; kalau tidak, pakai existing)
         Batch.BatchType targetType = request.getType() != null ? request.getType() : existing.getType();
         validateRuleByType(targetType, request.getCertificationRuleId(), false);
 
-        // Validasi transisi status jika ada perubahan status
         if (request.getStatus() != null && !Objects.equals(existing.getStatus(), request.getStatus())) {
             validateBatchStatusTransition(existing.getStatus(), request.getStatus());
         }
 
-        // Map field
         CertificationRule resolvedRule = resolveRuleForUpdate(targetType, existing, request.getCertificationRuleId());
-        Institution institution = resolveInstitutionNullable(request.getInstitutionId());
+
+        Institution institution = request.getInstitutionId() != null
+                ? resolveInstitutionNullable(request.getInstitutionId())
+                : existing.getInstitution();
 
         existing.setBatchName(request.getBatchName() != null ? request.getBatchName() : existing.getBatchName());
         existing.setCertificationRule(resolvedRule);
@@ -90,7 +93,7 @@ public class BatchService {
     }
 
     // ============================================================
-    // 🔹 GET BY ID
+    // GET BY ID
     // ============================================================
     @Transactional(readOnly = true)
     public BatchResponse getByIdResponse(Long id) {
@@ -100,7 +103,7 @@ public class BatchService {
     }
 
     // ============================================================
-    // 🔹 DELETE (SOFT)
+    // DELETE (SOFT)
     // ============================================================
     public void delete(Long id, String deletedBy) {
         Batch batch = batchRepository.findByIdAndDeletedAtIsNull(id)
@@ -111,7 +114,7 @@ public class BatchService {
     }
 
     // ============================================================
-    // 🔹 SEARCH + FILTER + PAGING
+    // SEARCH + FILTER + PAGING (Superadmin, PIC, Employee)
     // ============================================================
     @Transactional(readOnly = true)
     public Page<BatchResponse> search(
@@ -120,8 +123,16 @@ public class BatchService {
             Batch.BatchType type,
             Long certificationRuleId,
             Long institutionId,
+            Long regionalId,
+            Long divisionId,
+            Long unitId,
+            Long certificationId,
+            Long levelId,
+            Long subFieldId,
             LocalDate startDate,
             LocalDate endDate,
+            List<Long> allowedCertificationIds,
+            Long employeeId,
             Pageable pageable) {
 
         Specification<Batch> spec = BatchSpecification.notDeleted()
@@ -130,6 +141,12 @@ public class BatchService {
                 .and(BatchSpecification.byType(type))
                 .and(BatchSpecification.byCertificationRule(certificationRuleId))
                 .and(BatchSpecification.byInstitution(institutionId))
+                .and(BatchSpecification.byOrgScope(regionalId, divisionId, unitId))
+                .and(BatchSpecification.byCertification(certificationId))
+                .and(BatchSpecification.byCertificationLevel(levelId))
+                .and(BatchSpecification.bySubField(subFieldId))
+                .and(BatchSpecification.byAllowedCertifications(allowedCertificationIds))
+                .and(BatchSpecification.byEmployee(employeeId))
                 .and(BatchSpecification.byDateRange(startDate, endDate));
 
         if (pageable.getSort().isUnsorted()) {
@@ -143,19 +160,18 @@ public class BatchService {
     }
 
     // ============================================================
-    // 🔹 MAPPING
+    // MAPPING
     // ============================================================
     private Batch fromRequest(BatchRequest request, Batch existingOrNull) {
-        Batch.BatchType type = request.getType() != null ? request.getType()
+        Batch.BatchType type = request.getType() != null
+                ? request.getType()
                 : (existingOrNull != null ? existingOrNull.getType() : Batch.BatchType.CERTIFICATION);
 
         CertificationRule rule = null;
         if (type == Batch.BatchType.CERTIFICATION || type == Batch.BatchType.EXTENSION) {
-            // untuk CERTIFICATION & EXTENSION rule wajib
             rule = certificationRuleRepository.findById(request.getCertificationRuleId())
                     .orElseThrow(() -> new NotFoundException("CertificationRule not found"));
         } else if (request.getCertificationRuleId() != null) {
-            // TRAINING/REFRESHMENT boleh punya rule (opsional)
             rule = certificationRuleRepository.findById(request.getCertificationRuleId())
                     .orElseThrow(() -> new NotFoundException("CertificationRule not found"));
         }
@@ -240,15 +256,17 @@ public class BatchService {
     }
 
     // ============================================================
-    // 🔹 VALIDATION HELPERS
+    // VALIDATION HELPERS
     // ============================================================
     private void validateQuota(Integer quota) {
         if (quota == null)
             return;
-        if (quota < 1)
+        if (quota < 1) {
             throw new IllegalArgumentException("Quota minimal 1 peserta");
-        if (quota > 250)
+        }
+        if (quota > 250) {
             throw new IllegalArgumentException("Quota maksimal 250 peserta");
+        }
     }
 
     private void validateDates(LocalDate start, LocalDate end) {
@@ -266,18 +284,17 @@ public class BatchService {
             throw new IllegalArgumentException(
                     "CertificationRule wajib diisi untuk batch tipe " + type.name());
         }
-        // Untuk update: jika target type CERTIFICATION/EXTENSION tapi ruleId null,
-        // kita pakai existing (divalidasi di resolver).
     }
 
     private void validateBatchStatusTransition(Batch.Status current, Batch.Status next) {
         if (next == null) {
             throw new IllegalArgumentException("Status batch tidak boleh null");
         }
+        // kalau mau rule transisi, tambahin di sini
     }
 
     // ============================================================
-    // 🔹 RESOLVERS
+    // RESOLVERS
     // ============================================================
     private Institution resolveInstitutionNullable(Long institutionId) {
         if (institutionId == null)
@@ -286,27 +303,23 @@ public class BatchService {
                 .orElseThrow(() -> new NotFoundException("Institution not found"));
     }
 
-    /**
-     * Resolve rule untuk update sesuai target type.
-     * - CERTIFICATION / EXTENSION: wajib ada rule (pakai request kalau ada; kalau
-     * tidak, pakai
-     * existing; kalau tetap null → error).
-     * - TRAINING/REFRESHMENT: rule opsional (boleh null).
-     */
     private CertificationRule resolveRuleForUpdate(Batch.BatchType targetType, Batch existing, Long requestedRuleId) {
         if (targetType == Batch.BatchType.CERTIFICATION || targetType == Batch.BatchType.EXTENSION) {
             Long ruleId = requestedRuleId != null
                     ? requestedRuleId
                     : (existing.getCertificationRule() != null ? existing.getCertificationRule().getId() : null);
+
             if (ruleId == null) {
                 throw new IllegalArgumentException(
                         "CertificationRule wajib diisi untuk batch tipe " + targetType.name());
             }
+
             return certificationRuleRepository.findById(ruleId)
                     .orElseThrow(() -> new NotFoundException("CertificationRule not found"));
         } else {
-            if (requestedRuleId == null)
-                return null;
+            if (requestedRuleId == null) {
+                return existing.getCertificationRule();
+            }
             return certificationRuleRepository.findById(requestedRuleId)
                     .orElseThrow(() -> new NotFoundException("CertificationRule not found"));
         }

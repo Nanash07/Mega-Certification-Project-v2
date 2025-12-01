@@ -1,4 +1,3 @@
-// src/components/Sidebar.jsx
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 
@@ -29,6 +28,7 @@ export const MENU = [
         key: "employee",
         subMenu: [
             { label: "Data Pegawai", href: "/employee/data" },
+            { label: "Data Pegawai Resign", href: "/employee/resigned" }, // 🔹 NEW
             { label: "Eligibility", href: "/employee/eligibility" },
             { label: "Eligibility Manual", href: "/employee/exception" },
             { label: "Sertifikat Pegawai", href: "/employee/certification" },
@@ -92,10 +92,8 @@ export const MENU = [
 export const filterMenuByRole = (menu, roleRaw) => {
     const role = (roleRaw || "").toUpperCase();
 
-    // 🔵 SUPERADMIN → semua menu
     if (role === "SUPERADMIN") return menu;
 
-    // 🟣 PIC → hide menu user + limit Sertifikat submenu
     if (role === "PIC") {
         return menu
             .filter((item) => item.key !== "user")
@@ -110,7 +108,6 @@ export const filterMenuByRole = (menu, roleRaw) => {
             });
     }
 
-    // 🟢 EMPLOYEE / PEGAWAI → Dashboard, Pegawai, + Notifikasi personal
     if (role === "EMPLOYEE" || role === "PEGAWAI") {
         const employeeMenu = menu.filter((item) => item.key === "dashboard" || item.key === "employee");
 
@@ -125,7 +122,6 @@ export const filterMenuByRole = (menu, roleRaw) => {
         ];
     }
 
-    // Default fallback behaves like employee (safe)
     return menu.filter((item) => item.key === "dashboard" || item.key === "employee");
 };
 
@@ -162,7 +158,6 @@ export default function Sidebar({ open, setOpen }) {
 
     return (
         <>
-            {/* overlay mobile */}
             {open && <div className="fixed inset-0 z-30 lg:hidden" onClick={() => setOpen(false)} />}
 
             <aside

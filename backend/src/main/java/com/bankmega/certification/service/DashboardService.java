@@ -38,18 +38,6 @@ public class DashboardService {
         return repo.fetchMonthly(ensureFilters(f));
     }
 
-    public List<BatchCard> getOngoingBatches(DashboardFilters f) {
-        return repo.fetchOngoingBatches(ensureFilters(f));
-    }
-
-    public Map<String, List<PriorityRow>> getPriority(DashboardFilters f) {
-        return repo.fetchPriorityTop10(ensureFilters(f));
-    }
-
-    public FiltersResponse getFilters() {
-        return repo.fetchFilterOptions();
-    }
-
     private DashboardFilters ensureFilters(DashboardFilters f) {
         return f == null
                 ? DashboardFilters.builder().build()

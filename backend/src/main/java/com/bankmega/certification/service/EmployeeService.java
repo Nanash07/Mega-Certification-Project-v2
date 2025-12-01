@@ -35,7 +35,7 @@ public class EmployeeService {
                                 .toList();
         }
 
-        // ====================== SEARCH + FILTER ======================
+        // ====================== SEARCH ACTIVE ======================
         public Page<EmployeeResponse> search(
                         List<Long> employeeIds,
                         List<Long> regionalIds,
@@ -63,9 +63,37 @@ public class EmployeeService {
                 return repo.findAll(spec, pageable).map(this::toResponse);
         }
 
-        // ====================== GET DETAIL ======================
+        // ====================== SEARCH RESIGNED ======================
+        public Page<EmployeeResponse> searchResigned(
+                        List<Long> employeeIds,
+                        List<Long> regionalIds,
+                        List<Long> divisionIds,
+                        List<Long> unitIds,
+                        List<Long> jobPositionIds,
+                        String search,
+                        Pageable pageable) {
+
+                Specification<Employee> spec = EmployeeSpecification.deleted()
+                                .and(EmployeeSpecification.byEmployeeIds(employeeIds))
+                                .and(EmployeeSpecification.byRegionalIds(regionalIds))
+                                .and(EmployeeSpecification.byDivisionIds(divisionIds))
+                                .and(EmployeeSpecification.byUnitIds(unitIds))
+                                .and(EmployeeSpecification.byJobPositionIds(jobPositionIds))
+                                .and(EmployeeSpecification.bySearch(search));
+
+                if (pageable.getSort().isUnsorted()) {
+                        pageable = PageRequest.of(
+                                        pageable.getPageNumber(),
+                                        pageable.getPageSize(),
+                                        Sort.by(Sort.Order.asc("nip")));
+                }
+
+                return repo.findAll(spec, pageable).map(this::toResponse);
+        }
+
+        // ====================== GET DETAIL (ACTIVE + RESIGNED) ======================
         public EmployeeResponse getById(Long id) {
-                Employee emp = repo.findByIdAndDeletedAtIsNull(id)
+                Employee emp = repo.findById(id)
                                 .orElseThrow(() -> new NotFoundException("Employee not found with id " + id));
                 return toResponse(emp);
         }
@@ -82,39 +110,36 @@ public class EmployeeService {
                 emp.setUpdatedAt(Instant.now());
 
                 Employee saved = repo.save(emp);
-
-                // ✅ Catat histori CREATED
                 historyService.snapshot(saved, EmployeeHistory.EmployeeActionType.CREATED, saved.getEffectiveDate());
 
                 return toResponse(saved);
         }
 
-        // ====================== UPDATE ======================
+        // ====================== UPDATE (ACTIVE ONLY) ======================
         @Transactional
         public EmployeeResponse update(Long id, EmployeeRequest req) {
                 Employee emp = repo.findByIdAndDeletedAtIsNull(id)
                                 .orElseThrow(() -> new NotFoundException("Employee not found with id " + id));
 
-                if (!emp.getNip().equals(req.getNip()) && repo.existsByNipAndDeletedAtIsNull(req.getNip())) {
+                if (!emp.getNip().equals(req.getNip()) &&
+                                repo.existsByNipAndDeletedAtIsNull(req.getNip())) {
                         throw new ConflictException("NIP " + req.getNip() + " is already used");
                 }
 
-                // 🔹 Check if there's any actual change before saving
                 if (!hasChanged(emp, req)) {
-                        return toResponse(emp); // ⛔ skip save & history jika tidak ada perubahan
+                        return toResponse(emp);
                 }
 
                 emp = mapRequestToEntity(emp, req);
                 emp.setUpdatedAt(Instant.now());
-                Employee saved = repo.save(emp);
 
-                // ✅ Catat histori UPDATED (hanya kalau ada perubahan)
+                Employee saved = repo.save(emp);
                 historyService.snapshot(saved, EmployeeHistory.EmployeeActionType.UPDATED, saved.getEffectiveDate());
 
                 return toResponse(saved);
         }
 
-        // ====================== SOFT DELETE (TERMINATED) ======================
+        // ====================== SOFT DELETE ======================
         @Transactional
         public void softDelete(Long id) {
                 Employee emp = repo.findByIdAndDeletedAtIsNull(id)
@@ -125,8 +150,6 @@ public class EmployeeService {
                 emp.setUpdatedAt(Instant.now());
 
                 Employee saved = repo.save(emp);
-
-                // ✅ Catat histori TERMINATED
                 historyService.snapshot(saved, EmployeeHistory.EmployeeActionType.TERMINATED, saved.getEffectiveDate());
         }
 
@@ -156,7 +179,6 @@ public class EmployeeService {
                 return emp;
         }
 
-        // 🔹 Deteksi perubahan data sebelum update / histori
         private boolean hasChanged(Employee emp, EmployeeRequest req) {
                 return !Objects.equals(emp.getName(), req.getName())
                                 || !Objects.equals(emp.getEmail(), req.getEmail())

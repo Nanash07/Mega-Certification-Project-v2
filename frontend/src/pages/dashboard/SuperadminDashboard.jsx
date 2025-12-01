@@ -1,16 +1,13 @@
 // src/pages/dashboard/SuperadminDashboard.jsx
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import Select from "react-select";
 import api from "../../services/api";
+import Select from "react-select";
 
-import {
-    fetchDashboardAggregate,
-    fetchDashboardSummary,
-    fetchMonthlyCertificationTrend,
-    MONTHS,
-} from "../../services/dashboardService";
-import { formatShortIdDate, formatShortIdDateTime } from "../../utils/date";
+import { fetchDashboardAggregate, MONTHS } from "../../services/dashboardService";
+import { fetchBatches } from "../../services/batchService";
+
+import { formatShortIdDateTime } from "../../utils/date";
 
 import { fetchCertifications } from "../../services/certificationService";
 import { fetchCertificationLevels } from "../../services/certificationLevelService";
@@ -30,51 +27,22 @@ import {
     YAxis,
     CartesianGrid,
 } from "recharts";
-import PaginationSimple from "../../components/common/PaginationSimple";
 
-/* ========= utils ========= */
-const toDate = (d) => (d ? new Date(d) : null);
-const fmtID = (d) => formatShortIdDate(d);
-const daysBetween = (a, b) => Math.ceil((a - b) / (1000 * 60 * 60 * 24));
-const toNum = (v) => Number(v ?? 0) || 0;
+import BatchListCard from "../../components/dashboards/BatchListCard";
+import EligibilityPriorityCard from "../../components/dashboards/EligibilityPriorityCard";
 
-function getDeadline(row) {
-    return toDate(row?.dueDate) || toDate(row?.validUntil) || toDate(row?.reminderDate) || null;
+/* ========= helpers ========= */
+
+function SelectTop(props) {
+    return (
+        <Select
+            {...props}
+            menuPortalTarget={typeof document !== "undefined" ? document.body : null}
+            menuPosition="fixed"
+        />
+    );
 }
 
-/** KODE-{level}-SUBCODE; fallback ke row.rule */
-function getRuleCode(row) {
-    const pre = row?.ruleCode ?? row?.rule_code;
-    if (pre && String(pre).trim() !== "") return pre;
-
-    const code = row?.certificationCode ?? row?.certification?.code ?? row?.certification_code ?? row?.code ?? "";
-
-    const level =
-        row?.certificationLevelLevel ??
-        row?.certificationLevel?.level ??
-        row?.certification_level_level ??
-        row?.level ??
-        null;
-
-    const sub = row?.subFieldCode ?? row?.subfieldCode ?? row?.sub_field_code ?? row?.subField?.code ?? "";
-
-    const parts = [code || null, level != null ? String(level) : null, sub || null].filter(Boolean);
-    if (parts.length) return parts.join("-");
-    if (row?.rule && String(row.rule).trim() !== "") return row.rule;
-    return "-";
-}
-
-/** Path ke halaman yang ADA di Sidebar */
-function getPriorityPath(row) {
-    const nip = row?.nip || "";
-    const rule = getRuleCode(row);
-    if (row?.eligibilityId) {
-        return `/employee/eligibility?nip=${encodeURIComponent(nip)}&rule=${encodeURIComponent(rule)}`;
-    }
-    return `/employee/certification?nip=${encodeURIComponent(nip)}&rule=${encodeURIComponent(rule)}`;
-}
-
-/** Build query string dari filter */
 function buildQueryFromFilters(f) {
     const params = new URLSearchParams();
     if (f.regionalId) params.set("regionalId", f.regionalId);
@@ -86,15 +54,9 @@ function buildQueryFromFilters(f) {
     return params.toString();
 }
 
-/* ========= Select helper ========= */
-function SelectTop(props) {
-    return (
-        <Select
-            {...props}
-            menuPortalTarget={typeof document !== "undefined" ? document.body : null}
-            menuPosition="fixed"
-        />
-    );
+function toOptions(data, labelPicker) {
+    const arr = Array.isArray(data?.content) ? data.content : Array.isArray(data) ? data : [];
+    return arr.filter(Boolean).map((x) => ({ value: x.id, label: labelPicker(x), raw: x }));
 }
 
 /* ========= small components ========= */
@@ -111,65 +73,6 @@ function MiniCard({ label, value, sub, onClick, tip }) {
             </button>
         </div>
     );
-}
-
-function toOptions(data, labelPicker) {
-    const arr = Array.isArray(data?.content) ? data.content : Array.isArray(data) ? data : [];
-    return arr.filter(Boolean).map((x) => ({ value: x.id, label: labelPicker(x), raw: x }));
-}
-
-/** ======= QuotaBar ======= */
-function QuotaBar({ filled = 0, quota = 0, className }) {
-    const f = Math.max(0, Number(filled) || 0);
-    const q = Math.max(0, Number(quota) || 0);
-
-    if (q === 0) {
-        return <div className={`text-[10px] opacity-70 ${className || ""}`}>Terisi: {f} (tanpa kuota)</div>;
-    }
-
-    const pct = Math.min(100, Math.round((f / q) * 100));
-    const isFull = f >= q;
-    const label = `${f}/${q} (${pct}%)`;
-
-    const barColor = isFull ? "bg-success" : "bg-warning";
-
-    return (
-        <div
-            className={`tooltip tooltip-top w-full ${className || ""}`}
-            data-tip={label}
-            title={label}
-            aria-label={`Kuota ${label}`}
-        >
-            <div className="relative w-full h-3 rounded-full bg-base-200 overflow-hidden">
-                {pct > 0 && (
-                    <div
-                        className={`absolute left-0 top-0 h-full rounded-full ${barColor}`}
-                        style={{ width: `${pct}%` }}
-                    />
-                )}
-                <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-[10px] font-medium text-base-content/80">{label}</span>
-                </div>
-            </div>
-        </div>
-    );
-}
-
-/** Hitung "terisi" untuk progress bar ONGOING: onrun + passed + failed (fallback aman) */
-function getFilledForBar(b) {
-    const onrun = toNum(b.onrun ?? b.registeredOrAttended);
-    const passed = toNum(b.totalPassed ?? b.passed);
-    const failedExplicit = toNum(b.totalFailed ?? b.failed);
-    const totalKnown = toNum(b.totalParticipants ?? b.participants);
-    const failed = failedExplicit > 0 ? failedExplicit : Math.max(totalKnown - passed - onrun, 0);
-
-    const granular = onrun + passed + failed;
-    if (granular > 0) return granular;
-
-    if (totalKnown > 0) return totalKnown;
-    if (toNum(b.registeredOrAttended) > 0) return toNum(b.registeredOrAttended);
-    if (onrun > 0) return onrun;
-    return 0;
 }
 
 export default function SuperadminDashboard() {
@@ -208,20 +111,6 @@ export default function SuperadminDashboard() {
     const [kpi, setKpi] = useState(null);
     const [computedAt, setComputedAt] = useState(null);
 
-    // ===== peringatan
-    const [dueList, setDueList] = useState([]);
-    const [expiredList, setExpiredList] = useState([]);
-    const [notYetList, setNotYetList] = useState([]);
-    const [loadingAlert, setLoadingAlert] = useState(true);
-
-    // paging priority
-    const [notYetPage, setNotYetPage] = useState(1);
-    const [notYetRowsPerPage, setNotYetRowsPerPage] = useState(10);
-    const [duePage, setDuePage] = useState(1);
-    const [dueRowsPerPage, setDueRowsPerPage] = useState(10);
-    const [expiredPage, setExpiredPage] = useState(1);
-    const [expiredRowsPerPage, setExpiredRowsPerPage] = useState(10);
-
     // ===== batch ONGOING (paging)
     const [batches, setBatches] = useState([]);
     const [batchPage, setBatchPage] = useState(1);
@@ -230,7 +119,7 @@ export default function SuperadminDashboard() {
     const [batchTotalElements, setBatchTotalElements] = useState(0);
     const [loadingBatch, setLoadingBatch] = useState(false);
 
-    // ===== batch FINISHED (paging seperti ONGOING)
+    // ===== batch FINISHED (paging)
     const [finishedBatches, setFinishedBatches] = useState([]);
     const [finishedPage, setFinishedPage] = useState(1);
     const [finishedRows, setFinishedRows] = useState(5);
@@ -306,125 +195,99 @@ export default function SuperadminDashboard() {
     const params = currentFilters;
 
     async function loadSummaryAndKpi() {
-        const agg = await fetchDashboardAggregate({ ...params(), sections: "summary,kpi" });
+        const agg = await fetchDashboardAggregate({
+            ...params(),
+        });
         setSummary(agg.summary);
         setKpi(agg.kpiStatus);
         setComputedAt(agg.computedAt);
-    }
-
-    async function loadPriority() {
-        setLoadingAlert(true);
-        try {
-            const s = await fetchDashboardSummary({ ...params(), sections: "priority" });
-            setDueList(Array.isArray(s?.dueTop) ? s.dueTop : []);
-            setExpiredList(Array.isArray(s?.expiredTop) ? s.expiredTop : []);
-            setNotYetList(Array.isArray(s?.notYetTop) ? s.notYetTop : []);
-
-            setNotYetPage(1);
-            setDuePage(1);
-            setExpiredPage(1);
-        } catch {
-            setDueList([]);
-            setExpiredList([]);
-            setNotYetList([]);
-        } finally {
-            setLoadingAlert(false);
+        if (agg.monthlyTrend) {
+            setMonthly(agg.monthlyTrend);
         }
     }
 
-    async function loadBatches(page = 1) {
+    async function loadBatches(page = 1, rowsOverride) {
         setLoadingBatch(true);
         try {
-            const agg = await fetchDashboardAggregate({
+            const size = rowsOverride ?? batchRows;
+            const res = await fetchBatches({
                 ...params(),
-                sections: "batches",
-                batchPage: page - 1, // BE zero-based
-                batchSize: batchRows,
+                status: "ONGOING",
+                type: batchType?.value || undefined,
+                page: page - 1,
+                size,
+                sortField: "startDate",
+                sortDirection: "desc",
             });
-            const res = agg.ongoingBatchesPage || { content: [], totalPages: 0, totalElements: 0 };
-            const list = Array.isArray(res.content) ? res.content : [];
+
+            const list = Array.isArray(res?.content) ? res.content : [];
             setBatches(list);
-            setBatchTotalPages(res.totalPages || 1);
-            setBatchTotalElements(res.totalElements || list.length || 0);
+            setBatchTotalPages(res?.totalPages || 1);
+            setBatchTotalElements(res?.totalElements || list.length || 0);
             setBatchPage(page);
         } finally {
             setLoadingBatch(false);
         }
     }
 
-    async function loadFinishedBatches(page = 1) {
+    async function loadFinishedBatches(page = 1, rowsOverride) {
         setLoadingFinished(true);
         try {
-            const { data } = await api.get("/batches/paged", {
-                params: {
-                    status: "FINISHED",
-                    page: page - 1, // BE zero-based
-                    size: finishedRows,
-                    sort: "endDate,desc",
-                },
+            const size = rowsOverride ?? finishedRows;
+            const res = await fetchBatches({
+                ...params(),
+                status: "FINISHED",
+                type: batchType?.value || undefined,
+                page: page - 1,
+                size,
+                sortField: "endDate",
+                sortDirection: "desc",
             });
-            const content = Array.isArray(data?.content) ? data.content : [];
+
+            const content = Array.isArray(res?.content) ? res.content : [];
             setFinishedBatches(content);
-            setFinishedTotalPages(data?.totalPages || 1);
-            setFinishedTotalElements(data?.totalElements || content.length || 0);
+            setFinishedTotalPages(res?.totalPages || 1);
+            setFinishedTotalElements(res?.totalElements || content.length || 0);
             setFinishedPage(page);
         } finally {
             setLoadingFinished(false);
         }
     }
 
-    async function loadMonthly() {
-        const data = await fetchMonthlyCertificationTrend({
-            ...params(),
-            sections: "monthly",
-        });
-        setMonthly(data);
-    }
-
     useEffect(() => {
         (async () => {
             await loadSummaryAndKpi();
-            await loadPriority();
 
-            // ONGOING (reset ke page 1)
             setBatchPage(1);
             setBatches([]);
             await loadBatches(1);
 
-            // FINISHED (reset ke page 1)
             setFinishedPage(1);
             setFinishedBatches([]);
             await loadFinishedBatches(1);
-
-            await loadMonthly();
         })();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [divisionSel, regionalSel, unitSel, certSel, levelSel, subSel, startDate, endDate, batchType]);
 
     /* ===== computed ===== */
+
+    // Total eligible = ambil dari summary kalau ada, kalau nggak fallback ke KPI (eligibility)
     const eligibleTotal = useMemo(() => {
         if (summary?.eligibility?.total != null) return Number(summary.eligibility.total);
         const s = kpi || {};
         return (s.active ?? 0) + (s.due ?? 0) + (s.expired ?? 0) + (s.notYetCertified ?? 0);
     }, [summary, kpi]);
 
-    // Breakdown realisasi: hitung dari Summary (biar konsisten sama kartu)
+    // Data untuk pie chart dan legend – murni dari KPI eligibility
     const real = useMemo(() => {
-        const cert = summary?.certifications || {};
         const k = kpi || {};
 
-        // di Summary card: "Tersertifikasi" = ACTIVE + DUE
-        const activePlusDue = Number(cert.active ?? 0);
-        const due = Number(cert.due ?? 0);
-        const expired = Number(cert.expired ?? 0);
-
-        // ACTIVE only = (ACTIVE + DUE) - DUE
-        const activeOnly = Math.max(activePlusDue - due, 0);
-
-        // Summary nggak punya "belum bersertifikat", ambil dari kpi
+        const activeOnly = Number(k.active ?? 0); // ACTIVE
+        const due = Number(k.due ?? 0);
+        const expired = Number(k.expired ?? 0);
         const notYet = Number(k.notYetCertified ?? 0);
 
-        const certifiedIncDue = activePlusDue;
+        const certifiedIncDue = activeOnly + due; // definisi "tersretifikasi" = ACTIVE + DUE
         const total = activeOnly + due + expired + notYet;
         const pct = total > 0 ? Math.round((certifiedIncDue / total) * 1000) / 10 : 0;
 
@@ -437,29 +300,8 @@ export default function SuperadminDashboard() {
             total,
             pct,
         };
-    }, [summary, kpi]);
+    }, [kpi]);
 
-    // paging priority sliced
-    const notYetTotalPages = Math.max(1, Math.ceil(notYetList.length / notYetRowsPerPage));
-    const dueTotalPages = Math.max(1, Math.ceil(dueList.length / dueRowsPerPage));
-    const expiredTotalPages = Math.max(1, Math.ceil(expiredList.length / expiredRowsPerPage));
-
-    const notYetPaged = useMemo(() => {
-        const start = (notYetPage - 1) * notYetRowsPerPage;
-        return notYetList.slice(start, start + notYetRowsPerPage);
-    }, [notYetList, notYetPage, notYetRowsPerPage]);
-
-    const duePaged = useMemo(() => {
-        const start = (duePage - 1) * dueRowsPerPage;
-        return dueList.slice(start, start + dueRowsPerPage);
-    }, [dueList, duePage, dueRowsPerPage]);
-
-    const expiredPaged = useMemo(() => {
-        const start = (expiredPage - 1) * expiredRowsPerPage;
-        return expiredList.slice(start, start + expiredRowsPerPage);
-    }, [expiredList, expiredPage, expiredRowsPerPage]);
-
-    // Kartu ringkas
     const cardConfigs = useMemo(() => {
         const q = buildQueryFromFilters(currentFilters());
         return [
@@ -523,7 +365,7 @@ export default function SuperadminDashboard() {
                 </p>
             </div>
 
-            {/* Filter */}
+            {/* Filter organisasi/sertifikasi */}
             <div className="grid grid-cols-1 md:grid-cols-6 gap-2">
                 <div className="tooltip tooltip-top" data-tip="Regional" title="Regional">
                     <SelectTop
@@ -593,7 +435,7 @@ export default function SuperadminDashboard() {
                 </div>
             </div>
 
-            {/* Filter tanggal + jenis batch */}
+            {/* Filter tanggal */}
             <div className="grid grid-cols-1 md:grid-cols-6 gap-2">
                 <div className="tooltip tooltip-top" data-tip="Tanggal Mulai Batch" title="Tanggal Mulai Batch">
                     <div className="form-control w-full">
@@ -672,13 +514,9 @@ export default function SuperadminDashboard() {
                                                 outerRadius={85}
                                                 label
                                             >
-                                                {/* Aktif */}
                                                 <Cell fill="#16a34a" />
-                                                {/* Due */}
                                                 <Cell fill="#f97316" />
-                                                {/* Expired */}
                                                 <Cell fill="#ef4444" />
-                                                {/* Belum */}
                                                 <Cell fill="#717171" />
                                             </Pie>
                                             <ReTooltip />
@@ -765,387 +603,74 @@ export default function SuperadminDashboard() {
 
             {/* ====== Batch Berjalan & Selesai ====== */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                {/* Kolom 1 - ONGOING (pakai judul) */}
-                <div className="card bg-base-100 border rounded-2xl shadow-sm">
-                    <div className="card-body p-4 md:p-5">
-                        <div className="flex items-center justify-between">
-                            <h2 className="card-title text-base md:text-lg">Batch Berjalan</h2>
-                        </div>
+                <BatchListCard
+                    title="Batch Berjalan"
+                    status="ONGOING"
+                    batches={batches}
+                    loading={loadingBatch}
+                    page={batchPage}
+                    rowsPerPage={batchRows}
+                    totalPages={batchTotalPages}
+                    totalElements={batchTotalElements}
+                    onPageChange={(p) => {
+                        if (p !== batchPage) loadBatches(p);
+                    }}
+                    onRowsPerPageChange={(n) => {
+                        setBatchRows(n);
+                        loadBatches(1, n);
+                    }}
+                    onClickRow={(b) => navigate(`/batch/${b.id}`)}
+                    emptyText="Tidak ada batch berjalan."
+                />
 
-                        <div className="max-h-96 overflow-auto pr-1">
-                            {batches.length === 0 && loadingBatch ? (
-                                <div className="space-y-2">
-                                    {Array.from({ length: 4 }).map((_, i) => (
-                                        <div key={i} className="skeleton h-14 w-full rounded-xl" />
-                                    ))}
-                                </div>
-                            ) : batches.length === 0 ? (
-                                <div className="text-sm opacity-70">Tidak ada batch berjalan.</div>
-                            ) : (
-                                <ul className="menu w-full">
-                                    {batches.map((b) => {
-                                        const quota = toNum(b.quota);
-                                        const filled = getFilledForBar(b);
-                                        const chip = getRuleCode(b);
+                <BatchListCard
+                    title="Batch Selesai"
+                    status="FINISHED"
+                    batches={finishedBatches}
+                    loading={loadingFinished}
+                    page={finishedPage}
+                    rowsPerPage={finishedRows}
+                    totalPages={finishedTotalPages}
+                    totalElements={finishedTotalElements}
+                    onPageChange={(p) => {
+                        if (p !== finishedPage) loadFinishedBatches(p);
+                    }}
+                    onRowsPerPageChange={(n) => {
+                        setFinishedRows(n);
+                        loadFinishedBatches(1, n);
+                    }}
+                    onClickRow={(b) => navigate(`/batch/${b.id}`)}
+                    emptyText="Belum ada batch selesai."
+                />
 
-                                        const passed = toNum(b.totalPassed ?? b.passed);
-                                        const total = toNum(
-                                            b.totalParticipants ?? b.participants ?? b.registeredOrAttended ?? b.onrun
-                                        );
-                                        const failedExplicit = toNum(b.totalFailed ?? b.failed);
-                                        const onrun = toNum(b.onrun ?? b.registeredOrAttended);
-                                        const failed =
-                                            failedExplicit > 0 ? failedExplicit : Math.max(total - passed - onrun, 0);
-
-                                        return (
-                                            <li key={b.id} className="!p-0">
-                                                <button
-                                                    className="w-full text-left hover:bg-base-200 rounded-xl p-2"
-                                                    onClick={() => navigate(`/batch/${b.id}`)}
-                                                >
-                                                    <div className="min-w-0">
-                                                        <div className="font-medium truncate text-sm">
-                                                            {b.name || b.batchName}
-                                                        </div>
-                                                        <div className="text-[11px] opacity-70 truncate">
-                                                            {chip && chip !== "-" ? chip : b.type || "-"} •{" "}
-                                                            {b.startDate} – {b.endDate}
-                                                            {b.institutionName ? ` • ${b.institutionName}` : ""}
-                                                        </div>
-                                                        <div className="mt-1">
-                                                            <QuotaBar filled={filled} quota={quota} />
-                                                        </div>
-                                                        <div className="mt-1 text-[11px] opacity-70">
-                                                            Lulus: <span className="font-medium">{passed}</span> •
-                                                            Gagal: <span className="font-medium">{failed}</span> •
-                                                            Peserta: <span className="font-medium">{total}</span>
-                                                        </div>
-                                                    </div>
-                                                </button>
-                                            </li>
-                                        );
-                                    })}
-                                </ul>
-                            )}
-                        </div>
-
-                        {batchTotalElements > 0 && (
-                            <PaginationSimple
-                                page={batchPage}
-                                totalPages={batchTotalPages}
-                                totalElements={batchTotalElements}
-                                rowsPerPage={batchRows}
-                                onPageChange={(p) => {
-                                    if (p !== batchPage) {
-                                        loadBatches(p);
-                                    }
-                                }}
-                                onRowsPerPageChange={(n) => {
-                                    setBatchRows(n);
-                                    loadBatches(1);
-                                }}
-                            />
-                        )}
-                    </div>
-                </div>
-
-                {/* Kolom 2 - FINISHED (pakai judul, pakai PaginationSimple juga) */}
-                <div className="card bg-base-100 border rounded-2xl shadow-sm">
-                    <div className="card-body p-4 md:p-5">
-                        <div className="flex items-center justify-between">
-                            <h2 className="card-title text-base md:text-lg">Batch Selesai</h2>
-                        </div>
-
-                        <div className="max-h-96 overflow-auto pr-1">
-                            {finishedBatches.length === 0 && loadingFinished ? (
-                                <div className="space-y-2">
-                                    {Array.from({ length: 4 }).map((_, i) => (
-                                        <div key={i} className="skeleton h-14 w-full rounded-xl" />
-                                    ))}
-                                </div>
-                            ) : finishedBatches.length === 0 ? (
-                                <div className="text-sm opacity-70">Belum ada batch selesai.</div>
-                            ) : (
-                                <ul className="menu w-full">
-                                    {finishedBatches.map((b) => {
-                                        const quota = toNum(b.quota);
-                                        const passed = toNum(b.totalPassed ?? b.passed);
-                                        const total = toNum(b.totalParticipants);
-                                        const failed = Math.max(total - passed, 0);
-                                        const filled = passed + failed;
-                                        const chip = getRuleCode(b);
-
-                                        return (
-                                            <li key={b.id} className="!p-0">
-                                                <button
-                                                    className="w-full text-left hover:bg-base-200 rounded-xl p-2"
-                                                    onClick={() => navigate(`/batch/${b.id}`)}
-                                                >
-                                                    <div className="min-w-0">
-                                                        <div className="font-medium truncate text-sm">
-                                                            {b.name || b.batchName}
-                                                        </div>
-                                                        <div className="text-[11px] opacity-70 truncate">
-                                                            {chip && chip !== "-" ? chip : b.type || "-"} •{" "}
-                                                            {b.startDate} – {b.endDate}
-                                                            {b.institutionName ? ` • ${b.institutionName}` : ""}
-                                                        </div>
-                                                        <div className="mt-1">
-                                                            <QuotaBar filled={filled} quota={quota} />
-                                                        </div>
-                                                        <div className="mt-1 text-[11px] opacity-70">
-                                                            Lulus: <span className="font-medium">{passed}</span> •
-                                                            Gagal: <span className="font-medium">{failed}</span> •
-                                                            Peserta: <span className="font-medium">{total}</span>
-                                                        </div>
-                                                    </div>
-                                                </button>
-                                            </li>
-                                        );
-                                    })}
-                                </ul>
-                            )}
-                        </div>
-
-                        {finishedTotalElements > 0 && (
-                            <PaginationSimple
-                                page={finishedPage}
-                                totalPages={finishedTotalPages}
-                                totalElements={finishedTotalElements}
-                                rowsPerPage={finishedRows}
-                                onPageChange={(p) => {
-                                    if (p !== finishedPage) {
-                                        loadFinishedBatches(p);
-                                    }
-                                }}
-                                onRowsPerPageChange={(n) => {
-                                    setFinishedRows(n);
-                                    loadFinishedBatches(1);
-                                }}
-                            />
-                        )}
-                    </div>
-                </div>
-                {/* Belum Bersertifikat */}
-                <div className="card bg-base-100 border rounded-2xl shadow-sm">
-                    <div className="card-body p-4 md:p-5">
-                        <div className="flex items-center justify-between">
-                            <h2 className="card-title text-base md:text-lg text-sky-600">Belum Bersertifikat</h2>
-                        </div>
-                        <div className="overflow-auto max-h-96">
-                            <table className="table table-xs md:table-sm">
-                                <thead>
-                                    <tr>
-                                        <th>NIP</th>
-                                        <th>Nama</th>
-                                        <th>Rule</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {loadingAlert ? (
-                                        Array.from({ length: 6 }).map((_, i) => (
-                                            <tr key={i}>
-                                                <td colSpan={3}>
-                                                    <div className="skeleton h-5 w-full" />
-                                                </td>
-                                            </tr>
-                                        ))
-                                    ) : notYetList.length === 0 ? (
-                                        <tr>
-                                            <td colSpan={3} className="text-sm opacity-60">
-                                                Tidak ada data
-                                            </td>
-                                        </tr>
-                                    ) : (
-                                        notYetPaged.map((x, idx) => (
-                                            <tr
-                                                key={idx}
-                                                className="hover cursor-pointer"
-                                                onClick={(e) => {
-                                                    e.preventDefault();
-                                                    e.stopPropagation();
-                                                    navigate(getPriorityPath(x));
-                                                }}
-                                            >
-                                                <td className="whitespace-nowrap">{x.nip}</td>
-                                                <td className="whitespace-nowrap">{x.employeeName ?? x.name}</td>
-                                                <td className="whitespace-nowrap">{getRuleCode(x)}</td>
-                                            </tr>
-                                        ))
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-
-                        {notYetList.length > 0 && (
-                            <PaginationSimple
-                                page={notYetPage}
-                                totalPages={notYetTotalPages}
-                                totalElements={notYetList.length}
-                                rowsPerPage={notYetRowsPerPage}
-                                onPageChange={setNotYetPage}
-                                onRowsPerPageChange={(n) => {
-                                    setNotYetRowsPerPage(n);
-                                    setNotYetPage(1);
-                                }}
-                            />
-                        )}
-                    </div>
-                </div>
+                {/* Card Belum Bersertifikat - ikut filter */}
+                <EligibilityPriorityCard
+                    title="Belum Bersertifikat"
+                    status="NOT_YET_CERTIFIED"
+                    accentClass="text-sky-600"
+                    filters={currentFilters()}
+                    initialRowsPerPage={10}
+                />
             </div>
 
-            {/* ====== Due | Kadaluarsa (kesamping) ====== */}
+            {/* ====== Due | Kadaluarsa ====== */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {/* Due */}
-                <div className="card bg-base-100 border rounded-2xl shadow-sm">
-                    <div className="card-body p-4 md:p-5">
-                        <div className="flex items-center justify_between">
-                            <h2 className="card-title text-base md:text-lg text-amber-600">Jatuh Tempo</h2>
-                        </div>
-                        <div className="overflow-auto max-h-96">
-                            <table className="table table-xs md:table-sm">
-                                <thead>
-                                    <tr>
-                                        <th>NIP</th>
-                                        <th>Nama</th>
-                                        <th>Rule</th>
-                                        <th>Jatuh Tempo</th>
-                                        <th>Sisa</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {loadingAlert ? (
-                                        Array.from({ length: 6 }).map((_, i) => (
-                                            <tr key={i}>
-                                                <td colSpan={5}>
-                                                    <div className="skeleton h-5 w-full" />
-                                                </td>
-                                            </tr>
-                                        ))
-                                    ) : dueList.length === 0 ? (
-                                        <tr>
-                                            <td colSpan={5} className="text-sm opacity-60">
-                                                Tidak ada data
-                                            </td>
-                                        </tr>
-                                    ) : (
-                                        duePaged.map((x, idx) => {
-                                            const deadline = getDeadline(x);
-                                            const sisa = deadline ? daysBetween(deadline, new Date()) : null;
-                                            return (
-                                                <tr
-                                                    key={idx}
-                                                    className="hover cursor-pointer"
-                                                    onClick={(e) => {
-                                                        e.preventDefault();
-                                                        e.stopPropagation();
-                                                        navigate(getPriorityPath(x));
-                                                    }}
-                                                >
-                                                    <td className="whitespace-nowrap">{x.nip}</td>
-                                                    <td className="whitespace-nowrap">{x.employeeName ?? x.name}</td>
-                                                    <td className="whitespace-nowrap">{getRuleCode(x)}</td>
-                                                    <td className="whitespace-nowrap">{fmtID(deadline)}</td>
-                                                    <td className="whitespace-nowrap text-amber-600">
-                                                        {sisa != null ? `Tinggal ${sisa} hari` : "-"}
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
+                <EligibilityPriorityCard
+                    title="Jatuh Tempo"
+                    status="DUE"
+                    accentClass="text-amber-600"
+                    filters={currentFilters()}
+                    initialRowsPerPage={10}
+                />
 
-                        {dueList.length > 0 && (
-                            <PaginationSimple
-                                page={duePage}
-                                totalPages={dueTotalPages}
-                                totalElements={dueList.length}
-                                rowsPerPage={dueRowsPerPage}
-                                onPageChange={setDuePage}
-                                onRowsPerPageChange={(n) => {
-                                    setDueRowsPerPage(n);
-                                    setDuePage(1);
-                                }}
-                            />
-                        )}
-                    </div>
-                </div>
-
-                {/* Kadaluarsa */}
-                <div className="card bg-base-100 border rounded-2xl shadow-sm">
-                    <div className="card-body p-4 md:p-5">
-                        <div className="flex items-center justify-between">
-                            <h2 className="card-title text-base md:text-lg text-red-600">Kadaluarsa</h2>
-                        </div>
-                        <div className="overflow-auto max-h-96">
-                            <table className="table table-xs md:table-sm">
-                                <thead>
-                                    <tr>
-                                        <th>NIP</th>
-                                        <th>Nama</th>
-                                        <th>Rule</th>
-                                        <th>Jatuh Tempo</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {loadingAlert ? (
-                                        Array.from({ length: 6 }).map((_, i) => (
-                                            <tr key={i}>
-                                                <td colSpan={4}>
-                                                    <div className="skeleton h-5 w-full" />
-                                                </td>
-                                            </tr>
-                                        ))
-                                    ) : expiredList.length === 0 ? (
-                                        <tr>
-                                            <td colSpan={4} className="text-sm opacity-60">
-                                                Tidak ada data
-                                            </td>
-                                        </tr>
-                                    ) : (
-                                        expiredPaged.map((x, idx) => {
-                                            const deadline = getDeadline(x);
-                                            return (
-                                                <tr
-                                                    key={idx}
-                                                    className="hover cursor-pointer"
-                                                    onClick={(e) => {
-                                                        e.preventDefault();
-                                                        e.stopPropagation();
-                                                        navigate(getPriorityPath(x));
-                                                    }}
-                                                >
-                                                    <td className="whitespace-nowrap">{x.nip}</td>
-                                                    <td className="whitespace-nowrap">{x.employeeName ?? x.name}</td>
-                                                    <td className="whitespace-nowrap">{getRuleCode(x)}</td>
-                                                    <td className="whitespace-nowrap">{fmtID(deadline)}</td>
-                                                </tr>
-                                            );
-                                        })
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-
-                        {expiredList.length > 0 && (
-                            <PaginationSimple
-                                page={expiredPage}
-                                totalPages={expiredTotalPages}
-                                totalElements={expiredList.length}
-                                rowsPerPage={expiredRowsPerPage}
-                                onPageChange={setExpiredPage}
-                                onRowsPerPageChange={(n) => {
-                                    setExpiredRowsPerPage(n);
-                                    setExpiredPage(1);
-                                }}
-                            />
-                        )}
-                    </div>
-                </div>
+                <EligibilityPriorityCard
+                    title="Kadaluarsa"
+                    status="EXPIRED"
+                    accentClass="text-red-600"
+                    filters={currentFilters()}
+                    initialRowsPerPage={10}
+                />
             </div>
-            {/* end sections */}
         </div>
     );
 }

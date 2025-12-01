@@ -30,6 +30,7 @@ public class EmployeeBatchService {
     private final EmployeeEligibilityRepository eligibilityRepo;
     private final EmployeeCertificationRepository certificationRepo;
     private final EmployeeCertificationHistoryService historyService;
+    private final EmployeeEligibilityService employeeEligibilityService; // 🔹 NEW: direct refresh
 
     @PersistenceContext
     private EntityManager em;
@@ -51,7 +52,6 @@ public class EmployeeBatchService {
                 .employeeNip(emp != null ? emp.getNip() : null)
                 .employeeName(emp != null ? emp.getName() : null)
 
-                // struktur org
                 .employeeJobName(jp != null ? jp.getName() : null)
                 .employeeDivisionName(div != null ? div.getName() : null)
                 .employeeRegionalName(reg != null ? reg.getName() : null)
@@ -132,7 +132,7 @@ public class EmployeeBatchService {
         return repo.findAll(spec, pageable).map(this::toResponse);
     }
 
-    // ================== ADD SINGLE (restore if soft-deleted) ==================
+    // ================== ADD SINGLE ==================
     @Transactional
     public EmployeeBatchResponse addParticipant(Long batchId, Long employeeId) {
         Batch batch = batchRepo.findByIdAndDeletedAtIsNull(batchId)
@@ -145,7 +145,6 @@ public class EmployeeBatchService {
             throw new IllegalStateException("Quota batch sudah penuh");
         }
 
-        // Gate check
         assertAllowedToJoin(batch, emp);
 
         return repo.findByBatch_IdAndEmployee_Id(batchId, employeeId)
@@ -156,7 +155,7 @@ public class EmployeeBatchService {
                     eb.setDeletedAt(null);
                     eb.setStatus(EmployeeBatch.Status.REGISTERED);
                     if (eb.getProcessType() == null) {
-                        eb.setProcessType(mapProcessType(batch.getType())); // snapshot
+                        eb.setProcessType(mapProcessType(batch.getType()));
                     }
                     eb.setRegistrationDate(LocalDate.now());
                     eb.setUpdatedAt(Instant.now());
@@ -167,7 +166,7 @@ public class EmployeeBatchService {
                             .batch(batch)
                             .employee(emp)
                             .status(EmployeeBatch.Status.REGISTERED)
-                            .processType(mapProcessType(batch.getType())) // snapshot
+                            .processType(mapProcessType(batch.getType()))
                             .registrationDate(LocalDate.now())
                             .createdAt(Instant.now())
                             .updatedAt(Instant.now())
@@ -176,7 +175,7 @@ public class EmployeeBatchService {
                 });
     }
 
-    // ================== ADD BULK (chunk 10 + prefetch) ==================
+    // ================== ADD BULK ==================
     @Transactional
     public List<EmployeeBatchResponse> addParticipantsBulk(Long batchId, List<Long> employeeIds) {
         Batch batch = batchRepo.findByIdAndDeletedAtIsNull(batchId)
@@ -209,7 +208,6 @@ public class EmployeeBatchService {
             if (chunk.isEmpty())
                 break;
 
-            // Prefetch
             Map<Long, Employee> employees = employeeRepo
                     .findByIdInAndDeletedAtIsNull(chunk).stream()
                     .collect(Collectors.toMap(Employee::getId, e -> e));
@@ -238,7 +236,6 @@ public class EmployeeBatchService {
                 if (emp == null)
                     continue;
 
-                // Gate (tanpa query lagi)
                 EmployeeEligibility ee = eligByEmpId.get(empId);
                 if (ee == null || !Boolean.TRUE.equals(ee.getIsActive())) {
                     throw new IllegalStateException("Pegawai " + (emp.getNip() != null ? emp.getNip() : empId)
@@ -250,7 +247,6 @@ public class EmployeeBatchService {
 
                 switch (batch.getType()) {
                     case TRAINING -> {
-                        // semua eligible boleh
                     }
                     case REFRESHMENT -> {
                         if (!alreadyCert) {
@@ -278,7 +274,7 @@ public class EmployeeBatchService {
                 EmployeeBatch eb = existingByEmpId.get(empId);
                 if (eb != null) {
                     if (eb.getDeletedAt() == null)
-                        continue; // sudah aktif
+                        continue;
                     eb.setDeletedAt(null);
                     eb.setStatus(EmployeeBatch.Status.REGISTERED);
                     if (eb.getProcessType() == null)
@@ -312,7 +308,7 @@ public class EmployeeBatchService {
         return responses;
     }
 
-    // ================== UPDATE STATUS (lock PASSED + efek) ==================
+    // ================== UPDATE STATUS ==================
     @Transactional
     public EmployeeBatchResponse updateStatus(Long id, EmployeeBatch.Status status, Integer score, String notes) {
         EmployeeBatch eb = repo.findByIdAndDeletedAtIsNull(id)
@@ -330,7 +326,6 @@ public class EmployeeBatchService {
             throw new IllegalStateException("Peserta harus ATTENDED dulu sebelum PASSED/FAILED");
         }
 
-        // defensive: re-check gate saat attend
         if (status == EmployeeBatch.Status.ATTENDED) {
             assertAllowedToJoin(eb.getBatch(), eb.getEmployee());
         }
@@ -351,7 +346,6 @@ public class EmployeeBatchService {
 
         EmployeeBatch saved = repo.save(eb);
 
-        // Efek ketika lulus
         if (status == EmployeeBatch.Status.PASSED) {
             EmployeeBatch.ProcessType pt = saved.getProcessType() != null
                     ? saved.getProcessType()
@@ -361,17 +355,12 @@ public class EmployeeBatchService {
                 case TRAINING -> incrementTraining(saved);
                 case REFRESHMENT -> incrementRefreshment(saved);
                 case CERTIFICATION -> {
-                    // behavior lama: buat/update sertifikat sebagai SERTIFIKASI + reset
-                    // training/refreshment
                     createOrUpdateCertification(saved);
                     resetCounters(saved);
                 }
                 case EXTENSION -> {
-                    // extension: update masa berlaku sertifikat + naikkan extensionCount
                     createOrUpdateCertificationExtension(saved);
                     incrementExtension(saved);
-                    // tidak reset training/refreshment, karena siklusnya tetap; reset akan terjadi
-                    // saat CERTIFICATION
                 }
             }
         }
@@ -379,7 +368,7 @@ public class EmployeeBatchService {
         return toResponse(saved);
     }
 
-    // ================== RETRY FAILED -> REGISTERED ==================
+    // ================== RETRY FAILED ==================
     @Transactional
     public EmployeeBatchResponse retryFailed(Long id) {
         EmployeeBatch eb = repo.findByIdAndDeletedAtIsNull(id)
@@ -398,8 +387,7 @@ public class EmployeeBatchService {
         return toResponse(repo.save(eb));
     }
 
-    // ================== CERT CREATOR (CERTIFICATION - behavior lama)
-    // ==================
+    // ================== CERT (CERTIFICATION) ==================
     private void createOrUpdateCertification(EmployeeBatch eb) {
         Employee emp = eb.getEmployee();
         CertificationRule rule = eb.getBatch().getCertificationRule();
@@ -470,9 +458,14 @@ public class EmployeeBatchService {
         historyService.snapshot(saved,
                 isNew ? EmployeeCertificationHistory.ActionType.CREATED
                         : EmployeeCertificationHistory.ActionType.UPDATED);
+
+        // 🔹 langsung refresh eligibility pegawai ini
+        if (emp.getId() != null) {
+            employeeEligibilityService.refreshEligibilityForEmployee(emp.getId());
+        }
     }
 
-    // ================== CERT UPDATER UNTUK EXTENSION ==================
+    // ================== CERT (EXTENSION) ==================
     private void createOrUpdateCertificationExtension(EmployeeBatch eb) {
         Employee emp = eb.getEmployee();
         CertificationRule rule = eb.getBatch().getCertificationRule();
@@ -486,7 +479,6 @@ public class EmployeeBatchService {
         LocalDate passDate = eb.getResultDate() != null ? eb.getResultDate() : LocalDate.now();
 
         if (ec == null) {
-            // Secara normal gak kejadian karena gate EXTENSION minta sudah punya sertifikat
             ec = EmployeeCertification.builder()
                     .employee(emp)
                     .certificationRule(rule)
@@ -501,7 +493,6 @@ public class EmployeeBatchService {
                     .build();
             isNew = true;
         } else {
-            // EXTENSION: update tanggal & masa berlaku, tidak ubah certNumber/file
             ec.setCertDate(passDate);
             ec.setProcessType(EmployeeCertification.ProcessType.EXTENSION);
             ec.setUpdatedAt(Instant.now());
@@ -545,6 +536,11 @@ public class EmployeeBatchService {
         historyService.snapshot(saved,
                 isNew ? EmployeeCertificationHistory.ActionType.CREATED
                         : EmployeeCertificationHistory.ActionType.UPDATED);
+
+        // 🔹 langsung refresh eligibility pegawai ini
+        if (emp.getId() != null) {
+            employeeEligibilityService.refreshEligibilityForEmployee(emp.getId());
+        }
     }
 
     // ================== COUNTERS ==================
@@ -573,14 +569,11 @@ public class EmployeeBatchService {
         EmployeeEligibility ee = getActiveEligibilityOrThrow(eb.getEmployee(), eb.getBatch().getCertificationRule());
         ee.setTrainingCount(0);
         ee.setRefreshmentCount(0);
-        // extensionCount sengaja TIDAK di-reset di sini; kalau mau reset saat
-        // CERTIFICATION,
-        // lo bisa tambahin: ee.setExtensionCount(0);
         ee.setUpdatedAt(Instant.now());
         eligibilityRepo.save(ee);
     }
 
-    // ================== SOFT DELETE (hanya REGISTERED) ==================
+    // ================== REMOVE PARTICIPANT ==================
     @Transactional
     public void removeParticipant(Long id) {
         EmployeeBatch eb = repo.findByIdAndDeletedAtIsNull(id)
@@ -595,7 +588,7 @@ public class EmployeeBatchService {
         repo.save(eb);
     }
 
-    // ================== ELIGIBLE (apply gate sesuai tipe batch) ==================
+    // ================== ELIGIBLE LIST ==================
     @Transactional(readOnly = true)
     public List<EmployeeEligibilityResponse> getEligibleEmployeesForBatch(Long batchId) {
         Batch batch = batchRepo.findByIdAndDeletedAtIsNull(batchId)
@@ -651,7 +644,6 @@ public class EmployeeBatchService {
 
         switch (batch.getType()) {
             case TRAINING -> {
-                // semua eligible boleh
             }
             case REFRESHMENT -> {
                 if (!hasCert)
