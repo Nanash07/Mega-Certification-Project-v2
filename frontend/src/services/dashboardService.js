@@ -1,6 +1,6 @@
 // src/services/dashboardService.js
 import api from "./api";
-import { fetchEligibilityKpi } from "./employeeEligibilityService";
+import { fetchEligibilityCount } from "./employeeEligibilityService";
 
 export const MONTHS = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
 
@@ -14,6 +14,7 @@ function normalizeMonthly(raw) {
     if (!raw) return MONTHS.map((label, i) => ({ month: i + 1, label, count: 0 }));
 
     const arr = Array.isArray(raw) ? raw : raw?.months && Array.isArray(raw.months) ? raw.months : null;
+
     if (arr) {
         arr.forEach((it) => {
             const m = Number(it.month ?? it.m ?? it.monthIndex);
@@ -33,21 +34,21 @@ function normalizeMonthly(raw) {
 /** Helper bikin objek aggregate dari SummaryDTO backend */
 function mapSummaryToAggregate(summary) {
     const employeeCount = Number(summary?.employeeCount ?? 0);
-    const certifiedIncDue = Number(summary?.certifiedCount ?? 0);
+    const certifiedIncDue = Number(summary?.certifiedCount ?? 0); // ACTIVE + DUE
     const dueCount = Number(summary?.dueCount ?? 0);
     const expiredCount = Number(summary?.expiredCount ?? 0);
     const notYetCount = Number(summary?.notYetCount ?? 0);
     const eligibleTotal = Number(summary?.eligiblePopulation ?? 0);
     const ongoingBatchCnt = Number(summary?.ongoingBatchCount ?? 0);
 
-    // certifiedIncDue = ACTIVE + DUE (dari backend)
+    // ACTIVE only = (ACTIVE + DUE) - DUE
     const activeOnly = Math.max(0, certifiedIncDue - dueCount);
 
     return {
         summary: {
             employees: { active: employeeCount },
             certifications: {
-                active: certifiedIncDue,
+                active: certifiedIncDue, // definisi "Tersertifikasi" = ACTIVE + DUE
                 due: dueCount,
                 expired: expiredCount,
             },
@@ -68,9 +69,42 @@ function mapSummaryToAggregate(summary) {
 }
 
 /**
+ * Hitung KPI eligibility (ACTIVE, DUE, EXPIRED, NOT_YET_CERTIFIED)
+ * pakai endpoint baru /employee-eligibility/count.
+ * Ini menggantikan fetchEligibilityKpi lama.
+ */
+async function computeEligibilityKpi(filters = {}) {
+    const base = cleanParams(filters);
+    try {
+        const [active, due, expired, notYet] = await Promise.all([
+            fetchEligibilityCount({ ...base, status: "ACTIVE" }),
+            fetchEligibilityCount({ ...base, status: "DUE" }),
+            fetchEligibilityCount({ ...base, status: "EXPIRED" }),
+            fetchEligibilityCount({ ...base, status: "NOT_YET_CERTIFIED" }),
+        ]);
+
+        return {
+            active,
+            due,
+            expired,
+            notYetCertified: notYet,
+            eligibleTotal: active + due + expired + notYet,
+        };
+    } catch (e) {
+        console.error("computeEligibilityKpi error:", e);
+        return {
+            active: 0,
+            due: 0,
+            expired: 0,
+            notYetCertified: 0,
+            eligibleTotal: 0,
+        };
+    }
+}
+
+/**
  * Ambil 3 list prioritas (Belum, DUE, EXPIRED) dari /employee-eligibility/paged
  * dengan filter dashboard (regional/division/unit/cert/level/subField).
- * Backend sudah aware PIC scope.
  */
 async function fetchPriorityLists(filters = {}) {
     const base = cleanParams(filters);
@@ -120,26 +154,35 @@ async function fetchPriorityLists(filters = {}) {
     }
 }
 
-/** =================== SUPERADMIN / PIC =================== */
+/* =================== SUPERADMIN / PIC =================== */
 
 /**
  * Aggregate: summary + monthly + priority.
- * Summary tetap dari /dashboard/summary (yang sekarang sudah pakai eligibility di backend),
- * sedangkan KPI (pie chart) di-override dari /employee-eligibility/dashboard-kpi.
+ * Summary dari /dashboard/summary,
+ * KPI dari eligibility (via /employee-eligibility/count),
+ * monthly dari /batches/monthly.
  */
 export async function fetchDashboardAggregate(params = {}) {
     const filters = cleanParams(params);
 
+    // untuk /batches/monthly → pakai param "type" bukan "batchType"
+    const monthlyParams = { ...filters };
+    if (monthlyParams.batchType) {
+        monthlyParams.type = monthlyParams.batchType;
+        delete monthlyParams.batchType;
+    }
+
     try {
         const [summaryRes, monthlyRes, priorityLists, kpiRes] = await Promise.all([
             api.get(`/dashboard/summary`, { params: filters }),
-            api.get(`/dashboard/monthly`, { params: filters }),
+            api.get(`/batches/monthly`, { params: monthlyParams }),
             fetchPriorityLists(filters),
-            fetchEligibilityKpi(filters),
+            computeEligibilityKpi(filters),
         ]);
 
         const { summary, composition } = mapSummaryToAggregate(summaryRes?.data);
         const monthlyTrend = normalizeMonthly(monthlyRes?.data);
+
         const { notYet, due, expired } = priorityLists;
 
         const kpiStatus = {
@@ -149,7 +192,7 @@ export async function fetchDashboardAggregate(params = {}) {
             notYetCertified: Number(kpiRes?.notYetCertified ?? 0),
         };
 
-        // Sinkronkan total eligibility kalau summary belum isi
+        // Sinkron total eligibility kalau summary belum isi
         if (!summary?.eligibility?.total && kpiRes?.eligibleTotal != null) {
             summary.eligibility.total = Number(kpiRes.eligibleTotal ?? 0);
         }
@@ -177,7 +220,6 @@ export async function fetchDashboardAggregate(params = {}) {
             kpiStatus: { notYetCertified: 0, active: 0, due: 0, expired: 0 },
             composition: [],
             dueTop: [],
-
             expiredTop: [],
             notYetTop: [],
             monthlyTrend: MONTHS.map((label, i) => ({ month: i + 1, label, count: 0 })),
@@ -185,14 +227,14 @@ export async function fetchDashboardAggregate(params = {}) {
     }
 }
 
-/* ==== Wrapper yang lebih spesifik ==== */
+/** Ringkasan + priority list saja (dipakai PIC) */
 export async function fetchDashboardSummary(params = {}) {
     const filters = cleanParams(params);
     try {
         const [summaryRes, priorityLists, kpiRes] = await Promise.all([
             api.get(`/dashboard/summary`, { params: filters }),
             fetchPriorityLists(filters),
-            fetchEligibilityKpi(filters),
+            computeEligibilityKpi(filters),
         ]);
 
         const { summary, composition } = mapSummaryToAggregate(summaryRes?.data);
@@ -237,9 +279,10 @@ export async function fetchDashboardSummary(params = {}) {
     }
 }
 
+/** KPI doang (kalau butuh) */
 export async function fetchKpiStatus(params = {}) {
     try {
-        const kpiRes = await fetchEligibilityKpi(params);
+        const kpiRes = await computeEligibilityKpi(params);
         return {
             active: Number(kpiRes?.active ?? 0),
             due: Number(kpiRes?.due ?? 0),
@@ -252,10 +295,7 @@ export async function fetchKpiStatus(params = {}) {
     }
 }
 
-/**
- * Ongoing batches untuk dashboard (superadmin/PIC) sekarang pakai /batches/paged
- * dengan status=ONGOING. Dipisah dari aggregate.
- */
+/** Ongoing batches (superadmin/PIC) → /batches/paged status=ONGOING */
 export async function fetchOngoingBatchesPaged(params = {}) {
     const { page, size, ...filters } = params;
     const pg = Number.isInteger(page) ? Number(page) : 0;
@@ -283,9 +323,18 @@ export async function fetchOngoingBatchesPaged(params = {}) {
     }
 }
 
+/** Monthly trend (superadmin/PIC) → /batches/monthly */
 export async function fetchMonthlyCertificationTrend(params = {}) {
+    const filters = cleanParams(params);
+    const monthlyParams = { ...filters };
+
+    if (monthlyParams.batchType) {
+        monthlyParams.type = monthlyParams.batchType;
+        delete monthlyParams.batchType;
+    }
+
     try {
-        const { data } = await api.get(`/dashboard/monthly`, { params: cleanParams(params) });
+        const { data } = await api.get(`/batches/monthly`, { params: monthlyParams });
         return normalizeMonthly(data);
     } catch (e) {
         console.error("API error: monthly", e);
@@ -293,7 +342,7 @@ export async function fetchMonthlyCertificationTrend(params = {}) {
     }
 }
 
-/** Ambil opsi filter untuk dropdown FE */
+/** Ambil opsi filter untuk dropdown FE (kalau masih dipakai) */
 export async function fetchDashboardFilters() {
     try {
         const { data } = await api.get(`/dashboard/filters`);
@@ -313,7 +362,7 @@ export async function fetchDashboardFilters() {
     }
 }
 
-/** =================== PEGAWAI (SELF DASHBOARD) =================== */
+/* =================== PEGAWAI (SELF DASHBOARD) =================== */
 
 export async function fetchEmployeeDashboardAggregate(params = {}) {
     const { page, size, ...filters } = params;
@@ -426,10 +475,11 @@ export async function fetchEmployeeDashboardSummary(params = {}) {
     }
 }
 
-/** KPI khusus pegawai */
 export async function fetchEmployeeKpiStatus(params = {}) {
     try {
-        const { data } = await api.get(`/dashboard/employee/summary`, { params: cleanParams(params) });
+        const { data } = await api.get(`/dashboard/employee/summary`, {
+            params: cleanParams(params),
+        });
         return mapSummaryToAggregate(data).kpiStatus;
     } catch (e) {
         console.error("API error: employee KPI", e);
@@ -437,7 +487,6 @@ export async function fetchEmployeeKpiStatus(params = {}) {
     }
 }
 
-/** Ongoing batches (self) lewat endpoint baru /batches/employee/ongoing-paged */
 export async function fetchEmployeeOngoingBatchesPaged(params = {}) {
     const { page, size } = params;
     const pg = Number.isInteger(page) ? Number(page) : 0;
@@ -459,10 +508,11 @@ export async function fetchEmployeeOngoingBatchesPaged(params = {}) {
     }
 }
 
-/** Monthly trend khusus pegawai */
 export async function fetchEmployeeMonthlyCertificationTrend(params = {}) {
     try {
-        const { data } = await api.get(`/dashboard/employee/monthly`, { params: cleanParams(params) });
+        const { data } = await api.get(`/dashboard/employee/monthly`, {
+            params: cleanParams(params),
+        });
         return normalizeMonthly(data);
     } catch (e) {
         console.error("API error: employee monthly", e);

@@ -40,11 +40,10 @@ public class EmployeeEligibilityExceptionController {
             @RequestParam(required = false) List<String> subCodes,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String search,
-            Pageable pageable
-    ) {
+            Pageable pageable) {
         return ResponseEntity.ok(
-                exceptionService.getPagedFiltered(employeeIds, jobIds, certCodes, levels, subCodes, status, search, pageable)
-        );
+                exceptionService.getPagedFiltered(employeeIds, jobIds, certCodes, levels, subCodes, status, search,
+                        pageable));
     }
 
     @GetMapping("/employee/{employeeId}")
@@ -53,17 +52,16 @@ public class EmployeeEligibilityExceptionController {
     }
 
     @PostMapping
-    public ResponseEntity<EmployeeEligibilityExceptionResponse> create(@RequestBody EmployeeEligibilityExceptionRequest req) {
+    public ResponseEntity<EmployeeEligibilityExceptionResponse> create(
+            @RequestBody EmployeeEligibilityExceptionRequest req) {
         return ResponseEntity.ok(
-                exceptionService.create(req.getEmployeeId(), req.getCertificationRuleId(), req.getNotes())
-        );
+                exceptionService.create(req.getEmployeeId(), req.getCertificationRuleId(), req.getNotes()));
     }
 
     @PutMapping("/{id}/notes")
     public ResponseEntity<EmployeeEligibilityExceptionResponse> updateNotes(
             @PathVariable Long id,
-            @RequestParam String notes
-    ) {
+            @RequestParam String notes) {
         return ResponseEntity.ok(exceptionService.updateNotes(id, notes));
     }
 
@@ -88,8 +86,7 @@ public class EmployeeEligibilityExceptionController {
     @PostMapping("/import/dry-run")
     public ResponseEntity<EmployeeEligibilityExceptionImportResponse> dryRun(
             @RequestParam("file") MultipartFile file,
-            @AuthenticationPrincipal UserDetails principal
-    ) throws Exception {
+            @AuthenticationPrincipal UserDetails principal) throws Exception {
         User userEntity = userRepo.findByUsername(principal.getUsername())
                 .orElseThrow(() -> new RuntimeException("User not found"));
         return ResponseEntity.ok(importService.dryRun(file, userEntity));
@@ -98,8 +95,7 @@ public class EmployeeEligibilityExceptionController {
     @PostMapping("/import/confirm")
     public ResponseEntity<EmployeeEligibilityExceptionImportResponse> confirm(
             @RequestParam("file") MultipartFile file,
-            @AuthenticationPrincipal UserDetails principal
-    ) throws Exception {
+            @AuthenticationPrincipal UserDetails principal) throws Exception {
         User userEntity = userRepo.findByUsername(principal.getUsername())
                 .orElseThrow(() -> new RuntimeException("User not found"));
         return ResponseEntity.ok(importService.confirm(file, userEntity));

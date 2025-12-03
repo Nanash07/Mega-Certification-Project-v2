@@ -2,17 +2,16 @@
 package com.bankmega.certification.service;
 
 import com.bankmega.certification.dto.EmployeeEligibilityResponse;
-import com.bankmega.certification.dto.EligibilityKpiResponse;
 import com.bankmega.certification.entity.*;
 import com.bankmega.certification.repository.*;
 import com.bankmega.certification.specification.EmployeeEligibilitySpecification;
+import jakarta.persistence.criteria.JoinType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.*;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import jakarta.persistence.criteria.JoinType;
 import java.time.*;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
@@ -137,14 +136,7 @@ public class EmployeeEligibilityService {
                 .and(EmployeeEligibilitySpecification.byAllowedCertificationIds(allowedCertificationIds))
 
                 // exclude RESIGN / soft-deleted employee
-                .and((root, query, cb) -> {
-                    var emp = root.join("employee", JoinType.INNER);
-                    return cb.and(
-                            cb.isNull(emp.get("deletedAt")),
-                            cb.or(
-                                    cb.isNull(emp.get("status")),
-                                    cb.notEqual(cb.lower(emp.get("status")), cb.literal("resign"))));
-                });
+                .and(excludeResignedEmployee());
 
         if (search != null && !search.isBlank()) {
             spec = spec.and(EmployeeEligibilitySpecification.bySearch(search));
@@ -164,10 +156,17 @@ public class EmployeeEligibilityService {
         return eligibilityRepo.findAll(spec, pageable).map(this::toResponse);
     }
 
-    // ===================== DASHBOARD KPI (PIE CHART DARI ELIGIBILITY)
-    // =====================
-    @Transactional(readOnly = true)
-    public EligibilityKpiResponse getDashboardKpi(
+    // ===================== BASE SPEC DASHBOARD =====================
+
+    /**
+     * Base spec untuk semua perhitungan dashboard:
+     * - notDeleted
+     * - filter org (regional/division/unit)
+     * - filter cert (cert/level/subField)
+     * - PIC scope
+     * - exclude pegawai RESIGN / deleted
+     */
+    private Specification<EmployeeEligibility> buildDashboardBaseSpec(
             Long regionalId,
             Long divisionId,
             Long unitId,
@@ -176,51 +175,59 @@ public class EmployeeEligibilityService {
             Long subFieldId,
             List<Long> allowedCertificationIds) {
 
-        Specification<EmployeeEligibility> baseSpec = EmployeeEligibilitySpecification.notDeleted()
-                // org filter (dashboard)
+        return EmployeeEligibilitySpecification.notDeleted()
+                // org
                 .and(EmployeeEligibilitySpecification.byRegionalId(regionalId))
                 .and(EmployeeEligibilitySpecification.byDivisionId(divisionId))
                 .and(EmployeeEligibilitySpecification.byUnitId(unitId))
-
-                // cert dimension (dashboard)
+                // cert dimension
                 .and(EmployeeEligibilitySpecification.byCertificationId(certificationId))
                 .and(EmployeeEligibilitySpecification.byLevelId(levelId))
                 .and(EmployeeEligibilitySpecification.bySubFieldId(subFieldId))
-
                 // PIC scope
                 .and(EmployeeEligibilitySpecification.byAllowedCertificationIds(allowedCertificationIds))
+                // exclude RESIGN
+                .and(excludeResignedEmployee());
+    }
 
-                // exclude RESIGN / soft-deleted employee
-                .and((root, query, cb) -> {
-                    var emp = root.join("employee", JoinType.INNER);
-                    return cb.and(
-                            cb.isNull(emp.get("deletedAt")),
-                            cb.or(
-                                    cb.isNull(emp.get("status")),
-                                    cb.notEqual(cb.lower(emp.get("status")), cb.literal("resign"))));
-                });
+    private Specification<EmployeeEligibility> excludeResignedEmployee() {
+        return (root, query, cb) -> {
+            var emp = root.join("employee", JoinType.INNER);
+            return cb.and(
+                    cb.isNull(emp.get("deletedAt")),
+                    cb.or(
+                            cb.isNull(emp.get("status")),
+                            cb.notEqual(cb.lower(emp.get("status")), cb.literal("resign"))));
+        };
+    }
 
-        Specification<EmployeeEligibility> activeSpec = baseSpec
-                .and(EmployeeEligibilitySpecification.byStatuses(List.of("ACTIVE")));
-        Specification<EmployeeEligibility> dueSpec = baseSpec
-                .and(EmployeeEligibilitySpecification.byStatuses(List.of("DUE")));
-        Specification<EmployeeEligibility> expiredSpec = baseSpec
-                .and(EmployeeEligibilitySpecification.byStatuses(List.of("EXPIRED")));
-        Specification<EmployeeEligibility> notYetSpec = baseSpec
-                .and(EmployeeEligibilitySpecification.byStatuses(List.of("NOT_YET_CERTIFIED")));
+    // ===================== FLEXIBLE DASHBOARD COUNT =====================
+    @Transactional(readOnly = true)
+    public long countForDashboard(
+            List<String> statuses,
+            Long regionalId,
+            Long divisionId,
+            Long unitId,
+            Long certificationId,
+            Long levelId,
+            Long subFieldId,
+            List<Long> allowedCertificationIds) {
 
-        long active = eligibilityRepo.count(activeSpec);
-        long due = eligibilityRepo.count(dueSpec);
-        long expired = eligibilityRepo.count(expiredSpec);
-        long notYet = eligibilityRepo.count(notYetSpec);
-        long total = active + due + expired + notYet;
+        Specification<EmployeeEligibility> spec = buildDashboardBaseSpec(
+                regionalId,
+                divisionId,
+                unitId,
+                certificationId,
+                levelId,
+                subFieldId,
+                allowedCertificationIds);
 
-        return new EligibilityKpiResponse(
-                active,
-                due,
-                expired,
-                notYet,
-                total);
+        // kalau statuses null/empty => semua status
+        if (statuses != null && !statuses.isEmpty()) {
+            spec = spec.and(EmployeeEligibilitySpecification.byStatuses(statuses));
+        }
+
+        return eligibilityRepo.count(spec);
     }
 
     // ===================== GET ALL BY EMPLOYEE =====================
@@ -455,12 +462,7 @@ public class EmployeeEligibilityService {
             Long ruleId = ee.getCertificationRule() != null ? ee.getCertificationRule().getId() : null;
 
             if (ruleId == null || !requiredIds.contains(ruleId)) {
-
-                // 🔒 FIX:
                 // Jangan matikan eligibility yang sudah pernah punya sertifikat
-                // (status != NOT_YET_CERTIFIED),
-                // supaya data lama yang aktif/telah tersertifikasi tidak "hilang"
-                // hanya karena mapping job berubah.
                 if (ee.getStatus() != null
                         && ee.getStatus() != EmployeeEligibility.EligibilityStatus.NOT_YET_CERTIFIED) {
                     continue;
@@ -509,19 +511,12 @@ public class EmployeeEligibilityService {
         return toSave;
     }
 
-    /**
-     * Sinkron eligibility dari mapping job & exception untuk 1 pegawai (assumed
-     * active),
-     * versi lama (masih dipakai di beberapa tempat) - tetap pakai repo tapi
-     * diarahkan ke versi preload.
-     */
     private List<EmployeeEligibility> syncEligibilitiesForEmployee(
             Employee employee,
             Map<Long, List<CertificationRule>> jobRuleMap,
             Map<Long, List<CertificationRule>> exceptionRuleMap) {
 
         List<EmployeeEligibility> existingElig = eligibilityRepo.findByEmployeeIdAndDeletedAtIsNull(employee.getId());
-
         return syncEligibilitiesForEmployee(employee, existingElig, jobRuleMap, exceptionRuleMap);
     }
 
@@ -548,7 +543,6 @@ public class EmployeeEligibilityService {
                             return d1.isAfter(d2) ? c1 : c2;
                         }));
 
-        // 🔹 Ambil hanya eligibility milik employees tersebut (anti full table scan)
         List<EmployeeEligibility> allEligibilities = eligibilityRepo
                 .findByEmployeeIdInAndDeletedAtIsNull(new HashSet<>(employeeIds));
 

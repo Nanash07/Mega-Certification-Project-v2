@@ -1,3 +1,4 @@
+// src/main/java/com/bankmega/certification/specification/EmployeeEligibilitySpecification.java
 package com.bankmega.certification.specification;
 
 import com.bankmega.certification.entity.EmployeeEligibility;
@@ -131,7 +132,8 @@ public class EmployeeEligibilitySpecification {
     }
 
     /**
-     * PIC scope: list id sertifikasi yang diizinkan. null = full, empty = no rows.
+     * PIC scope: list id sertifikasi yang diizinkan.
+     * null = full access, empty = 0 rows (disjunction).
      */
     public static Specification<EmployeeEligibility> byAllowedCertificationIds(List<Long> allowedCertIds) {
         return (root, query, cb) -> {

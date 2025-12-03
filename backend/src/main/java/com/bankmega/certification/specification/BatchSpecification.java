@@ -2,10 +2,10 @@
 package com.bankmega.certification.specification;
 
 import com.bankmega.certification.entity.Batch;
-import org.springframework.data.jpa.domain.Specification;
-
 import jakarta.persistence.criteria.Join;
 import jakarta.persistence.criteria.JoinType;
+import org.springframework.data.jpa.domain.Specification;
+
 import java.time.LocalDate;
 import java.util.List;
 
@@ -29,6 +29,18 @@ public class BatchSpecification {
         return (root, query, cb) -> status == null
                 ? cb.conjunction()
                 : cb.equal(root.get("status"), status);
+    }
+
+    // NEW: status in ( ... ) untuk monthly chart
+    public static Specification<Batch> byStatuses(List<Batch.Status> statuses) {
+        return (root, query, cb) -> {
+            if (statuses == null || statuses.isEmpty()) {
+                return cb.conjunction();
+            }
+            var in = cb.in(root.get("status"));
+            statuses.forEach(in::value);
+            return in;
+        };
     }
 
     public static Specification<Batch> byType(Batch.BatchType type) {
@@ -93,19 +105,18 @@ public class BatchSpecification {
         };
     }
 
-    // scope organisasi (regional/division/unit) via employee_batches -> employee
+    // scope organisasi (regional/division/unit) via participants -> employee
     public static Specification<Batch> byOrgScope(Long regionalId, Long divisionId, Long unitId) {
         return (root, query, cb) -> {
             if (regionalId == null && divisionId == null && unitId == null) {
                 return cb.conjunction();
             }
 
-            // asumsi: Batch has Set<EmployeeBatch> employeeBatches; EmployeeBatch has
-            // employee; Employee has regional/division/unit rel
-            Join<Object, Object> eb = root.join("employeeBatches", JoinType.LEFT);
+            // Batch has List<EmployeeBatch> participants; EmployeeBatch has employee;
+            // Employee has regional/division/unit
+            Join<Object, Object> eb = root.join("participants", JoinType.LEFT);
             Join<Object, Object> e = eb.join("employee", JoinType.LEFT);
 
-            // (e.id IS NULL OR (filters...))
             var predicates = cb.conjunction();
 
             if (regionalId != null) {
@@ -127,7 +138,7 @@ public class BatchSpecification {
         return (root, query, cb) -> {
             if (employeeId == null)
                 return cb.conjunction();
-            Join<Object, Object> eb = root.join("employeeBatches", JoinType.INNER);
+            Join<Object, Object> eb = root.join("participants", JoinType.INNER);
             Join<Object, Object> e = eb.join("employee", JoinType.INNER);
             return cb.equal(e.get("id"), employeeId);
         };

@@ -1,12 +1,12 @@
 // src/components/dashboards/EligibilityPriorityCard.jsx
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import PaginationSimple from "../common/PaginationSimple";
 import { fetchEmployeeEligibilityPaged } from "../../services/employeeEligibilityService";
 import { formatShortIdDate } from "../../utils/date";
 
 const toDate = (d) => (d ? new Date(d) : null);
-const fmtID = (d) => formatShortIdDate(d);
+const fmtID = (d) => (d ? formatShortIdDate(d) : "-");
 const daysBetween = (a, b) => Math.ceil((a - b) / (1000 * 60 * 60 * 24));
 
 function getDeadline(row) {
@@ -45,6 +45,7 @@ function getPriorityPath(row) {
 
 /**
  * Reusable card untuk list eligibility by status (NOT_YET_CERTIFIED / DUE / EXPIRED)
+ *
  * props:
  * - title: judul card
  * - status: string status eligibility (NOT_YET_CERTIFIED | DUE | EXPIRED)
@@ -62,50 +63,46 @@ export default function EligibilityPriorityCard({
     const navigate = useNavigate();
 
     const [rows, setRows] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false);
     const [page, setPage] = useState(1);
     const [rowsPerPage, setRowsPerPage] = useState(initialRowsPerPage);
     const [totalPages, setTotalPages] = useState(1);
     const [totalElements, setTotalElements] = useState(0);
 
-    async function load(p = 1, rowsOverride) {
-        setLoading(true);
-        try {
-            const size = rowsOverride ?? rowsPerPage;
-            const res = await fetchEmployeeEligibilityPaged({
-                ...filters,
-                statuses: [status],
-                page: p - 1,
-                size,
-            });
-            const content = Array.isArray(res?.content) ? res.content : [];
-            setRows(content);
-            setTotalPages(res?.totalPages || 1);
-            setTotalElements(res?.totalElements || content.length || 0);
-            setPage(p);
-        } finally {
-            setLoading(false);
-        }
-    }
+    const load = useCallback(
+        async (p = 1, rowsOverride) => {
+            setLoading(true);
+            try {
+                const size = rowsOverride ?? rowsPerPage;
+                const res = await fetchEmployeeEligibilityPaged({
+                    ...filters,
+                    statuses: [status],
+                    page: p - 1,
+                    size,
+                });
+
+                const content = Array.isArray(res?.content) ? res.content : [];
+                setRows(content);
+                setTotalPages(res?.totalPages || 1);
+                setTotalElements(res?.totalElements || content.length || 0);
+                setPage(p);
+            } finally {
+                setLoading(false);
+            }
+        },
+        [filters, status, rowsPerPage]
+    );
 
     useEffect(() => {
         setPage(1);
         load(1);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [
-        status,
-        filters.divisionId,
-        filters.regionalId,
-        filters.unitId,
-        filters.certificationId,
-        filters.levelId,
-        filters.subFieldId,
-        filters.employeeId,
-    ]);
+    }, [load]);
 
     const isNotYet = status === "NOT_YET_CERTIFIED";
     const isDue = status === "DUE";
     const isExpired = status === "EXPIRED";
+
+    const colSpan = isDue ? 5 : isExpired ? 4 : 3;
 
     return (
         <div className="card bg-base-100 border rounded-2xl shadow-sm">
@@ -113,6 +110,7 @@ export default function EligibilityPriorityCard({
                 <div className="flex items-center justify-between">
                     <h2 className={`card-title text-base md:text-lg ${accentClass}`}>{title}</h2>
                 </div>
+
                 <div className="mt-2 overflow-x-auto">
                     <table className="table table-xs md:table-sm">
                         <thead>
@@ -128,14 +126,14 @@ export default function EligibilityPriorityCard({
                             {loading ? (
                                 Array.from({ length: 6 }).map((_, i) => (
                                     <tr key={i}>
-                                        <td colSpan={isDue ? 5 : isExpired ? 4 : 3}>
+                                        <td colSpan={colSpan}>
                                             <div className="skeleton h-5 w-full" />
                                         </td>
                                     </tr>
                                 ))
                             ) : rows.length === 0 ? (
                                 <tr>
-                                    <td colSpan={isDue ? 5 : isExpired ? 4 : 3} className="text-sm opacity-60">
+                                    <td colSpan={colSpan} className="text-sm opacity-60">
                                         Tidak ada data
                                     </td>
                                 </tr>
@@ -156,14 +154,14 @@ export default function EligibilityPriorityCard({
                                             <td className="whitespace-nowrap">{x.nip}</td>
                                             <td className="whitespace-nowrap">{x.employeeName ?? x.name}</td>
                                             <td className="whitespace-nowrap">{getRuleCode(x)}</td>
-                                            {isDue || isExpired ? (
+                                            {(isDue || isExpired) && (
                                                 <td className="whitespace-nowrap">{fmtID(deadline)}</td>
-                                            ) : null}
-                                            {isDue ? (
+                                            )}
+                                            {isDue && (
                                                 <td className="whitespace-nowrap text-amber-600">
                                                     {sisa != null ? `Tinggal ${sisa} hari` : "-"}
                                                 </td>
-                                            ) : null}
+                                            )}
                                         </tr>
                                     );
                                 })

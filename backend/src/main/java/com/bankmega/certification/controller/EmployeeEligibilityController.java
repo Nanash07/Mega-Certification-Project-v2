@@ -2,7 +2,7 @@
 package com.bankmega.certification.controller;
 
 import com.bankmega.certification.dto.EmployeeEligibilityResponse;
-import com.bankmega.certification.dto.EligibilityKpiResponse;
+import com.bankmega.certification.dto.dashboard.EligibilityCountResponse;
 import com.bankmega.certification.entity.PicCertificationScope;
 import com.bankmega.certification.repository.PicCertificationScopeRepository;
 import com.bankmega.certification.service.EmployeeEligibilityService;
@@ -53,6 +53,32 @@ public class EmployeeEligibilityController {
         return null;
     }
 
+    /**
+     * Resolve daftar certification.id yang boleh diakses PIC.
+     * - non-PIC -> return null (tanpa filter scope)
+     * - PIC tanpa userId -> empty list (artinya 0 data)
+     * - PIC tanpa scope -> empty list (artinya 0 data)
+     */
+    private List<Long> resolveAllowedCertIds(Authentication authentication, Long userIdFromPrincipal) {
+        if (!isPic(authentication)) {
+            return null; // non-PIC: tidak dibatasi scope cert
+        }
+
+        Long uid = extractUserId(authentication, userIdFromPrincipal);
+        if (uid == null) {
+            // nggak bisa identifikasi user PIC -> treat as no scope -> 0 data
+            return List.of();
+        }
+
+        List<Long> ids = scopeRepo.findByUser_Id(uid).stream()
+                .map(PicCertificationScope::getCertification)
+                .map(c -> c.getId())
+                .collect(Collectors.toList());
+
+        // Kalau kosong -> PIC tanpa scope -> 0 data
+        return ids;
+    }
+
     // ===================== PAGED FILTERED =====================
     @GetMapping("/paged")
     public ResponseEntity<Page<EmployeeEligibilityResponse>> getPagedFiltered(
@@ -77,27 +103,11 @@ public class EmployeeEligibilityController {
             @AuthenticationPrincipal(expression = "id") Long userIdFromPrincipal,
             Pageable pageable) {
 
-        // ===== PIC scope handling =====
-        List<Long> allowedCertIds = null;
+        List<Long> allowedCertIds = resolveAllowedCertIds(authentication, userIdFromPrincipal);
 
-        if (isPic(authentication)) {
-            Long uid = extractUserId(authentication, userIdFromPrincipal);
-            if (uid == null) {
-                // tidak bisa identifikasi user PIC -> aman: 0 data
-                Page<EmployeeEligibilityResponse> empty = Page.empty(pageable);
-                return ResponseEntity.ok(empty);
-            }
-
-            allowedCertIds = scopeRepo.findByUser_Id(uid).stream()
-                    .map(PicCertificationScope::getCertification)
-                    .map(c -> c.getId())
-                    .collect(Collectors.toList());
-
-            if (allowedCertIds.isEmpty()) {
-                // PIC tanpa scope -> 0 data
-                Page<EmployeeEligibilityResponse> empty = Page.empty(pageable);
-                return ResponseEntity.ok(empty);
-            }
+        // kalau PIC & nggak punya scope -> langsung 0 data
+        if (allowedCertIds != null && allowedCertIds.isEmpty()) {
+            return ResponseEntity.ok(Page.empty(pageable));
         }
 
         Page<EmployeeEligibilityResponse> result = service.getPagedFiltered(
@@ -121,10 +131,13 @@ public class EmployeeEligibilityController {
         return ResponseEntity.ok(result);
     }
 
-    // ===================== DASHBOARD KPI (PIE CHART DARI ELIGIBILITY)
-    // =====================
-    @GetMapping("/dashboard-kpi")
-    public ResponseEntity<EligibilityKpiResponse> getDashboardKpi(
+    // ===================== FLEXIBLE COUNT (GANTI KPI) =====================
+    @GetMapping("/count")
+    public ResponseEntity<EligibilityCountResponse> getDashboardCount(
+            // optional: 1 status atau multiple
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) List<String> statuses,
+
             // filter "dashboard"
             @RequestParam(required = false) Long regionalId,
             @RequestParam(required = false) Long divisionId,
@@ -136,28 +149,23 @@ public class EmployeeEligibilityController {
             Authentication authentication,
             @AuthenticationPrincipal(expression = "id") Long userIdFromPrincipal) {
 
-        // ===== PIC scope handling (sama seperti /paged) =====
-        List<Long> allowedCertIds = null;
-
-        if (isPic(authentication)) {
-            Long uid = extractUserId(authentication, userIdFromPrincipal);
-            if (uid == null) {
-                // tidak bisa identifikasi user PIC -> aman: 0 data
-                return ResponseEntity.ok(new EligibilityKpiResponse(0L, 0L, 0L, 0L, 0L));
-            }
-
-            allowedCertIds = scopeRepo.findByUser_Id(uid).stream()
-                    .map(PicCertificationScope::getCertification)
-                    .map(c -> c.getId())
-                    .collect(Collectors.toList());
-
-            if (allowedCertIds.isEmpty()) {
-                // PIC tanpa scope -> 0 data
-                return ResponseEntity.ok(new EligibilityKpiResponse(0L, 0L, 0L, 0L, 0L));
-            }
+        List<Long> allowedCertIds = resolveAllowedCertIds(authentication, userIdFromPrincipal);
+        if (allowedCertIds != null && allowedCertIds.isEmpty()) {
+            return ResponseEntity.ok(new EligibilityCountResponse(0L));
         }
 
-        EligibilityKpiResponse kpi = service.getDashboardKpi(
+        // normalisasi status
+        List<String> effectiveStatuses;
+        if (statuses != null && !statuses.isEmpty()) {
+            effectiveStatuses = statuses;
+        } else if (status != null && !status.isBlank()) {
+            effectiveStatuses = List.of(status);
+        } else {
+            effectiveStatuses = null; // semua status
+        }
+
+        long count = service.countForDashboard(
+                effectiveStatuses,
                 regionalId,
                 divisionId,
                 unitId,
@@ -166,7 +174,7 @@ public class EmployeeEligibilityController {
                 subFieldId,
                 allowedCertIds);
 
-        return ResponseEntity.ok(kpi);
+        return ResponseEntity.ok(new EligibilityCountResponse(count));
     }
 
     // ===================== GET BY EMPLOYEE (DETAIL PAGE) =====================

@@ -1,3 +1,4 @@
+// src/main/java/com/bankmega/certification/repository/JdbcDashboardRepository.java
 package com.bankmega.certification.repository;
 
 import com.bankmega.certification.dto.dashboard.*;
@@ -121,9 +122,7 @@ public class JdbcDashboardRepository implements DashboardRepository {
         if (f.getEndDate() != null) {
             p.addValue("endDate", f.getEndDate());
         }
-        if (f.getBatchType() != null) {
-            p.addValue("batchType", f.getBatchType());
-        }
+        // ❌ batchType sudah tidak dipakai lagi
         return p;
     }
 
@@ -212,37 +211,4 @@ public class JdbcDashboardRepository implements DashboardRepository {
                 ((Number) r.get("ongoing_batch_count")).longValue());
     }
 
-    @Override
-    public List<MonthlyPoint> fetchMonthly(DashboardFilters f) {
-        MapSqlParameterSource p = baseParams(f);
-        String ruleWhere = whereRule("cr", f, p);
-
-        StringBuilder dateClause = new StringBuilder();
-        if (f.getStartDate() != null) {
-            dateClause.append(" AND b.start_date >= :startDate");
-        }
-        if (f.getEndDate() != null) {
-            dateClause.append(" AND b.start_date <= :endDate");
-        }
-
-        String typeClause = "";
-        if (f.getBatchType() != null) {
-            typeClause = " AND b.type = :batchType";
-        }
-
-        String sql = """
-                SELECT EXTRACT(MONTH FROM b.start_date)::int AS m, COUNT(*) AS c
-                FROM batches b
-                JOIN certification_rules cr ON cr.id = b.certification_rule_id
-                WHERE b.deleted_at IS NULL
-                  AND b.status IN ('ONGOING','FINISHED')
-                  %s
-                  %s
-                  %s
-                GROUP BY m
-                ORDER BY m;
-                """.formatted(ruleWhere, dateClause.toString(), typeClause);
-
-        return jdbc.query(sql, p, (rs, i) -> new MonthlyPoint(rs.getInt("m"), rs.getLong("c")));
-    }
 }

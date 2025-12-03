@@ -1,4 +1,3 @@
-// src/services/batchService.js
 import api from "./api";
 
 const BASE = "/batches";
@@ -19,7 +18,11 @@ function buildParams(params = {}) {
     // filter umum
     set("batchIds", params.batchIds); // BE sekarang nggak pakai, tapi gak masalah kalau kepasang
     set("status", params.status);
-    set("type", params.type);
+
+    // 🔹 support param `type` dan juga alias `batchType` dari dashboard
+    const resolvedType = params.type ?? params.batchType;
+    set("type", resolvedType);
+
     set("certificationRuleId", params.certificationRuleId);
     set("institutionId", params.institutionId);
     set("search", params.search);
@@ -44,8 +47,6 @@ function buildParams(params = {}) {
 }
 
 // ================== BATCH CRUD ==================
-
-// 🔹 Paging + Filter + Search (tabel list & dashboard)
 export async function fetchBatches(params = {}) {
     try {
         const { data } = await api.get(`${BASE}/paged`, { params: buildParams(params) });
@@ -62,7 +63,6 @@ export async function fetchBatches(params = {}) {
     }
 }
 
-// 🔹 Create batch
 export async function createBatch(payload) {
     try {
         const { data } = await api.post(BASE, payload);
@@ -73,7 +73,6 @@ export async function createBatch(payload) {
     }
 }
 
-// 🔹 Update batch
 export async function updateBatch(id, payload) {
     try {
         const { data } = await api.put(`${BASE}/${id}`, payload);
@@ -84,7 +83,6 @@ export async function updateBatch(id, payload) {
     }
 }
 
-// 🔹 Delete batch (soft delete)
 export async function deleteBatch(id) {
     try {
         await api.delete(`${BASE}/${id}`);
@@ -95,7 +93,6 @@ export async function deleteBatch(id) {
     }
 }
 
-// 🔹 Search batch (async select di dropdown)
 export async function searchBatches({ search, page = 0, size = 20 } = {}) {
     try {
         const { data } = await api.get(`${BASE}/paged`, {
@@ -114,7 +111,6 @@ export async function searchBatches({ search, page = 0, size = 20 } = {}) {
     }
 }
 
-// 🔹 Get batch detail by ID
 export async function fetchBatchById(id) {
     try {
         const { data } = await api.get(`${BASE}/${id}`);
@@ -125,7 +121,6 @@ export async function fetchBatchById(id) {
     }
 }
 
-// 🔹 Kirim email notifikasi ke peserta batch
 export async function sendBatchNotifications(batchId, { status } = {}) {
     try {
         const { data } = await api.post(`/notifications/batches/${batchId}/send`, null, {
@@ -138,7 +133,6 @@ export async function sendBatchNotifications(batchId, { status } = {}) {
     }
 }
 
-// 🔹 Batch berjalan khusus Pegawai (self dashboard)
 export async function fetchEmployeeOngoingBatchesPaged({ page = 0, size = 10 } = {}) {
     try {
         const { data } = await api.get(`${BASE}/employee/ongoing-paged`, {
@@ -154,5 +148,39 @@ export async function fetchEmployeeOngoingBatchesPaged({ page = 0, size = 10 } =
     } catch (err) {
         console.error("fetchEmployeeOngoingBatchesPaged error:", err);
         return { content: [], totalPages: 0, totalElements: 0 };
+    }
+}
+
+// tetap boleh dipakai di tempat lain
+export async function fetchMonthlyBatches(params = {}) {
+    try {
+        const { data } = await api.get(`${BASE}/monthly`, {
+            params,
+        });
+        return Array.isArray(data) ? data : [];
+    } catch (err) {
+        console.error("fetchMonthlyBatches error:", err);
+        return [];
+    }
+}
+// ================== BATCH COUNT (DASHBOARD) ==================
+export async function fetchBatchCount(params = {}) {
+    try {
+        const { data } = await api.get(`${BASE}/count`, {
+            params: {
+                status: params.status,
+                type: params.type,
+                regionalId: params.regionalId,
+                divisionId: params.divisionId,
+                unitId: params.unitId,
+                certificationId: params.certificationId,
+                levelId: params.levelId,
+                subFieldId: params.subFieldId,
+            },
+        });
+        return Number(data?.count ?? 0);
+    } catch (err) {
+        console.error("fetchBatchCount error:", err);
+        return 0;
     }
 }

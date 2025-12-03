@@ -1,7 +1,9 @@
+// src/main/java/com/bankmega/certification/service/BatchService.java
 package com.bankmega.certification.service;
 
 import com.bankmega.certification.dto.BatchRequest;
 import com.bankmega.certification.dto.BatchResponse;
+import com.bankmega.certification.dto.dashboard.MonthlyPoint;
 import com.bankmega.certification.entity.Batch;
 import com.bankmega.certification.entity.CertificationRule;
 import com.bankmega.certification.entity.EmployeeBatch;
@@ -21,7 +23,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 @Service
 @RequiredArgsConstructor
@@ -157,6 +162,83 @@ public class BatchService {
         }
 
         return batchRepository.findAll(spec, pageable).map(this::toResponse);
+    }
+
+    // ============================================================
+    // DASHBOARD COUNT (summary batch) - fleksibel by status
+    // ============================================================
+    @Transactional(readOnly = true)
+    public long countForDashboard(
+            List<Batch.Status> statuses,
+            Batch.BatchType type,
+            Long certificationRuleId,
+            Long institutionId,
+            Long regionalId,
+            Long divisionId,
+            Long unitId,
+            Long certificationId,
+            Long levelId,
+            Long subFieldId,
+            LocalDate startDate,
+            LocalDate endDate,
+            List<Long> allowedCertificationIds,
+            Long employeeId) {
+        Specification<Batch> spec = BatchSpecification.notDeleted()
+                .and(BatchSpecification.byStatuses(statuses)) // boleh multi status atau null (semua)
+                .and(BatchSpecification.byType(type))
+                .and(BatchSpecification.byCertificationRule(certificationRuleId))
+                .and(BatchSpecification.byInstitution(institutionId))
+                .and(BatchSpecification.byOrgScope(regionalId, divisionId, unitId))
+                .and(BatchSpecification.byCertification(certificationId))
+                .and(BatchSpecification.byCertificationLevel(levelId))
+                .and(BatchSpecification.bySubField(subFieldId))
+                .and(BatchSpecification.byAllowedCertifications(allowedCertificationIds))
+                .and(BatchSpecification.byEmployee(employeeId))
+                .and(BatchSpecification.byDateRange(startDate, endDate));
+
+        return batchRepository.count(spec);
+    }
+
+    // ============================================================
+    // MONTHLY COUNT UNTUK DASHBOARD
+    // ============================================================
+    @Transactional(readOnly = true)
+    public List<MonthlyPoint> monthlyBatchCount(
+            Long regionalId,
+            Long divisionId,
+            Long unitId,
+            Long certificationId,
+            Long levelId,
+            Long subFieldId,
+            LocalDate startDate,
+            LocalDate endDate,
+            Batch.BatchType type,
+            List<Long> allowedCertificationIds) {
+        // status default: ONGOING + FINISHED (sama kayak query JDBC sebelumnya)
+        List<Batch.Status> statuses = List.of(Batch.Status.ONGOING, Batch.Status.FINISHED);
+
+        Specification<Batch> spec = BatchSpecification.notDeleted()
+                .and(BatchSpecification.byStatuses(statuses))
+                .and(BatchSpecification.byType(type))
+                .and(BatchSpecification.byOrgScope(regionalId, divisionId, unitId))
+                .and(BatchSpecification.byCertification(certificationId))
+                .and(BatchSpecification.byCertificationLevel(levelId))
+                .and(BatchSpecification.bySubField(subFieldId))
+                .and(BatchSpecification.byAllowedCertifications(allowedCertificationIds))
+                .and(BatchSpecification.byDateRange(startDate, endDate));
+
+        List<Batch> batches = batchRepository.findAll(spec);
+
+        Map<Integer, Long> grouped = batches.stream()
+                .filter(b -> b.getStartDate() != null)
+                .collect(Collectors.groupingBy(
+                        b -> b.getStartDate().getMonthValue(),
+                        Collectors.counting()));
+
+        // selalu balikin 12 bulan (Jan–Des)
+        return IntStream.rangeClosed(1, 12)
+                .mapToObj(m -> new MonthlyPoint(m, grouped.getOrDefault(m, 0L)))
+                .collect(Collectors.toList());
     }
 
     // ============================================================

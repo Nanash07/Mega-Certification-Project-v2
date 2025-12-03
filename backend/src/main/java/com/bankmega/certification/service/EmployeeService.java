@@ -1,3 +1,4 @@
+// src/main/java/com/bankmega/certification/service/EmployeeService.java
 package com.bankmega.certification.service;
 
 import com.bankmega.certification.dto.EmployeeRequest;
@@ -89,6 +90,17 @@ public class EmployeeService {
                 }
 
                 return repo.findAll(spec, pageable).map(this::toResponse);
+        }
+
+        // ====================== COUNT ACTIVE (DASHBOARD) ======================
+        @Transactional(readOnly = true)
+        public long countActive(Long regionalId, Long divisionId, Long unitId) {
+                Specification<Employee> spec = EmployeeSpecification.notDeleted()
+                                .and(EmployeeSpecification.byRegionalId(regionalId))
+                                .and(EmployeeSpecification.byDivisionId(divisionId))
+                                .and(EmployeeSpecification.byUnitId(unitId));
+
+                return repo.count(spec);
         }
 
         // ====================== GET DETAIL (ACTIVE + RESIGNED) ======================

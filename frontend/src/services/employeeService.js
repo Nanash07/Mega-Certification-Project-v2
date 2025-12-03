@@ -221,3 +221,19 @@ export async function fetchJobPositions() {
         return [];
     }
 }
+// ================== EMPLOYEE COUNT (DASHBOARD) ==================
+export async function fetchEmployeeCount(params = {}) {
+    try {
+        const { data } = await api.get(`${EMPLOYEE_BASE}/count`, {
+            params: {
+                regionalId: params.regionalId,
+                divisionId: params.divisionId,
+                unitId: params.unitId,
+            },
+        });
+        return Number(data?.count ?? 0);
+    } catch (err) {
+        console.error("fetchEmployeeCount error:", err);
+        return 0;
+    }
+}

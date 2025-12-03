@@ -3,6 +3,8 @@ package com.bankmega.certification.controller;
 
 import com.bankmega.certification.dto.BatchRequest;
 import com.bankmega.certification.dto.BatchResponse;
+import com.bankmega.certification.dto.dashboard.BatchCountResponse;
+import com.bankmega.certification.dto.dashboard.MonthlyPoint;
 import com.bankmega.certification.entity.Batch;
 import com.bankmega.certification.entity.PicCertificationScope;
 import com.bankmega.certification.repository.PicCertificationScopeRepository;
@@ -56,14 +58,22 @@ public class BatchController {
 
     private List<Long> resolveAllowedCertIds(Authentication auth, Long userIdFromPrincipal) {
         if (!isPic(auth))
-            return null;
+            return null; // non-PIC: tidak dibatasi scope sertifikasi
+
         Long uid = extractUserId(auth, userIdFromPrincipal);
         if (uid == null)
             return List.of(-1L); // sentinel kosong
-        return scopeRepo.findByUser_Id(uid).stream()
+
+        List<Long> ids = scopeRepo.findByUser_Id(uid).stream()
                 .map(PicCertificationScope::getCertification)
                 .map(c -> c.getId())
                 .collect(Collectors.toList());
+
+        // 🔐 PIC tanpa scope apapun -> pakai sentinel supaya hasil selalu kosong
+        if (ids.isEmpty()) {
+            return List.of(-1L);
+        }
+        return ids;
     }
 
     // 🔹 Create
@@ -117,6 +127,88 @@ public class BatchController {
                 pageable);
 
         return ResponseEntity.ok(result);
+    }
+
+    // 🔹 Summary count untuk dashboard (Superadmin / PIC)
+    @GetMapping("/dashboard-count")
+    public BatchCountResponse dashboardCount(
+            // bisa kirim 1 status atau banyak
+            @RequestParam(required = false) Batch.Status status,
+            @RequestParam(required = false) List<Batch.Status> statuses,
+            @RequestParam(required = false) Batch.BatchType type,
+            @RequestParam(required = false) Long certificationRuleId,
+            @RequestParam(required = false) Long institutionId,
+            @RequestParam(required = false) Long regionalId,
+            @RequestParam(required = false) Long divisionId,
+            @RequestParam(required = false) Long unitId,
+            @RequestParam(required = false) Long certificationId,
+            @RequestParam(required = false) Long levelId,
+            @RequestParam(required = false) Long subFieldId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            Authentication auth,
+            @AuthenticationPrincipal(expression = "id") Long userId) {
+        List<Long> allowedCertIds = resolveAllowedCertIds(auth, userId);
+
+        // Normalisasi: kalau FE kirim 'statuses' pakai itu, kalau nggak fallback ke
+        // 'status'
+        List<Batch.Status> effectiveStatuses;
+        if (statuses != null && !statuses.isEmpty()) {
+            effectiveStatuses = statuses;
+        } else if (status != null) {
+            effectiveStatuses = List.of(status);
+        } else {
+            effectiveStatuses = null; // null -> semua status
+        }
+
+        long count = batchService.countForDashboard(
+                effectiveStatuses,
+                type,
+                certificationRuleId,
+                institutionId,
+                regionalId,
+                divisionId,
+                unitId,
+                certificationId,
+                levelId,
+                subFieldId,
+                startDate,
+                endDate,
+                allowedCertIds,
+                null // employeeId (khusus self endpoint)
+        );
+
+        return new BatchCountResponse(count);
+    }
+
+    // 🔹 Monthly batch chart untuk dashboard (Superadmin / PIC)
+    @GetMapping("/monthly")
+    public List<MonthlyPoint> monthly(
+            @RequestParam(required = false) Long regionalId,
+            @RequestParam(required = false) Long divisionId,
+            @RequestParam(required = false) Long unitId,
+            @RequestParam(required = false) Long certificationId,
+            @RequestParam(required = false) Long levelId,
+            @RequestParam(required = false) Long subFieldId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(required = false) Batch.BatchType type,
+            Authentication auth,
+            @AuthenticationPrincipal(expression = "id") Long userId) {
+
+        List<Long> allowedCertIds = resolveAllowedCertIds(auth, userId);
+
+        return batchService.monthlyBatchCount(
+                regionalId,
+                divisionId,
+                unitId,
+                certificationId,
+                levelId,
+                subFieldId,
+                startDate,
+                endDate,
+                type,
+                allowedCertIds);
     }
 
     // 🔹 Batch berjalan khusus Pegawai (self)

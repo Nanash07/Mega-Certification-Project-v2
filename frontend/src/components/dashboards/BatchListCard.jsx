@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+// src/components/dashboards/BatchListCard.jsx
+import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import PaginationSimple from "../common/PaginationSimple";
 import { fetchBatches } from "../../services/batchService";
@@ -41,59 +42,55 @@ function QuotaBar({ filled, quota }) {
 }
 
 /**
- * Komponen batch list reusable
+ * Komponen batch list reusable (data di-load sendiri)
+ *
  * props:
  * - title: string
  * - status: "ONGOING" | "FINISHED"
- * - filters: filter dashboard (regional, division, unit, certification)
+ * - filters: filter dashboard (regionalId, divisionId, unitId, certificationId, levelId, subFieldId)
  * - initialRows: default 5
  */
 export default function BatchListCard({ title, status, filters = {}, initialRows = 5 }) {
     const navigate = useNavigate();
 
     const [rows, setRows] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false);
     const [page, setPage] = useState(1);
     const [rowsPerPage, setRowsPerPage] = useState(initialRows);
     const [totalPages, setTotalPages] = useState(1);
     const [totalElements, setTotalElements] = useState(0);
 
-    async function load(p = 1, rowsOverride) {
-        setLoading(true);
-        try {
-            const size = rowsOverride ?? rowsPerPage;
-            const res = await fetchBatches({
-                ...filters,
-                status,
-                page: p - 1,
-                size,
-                sortField: status === "ONGOING" ? "startDate" : "endDate",
-                sortDirection: "desc",
-            });
+    const load = useCallback(
+        async (p = 1, rowsOverride) => {
+            setLoading(true);
+            try {
+                const size = rowsOverride ?? rowsPerPage;
+                const res = await fetchBatches({
+                    ...filters,
+                    status,
+                    page: p - 1,
+                    size,
+                    sortField: status === "ONGOING" ? "startDate" : "endDate",
+                    sortDirection: "desc",
+                });
 
-            const content = Array.isArray(res?.content) ? res.content : [];
-            setRows(content);
-            setTotalPages(res?.totalPages || 1);
-            setTotalElements(res?.totalElements || content.length);
-            setPage(p);
-        } finally {
-            setLoading(false);
-        }
-    }
+                const content = Array.isArray(res?.content) ? res.content : [];
+                setRows(content);
+                setTotalPages(res?.totalPages || 1);
+                setTotalElements(res?.totalElements || content.length || 0);
+                setPage(p);
+            } finally {
+                setLoading(false);
+            }
+        },
+        [filters, status, rowsPerPage]
+    );
 
     useEffect(() => {
+        // reset ke page 1 setiap filter/status berubah
         setPage(1);
         load(1);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [
-        status,
-        filters.regionalId,
-        filters.divisionId,
-        filters.unitId,
-        filters.certificationId,
-        filters.levelId,
-        filters.subFieldId,
-    ]);
+    }, [load]);
 
     return (
         <div className="card bg-base-100 border rounded-2xl shadow-sm">
@@ -101,7 +98,7 @@ export default function BatchListCard({ title, status, filters = {}, initialRows
                 <h2 className="card-title text-base md:text-lg">{title}</h2>
 
                 <div className="mt-2">
-                    {rows.length === 0 && loading ? (
+                    {loading && rows.length === 0 ? (
                         <div className="space-y-2">
                             {Array.from({ length: 4 }).map((_, i) => (
                                 <div key={i} className="skeleton h-14 w-full rounded-xl" />
@@ -125,6 +122,7 @@ export default function BatchListCard({ title, status, filters = {}, initialRows
                                 return (
                                     <li key={b.id} className="!p-0">
                                         <button
+                                            type="button"
                                             className="w-full text-left hover:bg-base-200 rounded-xl p-2"
                                             onClick={() => navigate(`/batch/${b.id}`)}
                                         >

@@ -67,40 +67,23 @@ export async function refreshEmployeeEligibility() {
     }
 }
 
-/**
- * KPI untuk dashboard (pie chart) langsung dari employee_eligibility.
- * Endpoint: GET /employee-eligibility/dashboard-kpi
- */
-export async function fetchEligibilityKpi(params = {}) {
+// ================== ELIGIBILITY COUNT (DASHBOARD) ==================
+export async function fetchEligibilityCount(params = {}) {
     try {
-        // Kirim cuma filter dashboard (tanpa paging / search)
-        const q = buildParams({
-            regionalId: params.regionalId,
-            divisionId: params.divisionId,
-            unitId: params.unitId,
-            certificationId: params.certificationId,
-            levelId: params.levelId,
-            subFieldId: params.subFieldId,
+        const { data } = await api.get(`${BASE}/count`, {
+            params: {
+                status: params.status, // ACTIVE, DUE, EXPIRED, NOT_YET_CERTIFIED
+                regionalId: params.regionalId,
+                divisionId: params.divisionId,
+                unitId: params.unitId,
+                certificationId: params.certificationId,
+                levelId: params.levelId,
+                subFieldId: params.subFieldId,
+            },
         });
-
-        const { data } = await api.get(`${BASE}/dashboard-kpi`, { params: q });
-        const safe = data || {};
-
-        return {
-            active: Number(safe.active ?? 0),
-            due: Number(safe.due ?? 0),
-            expired: Number(safe.expired ?? 0),
-            notYetCertified: Number(safe.notYetCertified ?? 0),
-            eligibleTotal: Number(safe.eligibleTotal ?? 0),
-        };
+        return Number(data?.count ?? 0);
     } catch (err) {
-        console.error("fetchEligibilityKpi:", err);
-        return {
-            active: 0,
-            due: 0,
-            expired: 0,
-            notYetCertified: 0,
-            eligibleTotal: 0,
-        };
+        console.error("fetchEligibilityCount error:", err);
+        return 0;
     }
 }

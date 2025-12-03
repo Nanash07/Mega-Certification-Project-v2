@@ -4,8 +4,7 @@ import { useNavigate } from "react-router-dom";
 import api from "../../services/api";
 import Select from "react-select";
 
-import { fetchDashboardAggregate, MONTHS } from "../../services/dashboardService";
-import { fetchBatches } from "../../services/batchService";
+import { fetchBatches, fetchMonthlyBatches } from "../../services/batchService";
 
 import { formatShortIdDateTime } from "../../utils/date";
 
@@ -30,6 +29,9 @@ import {
 
 import BatchListCard from "../../components/dashboards/BatchListCard";
 import EligibilityPriorityCard from "../../components/dashboards/EligibilityPriorityCard";
+
+// ====== MONTHS lokal (pengganti dari dashboardService) ======
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
 
 /* ========= helpers ========= */
 
@@ -73,6 +75,39 @@ function MiniCard({ label, value, sub, onClick, tip }) {
             </button>
         </div>
     );
+}
+
+/** mapping langsung dari SummaryDTO backend (/dashboard/summary) */
+function mapSummaryDto(dto) {
+    const employeeCount = Number(dto?.employeeCount ?? 0);
+    const certifiedIncDue = Number(dto?.certifiedCount ?? 0);
+    const dueCount = Number(dto?.dueCount ?? 0);
+    const expiredCount = Number(dto?.expiredCount ?? 0);
+    const notYetCount = Number(dto?.notYetCount ?? 0);
+    const eligibleTotal = Number(dto?.eligiblePopulation ?? 0);
+    const ongoingBatchCnt = Number(dto?.ongoingBatchCount ?? 0);
+
+    const activeOnly = Math.max(0, certifiedIncDue - dueCount); // ACTIVE only
+
+    const mappedSummary = {
+        employees: { active: employeeCount },
+        certifications: {
+            active: certifiedIncDue, // ACTIVE + DUE (definisi "tersretifikasi")
+            due: dueCount,
+            expired: expiredCount,
+        },
+        batches: { ongoing: ongoingBatchCnt },
+        eligibility: { total: eligibleTotal },
+    };
+
+    const mappedKpi = {
+        notYetCertified: notYetCount,
+        active: activeOnly,
+        due: dueCount,
+        expired: expiredCount,
+    };
+
+    return { mappedSummary, mappedKpi };
 }
 
 export default function SuperadminDashboard() {
@@ -170,7 +205,6 @@ export default function SuperadminDashboard() {
                     )
                 )
                 .catch(() => {});
-
             fetchSubFields()
                 .then((arr) =>
                     setSubFieldOptions((arr || []).map((s) => ({ value: s.id, label: `${s.code || s.name}` })))
@@ -180,29 +214,79 @@ export default function SuperadminDashboard() {
     }, []);
 
     /* ===== helpers ===== */
-    const currentFilters = () => ({
-        divisionId: divisionSel?.value,
-        regionalId: regionalSel?.value,
-        unitId: unitSel?.value,
-        certificationId: certSel?.value,
-        levelId: levelSel?.value,
-        subFieldId: subSel?.value,
-        startDate: startDate || undefined,
-        endDate: endDate || undefined,
-        batchType: batchType?.value || undefined,
-    });
+    const currentFilters = () => {
+        const typeVal = batchType?.value || undefined;
+        return {
+            divisionId: divisionSel?.value,
+            regionalId: regionalSel?.value,
+            unitId: unitSel?.value,
+            certificationId: certSel?.value,
+            levelId: levelSel?.value,
+            subFieldId: subSel?.value,
+            batchType: typeVal,
+            startDate: startDate || undefined,
+            endDate: endDate || undefined,
+        };
+    };
 
     const params = currentFilters;
 
     async function loadSummaryAndKpi() {
-        const agg = await fetchDashboardAggregate({
-            ...params(),
-        });
-        setSummary(agg.summary);
-        setKpi(agg.kpiStatus);
-        setComputedAt(agg.computedAt);
-        if (agg.monthlyTrend) {
-            setMonthly(agg.monthlyTrend);
+        const filters = params();
+        try {
+            const { data } = await api.get("/dashboard/summary", {
+                params: {
+                    regionalId: filters.regionalId,
+                    divisionId: filters.divisionId,
+                    unitId: filters.unitId,
+                    certificationId: filters.certificationId,
+                    levelId: filters.levelId,
+                    subFieldId: filters.subFieldId,
+                },
+            });
+
+            const { mappedSummary, mappedKpi } = mapSummaryDto(data || {});
+            setSummary(mappedSummary);
+            setKpi(mappedKpi);
+            setComputedAt(new Date().toISOString());
+        } catch (e) {
+            console.error("loadSummaryAndKpi error", e);
+            setSummary(null);
+            setKpi(null);
+            setComputedAt(null);
+        }
+    }
+
+    async function loadMonthly() {
+        const f = currentFilters();
+        const typeVal = batchType?.value || undefined;
+
+        try {
+            const data = await fetchMonthlyBatches({
+                regionalId: f.regionalId,
+                divisionId: f.divisionId,
+                unitId: f.unitId,
+                certificationId: f.certificationId,
+                levelId: f.levelId,
+                subFieldId: f.subFieldId,
+                startDate: f.startDate,
+                endDate: f.endDate,
+                type: typeVal,
+            });
+
+            const byIdx = Array(12).fill(0);
+            if (Array.isArray(data)) {
+                data.forEach((it) => {
+                    const m = Number(it.month ?? it.m ?? it.monthIndex);
+                    const c = Number(it.count ?? it.total ?? it.value ?? 0);
+                    if (m >= 1 && m <= 12) byIdx[m - 1] = c;
+                });
+            }
+
+            setMonthly(MONTHS.map((label, i) => ({ month: i + 1, label, count: byIdx[i] })));
+        } catch (e) {
+            console.error("loadMonthly error", e);
+            setMonthly(MONTHS.map((label, i) => ({ month: i + 1, label, count: 0 })));
         }
     }
 
@@ -213,7 +297,6 @@ export default function SuperadminDashboard() {
             const res = await fetchBatches({
                 ...params(),
                 status: "ONGOING",
-                type: batchType?.value || undefined,
                 page: page - 1,
                 size,
                 sortField: "startDate",
@@ -237,7 +320,6 @@ export default function SuperadminDashboard() {
             const res = await fetchBatches({
                 ...params(),
                 status: "FINISHED",
-                type: batchType?.value || undefined,
                 page: page - 1,
                 size,
                 sortField: "endDate",
@@ -257,6 +339,7 @@ export default function SuperadminDashboard() {
     useEffect(() => {
         (async () => {
             await loadSummaryAndKpi();
+            await loadMonthly();
 
             setBatchPage(1);
             setBatches([]);
@@ -271,23 +354,21 @@ export default function SuperadminDashboard() {
 
     /* ===== computed ===== */
 
-    // Total eligible = ambil dari summary kalau ada, kalau nggak fallback ke KPI (eligibility)
     const eligibleTotal = useMemo(() => {
         if (summary?.eligibility?.total != null) return Number(summary.eligibility.total);
         const s = kpi || {};
         return (s.active ?? 0) + (s.due ?? 0) + (s.expired ?? 0) + (s.notYetCertified ?? 0);
     }, [summary, kpi]);
 
-    // Data untuk pie chart dan legend – murni dari KPI eligibility
     const real = useMemo(() => {
         const k = kpi || {};
 
-        const activeOnly = Number(k.active ?? 0); // ACTIVE
+        const activeOnly = Number(k.active ?? 0);
         const due = Number(k.due ?? 0);
         const expired = Number(k.expired ?? 0);
         const notYet = Number(k.notYetCertified ?? 0);
 
-        const certifiedIncDue = activeOnly + due; // definisi "tersretifikasi" = ACTIVE + DUE
+        const certifiedIncDue = activeOnly + due;
         const total = activeOnly + due + expired + notYet;
         const pct = total > 0 ? Math.round((certifiedIncDue / total) * 1000) / 10 : 0;
 
@@ -583,7 +664,7 @@ export default function SuperadminDashboard() {
                             </div>
                         </div>
                         <div className="h-64">
-                            {!monthly ? (
+                            {!monthly || monthly.length === 0 ? (
                                 <div className="skeleton h-full w-full rounded-xl" />
                             ) : (
                                 <ResponsiveContainer width="100%" height="100%">
@@ -603,47 +684,10 @@ export default function SuperadminDashboard() {
 
             {/* ====== Batch Berjalan & Selesai ====== */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                <BatchListCard
-                    title="Batch Berjalan"
-                    status="ONGOING"
-                    batches={batches}
-                    loading={loadingBatch}
-                    page={batchPage}
-                    rowsPerPage={batchRows}
-                    totalPages={batchTotalPages}
-                    totalElements={batchTotalElements}
-                    onPageChange={(p) => {
-                        if (p !== batchPage) loadBatches(p);
-                    }}
-                    onRowsPerPageChange={(n) => {
-                        setBatchRows(n);
-                        loadBatches(1, n);
-                    }}
-                    onClickRow={(b) => navigate(`/batch/${b.id}`)}
-                    emptyText="Tidak ada batch berjalan."
-                />
+                <BatchListCard title="Batch Berjalan" status="ONGOING" filters={currentFilters()} initialRows={5} />
 
-                <BatchListCard
-                    title="Batch Selesai"
-                    status="FINISHED"
-                    batches={finishedBatches}
-                    loading={loadingFinished}
-                    page={finishedPage}
-                    rowsPerPage={finishedRows}
-                    totalPages={finishedTotalPages}
-                    totalElements={finishedTotalElements}
-                    onPageChange={(p) => {
-                        if (p !== finishedPage) loadFinishedBatches(p);
-                    }}
-                    onRowsPerPageChange={(n) => {
-                        setFinishedRows(n);
-                        loadFinishedBatches(1, n);
-                    }}
-                    onClickRow={(b) => navigate(`/batch/${b.id}`)}
-                    emptyText="Belum ada batch selesai."
-                />
+                <BatchListCard title="Batch Selesai" status="FINISHED" filters={currentFilters()} initialRows={5} />
 
-                {/* Card Belum Bersertifikat - ikut filter */}
                 <EligibilityPriorityCard
                     title="Belum Bersertifikat"
                     status="NOT_YET_CERTIFIED"

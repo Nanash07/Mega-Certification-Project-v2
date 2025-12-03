@@ -4,18 +4,16 @@ import { useNavigate } from "react-router-dom";
 import Select from "react-select";
 import api from "../../services/api";
 
-import {
-    fetchDashboardAggregate,
-    fetchDashboardSummary,
-    fetchMonthlyCertificationTrend,
-    MONTHS,
-} from "../../services/dashboardService";
+// HAPUS: fetchDashboardSummary, MONTHS dari dashboardService
+// import { fetchDashboardSummary, MONTHS } from "../../services/dashboardService";
 import { fetchRegionals } from "../../services/regionalService";
 import { fetchUnits } from "../../services/unitService";
 import { fetchCertificationLevels } from "../../services/certificationLevelService";
 import { fetchSubFields } from "../../services/subFieldService";
 import { fetchMyPicScope } from "../../services/picScopeService";
-import { formatShortIdDate, formatShortIdDateTime } from "../../utils/date";
+import { fetchMonthlyBatches } from "../../services/batchService";
+
+import { formatShortIdDateTime } from "../../utils/date";
 
 import {
     PieChart,
@@ -30,62 +28,14 @@ import {
     CartesianGrid,
 } from "recharts";
 
-import PaginationSimple from "../../components/common/PaginationSimple";
+import BatchListCard from "../../components/dashboards/BatchListCard";
+import EligibilityPriorityCard from "../../components/dashboards/EligibilityPriorityCard";
+
+/* ===== MONTHS (lokal, sama kayak SuperadminDashboard) ===== */
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
 
 /* ===== utils ===== */
-const toDate = (d) => (d ? new Date(d) : null);
-const fmtID = (d) => formatShortIdDate(d);
-const daysBetween = (a, b) => Math.ceil((a - b) / (1000 * 60 * 60 * 24));
-const toNum = (v) => Number(v ?? 0) || 0;
 
-function getRuleCode(row) {
-    const pre = row?.ruleCode ?? row?.rule_code;
-    if (pre && String(pre).trim() !== "") return pre;
-
-    const code = row?.certificationCode ?? row?.certification?.code ?? row?.certification_code ?? row?.code ?? "";
-
-    const level =
-        row?.certificationLevelLevel ??
-        row?.certificationLevel?.level ??
-        row?.certification_level_level ??
-        row?.level ??
-        null;
-
-    const sub = row?.subFieldCode ?? row?.subfieldCode ?? row?.sub_field_code ?? row?.subField?.code ?? "";
-
-    const parts = [code || null, level != null ? String(level) : null, sub || null].filter(Boolean);
-    if (parts.length) return parts.join("-");
-    if (row?.rule && String(row.rule).trim() !== "") return row.rule;
-    return "-";
-}
-
-function getDeadline(row) {
-    return toDate(row?.dueDate) || toDate(row?.validUntil) || toDate(row?.reminderDate) || null;
-}
-
-/** Path ke halaman yang ADA di Sidebar */
-function getPriorityPath(row) {
-    const nip = row?.nip || "";
-    const rule = getRuleCode(row);
-    if (row?.eligibilityId) {
-        return `/employee/eligibility?nip=${encodeURIComponent(nip)}&rule=${encodeURIComponent(rule)}`;
-    }
-    return `/employee/certification?nip=${encodeURIComponent(nip)}&rule=${encodeURIComponent(rule)}`;
-}
-
-/** Build query string dari filter */
-function buildQueryFromFilters(f) {
-    const params = new URLSearchParams();
-    if (f.regionalId) params.set("regionalId", f.regionalId);
-    if (f.divisionId) params.set("divisionId", f.divisionId);
-    if (f.unitId) params.set("unitId", f.unitId);
-    if (f.certificationId) params.set("certificationId", f.certificationId);
-    if (f.levelId) params.set("levelId", f.levelId);
-    if (f.subFieldId) params.set("subFieldId", f.subFieldId);
-    return params.toString();
-}
-
-/* React-Select helper biar menu gak ketutup */
 function SelectTop(props) {
     return (
         <Select
@@ -96,99 +46,65 @@ function SelectTop(props) {
     );
 }
 
-/* ===== small components (tooltip & size sama Superadmin) ===== */
-function MiniCard({ label, value, sub, onClick, tip }) {
-    return (
-        <div className="tooltip tooltip-top w-full" data-tip={tip || label} title={tip || label}>
-            <button
-                onClick={onClick}
-                className="rounded-2xl border border-base-200 bg-base-100 p-3 w-full text-left transition hover:shadow cursor-pointer min-h-[88px]"
-            >
-                <div className="text-[11px] opacity-70">{label}</div>
-                <div className="text-xl font-bold">{value ?? 0}</div>
-                {sub ? <div className="text-[11px] opacity-60">{sub}</div> : null}
-            </button>
-        </div>
-    );
-}
-
-/** QuotaBar: teks gelap tunggal, tooltip DaisyUI */
-function QuotaBar({ filled = 0, quota = 0, className }) {
-    const f = Math.max(0, Number(filled) || 0);
-    const q = Math.max(0, Number(quota) || 0);
-
-    if (q === 0) {
-        return <div className={`text-[10px] opacity-70 ${className || ""}`}>Terisi: {f} (tanpa kuota)</div>;
-    }
-
-    const pct = Math.min(100, Math.round((f / q) * 100));
-    const isFull = f >= q;
-    const label = `${f}/${q} (${pct}%)`;
-
-    return (
-        <div
-            className={`tooltip tooltip-top w-full ${className || ""}`}
-            data-tip={label}
-            title={label}
-            aria-label={`Kuota ${label}`}
-        >
-            <div className="relative w-full h-3 rounded-full bg-base-200 overflow-hidden">
-                {pct > 0 && (
-                    <div
-                        className={`absolute left-0 top-0 h-full rounded-full ${isFull ? "bg-success" : "bg-warning"}`}
-                        style={{ width: `${pct}%` }}
-                    />
-                )}
-                <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-[10px] font-medium text-base-content/80">{label}</span>
-                </div>
-            </div>
-        </div>
-    );
-}
-
 function toOptions(data, labelPicker) {
     const arr = Array.isArray(data?.content) ? data.content : Array.isArray(data) ? data : [];
     return arr.filter(Boolean).map((x) => ({ value: x.id, label: labelPicker(x), raw: x }));
 }
 
-/** Hitung "terisi" untuk progress bar ONGOING: onrun + passed + failed (fallback aman) */
-function getFilledForBar(b) {
-    const onrun = toNum(b.onrun ?? b.registeredOrAttended);
-    const passed = toNum(b.totalPassed ?? b.passed);
-    const failedExplicit = toNum(b.totalFailed ?? b.failed);
-    const totalKnown = toNum(b.totalParticipants ?? b.participants);
-    const failed = failedExplicit > 0 ? failedExplicit : Math.max(totalKnown - passed - onrun, 0);
+/** mapping SummaryDTO backend -> summary + kpi (sama persis dengan Superadmin) */
+function mapSummaryDto(dto) {
+    const employeeCount = Number(dto?.employeeCount ?? 0);
+    const certifiedIncDue = Number(dto?.certifiedCount ?? 0); // ACTIVE + DUE
+    const dueCount = Number(dto?.dueCount ?? 0);
+    const expiredCount = Number(dto?.expiredCount ?? 0);
+    const notYetCount = Number(dto?.notYetCount ?? 0);
+    const eligibleTotal = Number(dto?.eligiblePopulation ?? 0);
+    const ongoingBatchCnt = Number(dto?.ongoingBatchCount ?? 0);
 
-    const granular = onrun + passed + failed;
-    if (granular > 0) return granular;
+    // ACTIVE only = (ACTIVE + DUE) - DUE
+    const activeOnly = Math.max(0, certifiedIncDue - dueCount);
 
-    if (totalKnown > 0) return totalKnown;
-    if (toNum(b.registeredOrAttended) > 0) return toNum(b.registeredOrAttended);
-    if (onrun > 0) return onrun;
-    return 0;
+    const mappedSummary = {
+        employees: { active: employeeCount },
+        certifications: {
+            active: certifiedIncDue, // definisi "Tersertifikasi" = ACTIVE + DUE
+            due: dueCount,
+            expired: expiredCount,
+        },
+        batches: { ongoing: ongoingBatchCnt },
+        eligibility: { total: eligibleTotal },
+    };
+
+    const mappedKpi = {
+        notYetCertified: notYetCount,
+        active: activeOnly,
+        due: dueCount,
+        expired: expiredCount,
+    };
+
+    return { mappedSummary, mappedKpi };
 }
 
 export default function PicDashboard() {
     const navigate = useNavigate();
 
-    // ===== 6 filter =====
-    const [regionalSel, setRegionalSel] = useState(null);
+    // ===== filter organisasi =====
     const [divisionSel, setDivisionSel] = useState(null);
+    const [regionalSel, setRegionalSel] = useState(null);
     const [unitSel, setUnitSel] = useState(null);
+    const [divisionOptions, setDivisionOptions] = useState([]);
+    const [regionalOptions, setRegionalOptions] = useState([]);
+    const [unitOptions, setUnitOptions] = useState([]);
 
-    const [certSel, setCertSel] = useState(null); // dari scope PIC (wajib)
+    // ===== filter sertifikasi (dibatasi scope PIC) =====
+    const [certSel, setCertSel] = useState(null);
     const [levelSel, setLevelSel] = useState(null);
     const [subSel, setSubSel] = useState(null);
-
-    const [regionalOptions, setRegionalOptions] = useState([]);
-    const [divisionOptions, setDivisionOptions] = useState([]);
-    const [unitOptions, setUnitOptions] = useState([]);
     const [certOptions, setCertOptions] = useState([]);
     const [levelOptions, setLevelOptions] = useState([]);
     const [subFieldOptions, setSubFieldOptions] = useState([]);
 
-    // ===== filter tanggal & jenis batch (sama seperti Superadmin) =====
+    // ===== filter tanggal & jenis batch =====
     const [startDate, setStartDate] = useState("");
     const [endDate, setEndDate] = useState("");
     const batchTypeOptions = [
@@ -200,47 +116,16 @@ export default function PicDashboard() {
     ];
     const [batchType, setBatchType] = useState(batchTypeOptions[0]);
 
-    // scope ready flag → cegah request tanpa certificationId
+    // scope flag → jangan load sebelum scope siap
     const [scopeReady, setScopeReady] = useState(false);
 
-    // ===== ringkasan/kpi/prioritas =====
+    // ===== summary / KPI / monthly =====
     const [summary, setSummary] = useState(null);
     const [kpi, setKpi] = useState(null);
     const [computedAt, setComputedAt] = useState(null);
-
-    const [dueList, setDueList] = useState([]);
-    const [expiredList, setExpiredList] = useState([]);
-    const [notYetList, setNotYetList] = useState([]);
-    const [loadingAlert, setLoadingAlert] = useState(true);
-
-    // paging priority
-    const [notYetPage, setNotYetPage] = useState(1);
-    const [notYetRowsPerPage, setNotYetRowsPerPage] = useState(10);
-    const [duePage, setDuePage] = useState(1);
-    const [dueRowsPerPage, setDueRowsPerPage] = useState(10);
-    const [expiredPage, setExpiredPage] = useState(1);
-    const [expiredRowsPerPage, setExpiredRowsPerPage] = useState(10);
-
-    // ===== batch ONGOING (paging) =====
-    const [batches, setBatches] = useState([]);
-    const [batchPage, setBatchPage] = useState(1);
-    const [batchRows, setBatchRows] = useState(10);
-    const [batchTotalPages, setBatchTotalPages] = useState(1);
-    const [batchTotalElements, setBatchTotalElements] = useState(0);
-    const [loadingBatch, setLoadingBatch] = useState(false);
-
-    // ===== batch FINISHED (paging, sama layout Superadmin) =====
-    const [finishedBatches, setFinishedBatches] = useState([]);
-    const [finishedPage, setFinishedPage] = useState(1);
-    const [finishedRows, setFinishedRows] = useState(10);
-    const [finishedTotalPages, setFinishedTotalPages] = useState(1);
-    const [finishedTotalElements, setFinishedTotalElements] = useState(0);
-    const [loadingFinished, setLoadingFinished] = useState(false);
-
-    // ===== bulanan =====
     const [monthly, setMonthly] = useState(MONTHS.map((label, i) => ({ month: i + 1, label, count: 0 })));
 
-    /* ===== masters + scope ===== */
+    /* ===== master + scope PIC ===== */
     useEffect(() => {
         (async () => {
             try {
@@ -249,12 +134,16 @@ export default function PicDashboard() {
             } catch {
                 setRegionalOptions([]);
             }
+
             try {
-                const { data } = await api.get("/divisions", { params: { page: 0, size: 1000, sort: "name,asc" } });
+                const { data } = await api.get("/divisions", {
+                    params: { page: 0, size: 1000, sort: "name,asc" },
+                });
                 setDivisionOptions(toOptions(data, (d) => d?.name || d?.code || `Divisi #${d?.id}`));
             } catch {
                 setDivisionOptions([]);
             }
+
             try {
                 const unitRaw = await fetchUnits({ page: 0, size: 1000, sort: "name,asc" });
                 setUnitOptions(toOptions(unitRaw, (u) => u?.name || u?.code || `Unit #${u?.id}`));
@@ -262,7 +151,7 @@ export default function PicDashboard() {
                 setUnitOptions([]);
             }
 
-            // ----- scope PIC: opsi sertifikat & default -----
+            // ---- scope PIC: hanya sertifikat yang di-scope ----
             try {
                 const scope = await fetchMyPicScope();
                 const opts = (scope?.certifications || []).map((s) => ({
@@ -271,13 +160,12 @@ export default function PicDashboard() {
                     raw: s,
                 }));
                 setCertOptions(opts);
+
                 if (opts.length === 0) {
                     setCertSel(null);
                 } else {
                     setCertSel((prev) => {
-                        if (prev && opts.some((opt) => opt.value === prev.value)) {
-                            return prev;
-                        }
+                        if (prev && opts.some((o) => o.value === prev.value)) return prev;
                         return opts[0];
                     });
                 }
@@ -288,7 +176,7 @@ export default function PicDashboard() {
                 setScopeReady(true);
             }
 
-            // level & sub-bidang
+            // level & sub-bidang (global)
             fetchCertificationLevels()
                 .then((arr) =>
                     setLevelOptions(
@@ -299,6 +187,7 @@ export default function PicDashboard() {
                     )
                 )
                 .catch(() => {});
+
             fetchSubFields()
                 .then((arr) =>
                     setSubFieldOptions((arr || []).map((s) => ({ value: s.id, label: `${s.code || s.name}` })))
@@ -308,10 +197,11 @@ export default function PicDashboard() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    /* ===== helpers ===== */
-    const params = () => {
+    /* ===== helper: current filter ===== */
+    const currentFilters = () => {
         // pastikan selalu ada certificationId dari scope PIC
         const certIdFallback = certSel?.value ?? (certOptions.length > 0 ? certOptions[0].value : undefined);
+
         return {
             regionalId: regionalSel?.value,
             divisionId: divisionSel?.value,
@@ -319,134 +209,104 @@ export default function PicDashboard() {
             certificationId: certIdFallback,
             levelId: levelSel?.value,
             subFieldId: subSel?.value,
+            batchType: batchType?.value || undefined,
             startDate: startDate || undefined,
             endDate: endDate || undefined,
-            batchType: batchType?.value || undefined,
         };
     };
 
-    const currentFilters = params;
-
+    /* ===== loader summary + KPI: sekarang pakai /dashboard/summary ===== */
     async function loadSummaryAndKpi() {
-        const agg = await fetchDashboardAggregate({ ...params(), sections: "summary,kpi" });
-        setSummary(agg.summary);
-        setKpi(agg.kpiStatus);
-        setComputedAt(agg.computedAt);
-    }
-
-    async function loadPriority() {
-        setLoadingAlert(true);
+        const filters = currentFilters();
         try {
-            const s = await fetchDashboardSummary({ ...params(), sections: "priority" });
-            setDueList(Array.isArray(s?.dueTop) ? s.dueTop : []);
-            setExpiredList(Array.isArray(s?.expiredTop) ? s.expiredTop : []);
-            setNotYetList(Array.isArray(s?.notYetTop) ? s.notYetTop : []);
-
-            setNotYetPage(1);
-            setDuePage(1);
-            setExpiredPage(1);
-        } finally {
-            setLoadingAlert(false);
-        }
-    }
-
-    async function loadBatches(page = 1) {
-        setLoadingBatch(true);
-        try {
-            const agg = await fetchDashboardAggregate({
-                ...params(),
-                sections: "batches",
-                batchPage: page - 1, // BE zero-based
-                batchSize: batchRows,
-            });
-            const res = agg.ongoingBatchesPage || { content: [], totalPages: 0, totalElements: 0 };
-            const list = Array.isArray(res.content) ? res.content : [];
-            setBatches(list);
-            setBatchTotalPages(res.totalPages || 1);
-            setBatchTotalElements(res.totalElements || list.length || 0);
-            setBatchPage(page);
-        } finally {
-            setLoadingBatch(false);
-        }
-    }
-
-    async function loadFinishedBatches(page = 1) {
-        setLoadingFinished(true);
-        try {
-            const { data } = await api.get("/batches/paged", {
+            const { data } = await api.get("/dashboard/summary", {
                 params: {
-                    status: "FINISHED",
-                    page: page - 1, // BE zero-based
-                    size: finishedRows,
-                    sort: "endDate,desc",
+                    regionalId: filters.regionalId,
+                    divisionId: filters.divisionId,
+                    unitId: filters.unitId,
+                    certificationId: filters.certificationId,
+                    levelId: filters.levelId,
+                    subFieldId: filters.subFieldId,
+                    // startDate, endDate, batchType tidak dipakai di summary (sama seperti Superadmin)
                 },
             });
-            const content = Array.isArray(data?.content) ? data.content : [];
-            setFinishedBatches(content);
-            setFinishedTotalPages(data?.totalPages || 1);
-            setFinishedTotalElements(data?.totalElements || content.length || 0);
-            setFinishedPage(page);
-        } finally {
-            setLoadingFinished(false);
+
+            const { mappedSummary, mappedKpi } = mapSummaryDto(data || {});
+            setSummary(mappedSummary);
+            setKpi(mappedKpi);
+            setComputedAt(new Date().toISOString());
+        } catch (e) {
+            console.error("PicDashboard loadSummaryAndKpi error", e);
+            setSummary(null);
+            setKpi(null);
+            setComputedAt(null);
         }
     }
 
+    /* ===== loader monthly (sama Superadmin) ===== */
     async function loadMonthly() {
-        const data = await fetchMonthlyCertificationTrend({
-            ...params(),
-            sections: "monthly",
-        });
-        setMonthly(data);
+        try {
+            const f = currentFilters();
+            const typeVal = batchType?.value || undefined;
+
+            const data = await fetchMonthlyBatches({
+                regionalId: f.regionalId,
+                divisionId: f.divisionId,
+                unitId: f.unitId,
+                certificationId: f.certificationId,
+                levelId: f.levelId,
+                subFieldId: f.subFieldId,
+                startDate: f.startDate,
+                endDate: f.endDate,
+                type: typeVal,
+            });
+
+            const byIdx = Array(12).fill(0);
+            if (Array.isArray(data)) {
+                data.forEach((it) => {
+                    const m = Number(it.month ?? it.m ?? it.monthIndex);
+                    const c = Number(it.count ?? it.total ?? it.value ?? 0);
+                    if (m >= 1 && m <= 12) byIdx[m - 1] = c;
+                });
+            }
+
+            setMonthly(MONTHS.map((label, i) => ({ month: i + 1, label, count: byIdx[i] })));
+        } catch (e) {
+            console.error("PicDashboard loadMonthly error", e);
+            setMonthly(MONTHS.map((label, i) => ({ month: i + 1, label, count: 0 })));
+        }
     }
 
-    // ⛔️ Jangan fetch sebelum scope PIC siap (biar data tetap terbatas sesuai scope)
+    // Jangan fetch sebelum scope-ready & sertifikat terpilih
     useEffect(() => {
         if (!scopeReady) return;
         if (certOptions.length > 0 && !certSel) return;
 
         (async () => {
             await loadSummaryAndKpi();
-            await loadPriority();
-
-            // ONGOING (reset ke page 1)
-            setBatchPage(1);
-            setBatches([]);
-            await loadBatches(1);
-
-            // FINISHED (reset ke page 1)
-            setFinishedPage(1);
-            setFinishedBatches([]);
-            await loadFinishedBatches(1);
-
             await loadMonthly();
         })();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [scopeReady, regionalSel, divisionSel, unitSel, certSel, levelSel, subSel, startDate, endDate, batchType]);
 
     /* ===== computed ===== */
+
     const eligibleTotal = useMemo(() => {
         if (summary?.eligibility?.total != null) return Number(summary.eligibility.total);
         const s = kpi || {};
         return (s.active ?? 0) + (s.due ?? 0) + (s.expired ?? 0) + (s.notYetCertified ?? 0);
     }, [summary, kpi]);
 
-    // Realisasi: DISAMAKAN dengan Superadmin (4 kategori)
+    // data untuk pie chart & legend: 4 kategori (ACTIVE, DUE, EXPIRED, NOT_YET)
     const real = useMemo(() => {
-        const cert = summary?.certifications || {};
         const k = kpi || {};
 
-        // di Summary card: "Tersertifikasi" = ACTIVE + DUE
-        const activePlusDue = Number(cert.active ?? 0);
-        const due = Number(cert.due ?? 0);
-        const expired = Number(cert.expired ?? 0);
-
-        // ACTIVE only = (ACTIVE + DUE) - DUE
-        const activeOnly = Math.max(activePlusDue - due, 0);
-
-        // Summary nggak punya "belum bersertifikat", ambil dari kpi
+        const activeOnly = Number(k.active ?? 0); // ACTIVE
+        const due = Number(k.due ?? 0);
+        const expired = Number(k.expired ?? 0);
         const notYet = Number(k.notYetCertified ?? 0);
 
-        const certifiedIncDue = activePlusDue;
+        const certifiedIncDue = activeOnly + due; // definisi "Tersertifikasi" = ACTIVE + DUE
         const total = activeOnly + due + expired + notYet;
         const pct = total > 0 ? Math.round((certifiedIncDue / total) * 1000) / 10 : 0;
 
@@ -459,31 +319,17 @@ export default function PicDashboard() {
             total,
             pct,
         };
-    }, [summary, kpi]);
+    }, [kpi]);
 
-    // paging priority sliced
-    const notYetTotalPages = Math.max(1, Math.ceil(notYetList.length / notYetRowsPerPage));
-    const dueTotalPages = Math.max(1, Math.ceil(dueList.length / dueRowsPerPage));
-    const expiredTotalPages = Math.max(1, Math.ceil(expiredList.length / expiredRowsPerPage));
-
-    const notYetPaged = useMemo(() => {
-        const start = (notYetPage - 1) * notYetRowsPerPage;
-        return notYetList.slice(start, start + notYetRowsPerPage);
-    }, [notYetList, notYetPage, notYetRowsPerPage]);
-
-    const duePaged = useMemo(() => {
-        const start = (duePage - 1) * dueRowsPerPage;
-        return dueList.slice(start, start + dueRowsPerPage);
-    }, [dueList, duePage, dueRowsPerPage]);
-
-    const expiredPaged = useMemo(() => {
-        const start = (expiredPage - 1) * expiredRowsPerPage;
-        return expiredList.slice(start, start + expiredRowsPerPage);
-    }, [expiredList, expiredPage, expiredRowsPerPage]);
-
-    // ======= Kartu ringkas =======
+    // kartu kecil summary (sama seperti Superadmin)
     const cardConfigs = useMemo(() => {
-        const q = buildQueryFromFilters(currentFilters());
+        const q = new URLSearchParams(
+            Object.entries(currentFilters()).reduce((acc, [k, v]) => {
+                if (v !== undefined && v !== null && v !== "") acc[k] = v;
+                return acc;
+            }, {})
+        ).toString();
+
         return [
             {
                 key: "employees",
@@ -493,7 +339,7 @@ export default function PicDashboard() {
                 href: `/employee/data${q ? `?${q}` : ""}`,
             },
             {
-                key: "certified",
+                key: "tersretifikasi",
                 label: "Tersertifikasi",
                 value: Number(summary?.certifications?.active ?? 0),
                 sub:
@@ -545,7 +391,7 @@ export default function PicDashboard() {
                 </p>
             </div>
 
-            {/* Filter: 6 kolom + tooltip ala Superadmin */}
+            {/* Filter organisasi/sertifikasi */}
             <div className="grid grid-cols-1 md:grid-cols-6 gap-2">
                 <div className="tooltip tooltip-top" data-tip="Regional" title="Regional">
                     <SelectTop
@@ -580,7 +426,7 @@ export default function PicDashboard() {
                         isSearchable
                     />
                 </div>
-                <div className="tooltip tooltip-top" data-tip="Sertifikat" title="Sertifikat">
+                <div className="tooltip tooltip-top" data-tip="Sertifikat (dibatasi scope PIC)" title="Sertifikat">
                     <SelectTop
                         className="w-full"
                         options={certOptions}
@@ -615,7 +461,7 @@ export default function PicDashboard() {
                 </div>
             </div>
 
-            {/* Filter tanggal (sama Superadmin) */}
+            {/* Filter tanggal */}
             <div className="grid grid-cols-1 md:grid-cols-6 gap-2">
                 <div className="tooltip tooltip-top" data-tip="Tanggal Mulai Batch" title="Tanggal Mulai Batch">
                     <div className="form-control w-full">
@@ -645,7 +491,7 @@ export default function PicDashboard() {
                 </div>
             </div>
 
-            {/* Summary cards (ukuran & konten sama) */}
+            {/* Summary cards */}
             <div className="grid grid-cols-2 md:grid-cols-6 gap-3 md:gap-4">
                 {!summary
                     ? Array.from({ length: 6 }).map((_, i) => (
@@ -657,20 +503,27 @@ export default function PicDashboard() {
                           </div>
                       ))
                     : cardConfigs.map((c) => (
-                          <MiniCard
+                          <div
                               key={c.key}
-                              label={c.label}
-                              value={c.value}
-                              sub={c.sub}
-                              tip={c.tip}
-                              onClick={() => navigate(c.href)}
-                          />
+                              className="tooltip tooltip-top w-full"
+                              data-tip={c.tip || c.label}
+                              title={c.tip || c.label}
+                          >
+                              <button
+                                  onClick={() => navigate(c.href)}
+                                  className="rounded-2xl border border-base-200 bg-base-100 p-3 w-full text-left transition hover:shadow cursor-pointer min-h-[88px]"
+                              >
+                                  <div className="text-[11px] opacity-70">{c.label}</div>
+                                  <div className="text-xl font-bold">{c.value ?? 0}</div>
+                                  {c.sub ? <div className="text-[11px] opacity-60">{c.sub}</div> : null}
+                              </button>
+                          </div>
                       ))}
             </div>
 
             {/* Realisasi & Bulanan */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {/* Realisasi – DISAMAKAN dengan Superadmin */}
+                {/* Realisasi */}
                 <div className="card bg-base-100 border rounded-2xl shadow-sm">
                     <div className="card-body p-4 md:p-5">
                         <h2 className="card-title text-base md:text-lg">Realisasi</h2>
@@ -694,13 +547,9 @@ export default function PicDashboard() {
                                                 outerRadius={85}
                                                 label
                                             >
-                                                {/* Aktif */}
                                                 <Cell fill="#16a34a" />
-                                                {/* Due */}
                                                 <Cell fill="#f97316" />
-                                                {/* Expired */}
                                                 <Cell fill="#ef4444" />
-                                                {/* Belum */}
                                                 <Cell fill="#717171" />
                                             </Pie>
                                             <ReTooltip />
@@ -750,7 +599,7 @@ export default function PicDashboard() {
                     </div>
                 </div>
 
-                {/* Bulanan - sama gaya Superadmin (pakai batchType) */}
+                {/* Bulanan */}
                 <div className="card bg-base-100 border rounded-2xl shadow-sm">
                     <div className="card-body p-4 md:p-5">
                         <div className="flex items-center justify-between gap-2">
@@ -767,7 +616,7 @@ export default function PicDashboard() {
                             </div>
                         </div>
                         <div className="h-64">
-                            {!monthly ? (
+                            {!monthly || monthly.length === 0 ? (
                                 <div className="skeleton h-full w-full rounded-xl" />
                             ) : (
                                 <ResponsiveContainer width="100%" height="100%">
@@ -787,386 +636,33 @@ export default function PicDashboard() {
 
             {/* ====== Batch Berjalan & Selesai & Belum Bersertifikat ====== */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                {/* Kolom 1 - ONGOING */}
-                <div className="card bg-base-100 border rounded-2xl shadow-sm">
-                    <div className="card-body p-4 md:p-5">
-                        <div className="flex items-center justify-between">
-                            <h2 className="card-title text-base md:text-lg">Batch Berjalan</h2>
-                        </div>
-
-                        <div className="max-h-96 overflow-auto pr-1">
-                            {batches.length === 0 && loadingBatch ? (
-                                <div className="space-y-2">
-                                    {Array.from({ length: 4 }).map((_, i) => (
-                                        <div key={i} className="skeleton h-14 w-full rounded-xl" />
-                                    ))}
-                                </div>
-                            ) : batches.length === 0 ? (
-                                <div className="text-sm opacity-70">Tidak ada batch berjalan.</div>
-                            ) : (
-                                <ul className="menu w-full">
-                                    {batches.map((b) => {
-                                        const quota = toNum(b.quota);
-                                        const filled = getFilledForBar(b);
-                                        const chip = getRuleCode(b);
-
-                                        const passed = toNum(b.totalPassed ?? b.passed);
-                                        const total = toNum(
-                                            b.totalParticipants ?? b.participants ?? b.registeredOrAttended ?? b.onrun
-                                        );
-                                        const failedExplicit = toNum(b.totalFailed ?? b.failed);
-                                        const onrun = toNum(b.onrun ?? b.registeredOrAttended);
-                                        const failed =
-                                            failedExplicit > 0 ? failedExplicit : Math.max(total - passed - onrun, 0);
-
-                                        return (
-                                            <li key={b.id} className="!p-0">
-                                                <button
-                                                    className="w-full text-left hover:bg-base-200 rounded-xl p-2"
-                                                    onClick={() => navigate(`/batch/${b.id}`)}
-                                                >
-                                                    <div className="min-w-0">
-                                                        <div className="font-medium truncate text-sm">
-                                                            {b.name || b.batchName}
-                                                        </div>
-                                                        <div className="text-[11px] opacity-70 truncate">
-                                                            {chip && chip !== "-" ? chip : b.type || "-"} •{" "}
-                                                            {b.startDate} – {b.endDate}
-                                                            {b.institutionName ? ` • ${b.institutionName}` : ""}
-                                                        </div>
-                                                        <div className="mt-1">
-                                                            <QuotaBar filled={filled} quota={quota} />
-                                                        </div>
-                                                        <div className="mt-1 text-[11px] opacity-70">
-                                                            Lulus: <span className="font-medium">{passed}</span> •
-                                                            Gagal: <span className="font-medium">{failed}</span> •
-                                                            Peserta: <span className="font-medium">{total}</span>
-                                                        </div>
-                                                    </div>
-                                                </button>
-                                            </li>
-                                        );
-                                    })}
-                                </ul>
-                            )}
-                        </div>
-
-                        {batchTotalElements > 0 && (
-                            <PaginationSimple
-                                page={batchPage}
-                                totalPages={batchTotalPages}
-                                totalElements={batchTotalElements}
-                                rowsPerPage={batchRows}
-                                onPageChange={(p) => {
-                                    if (p !== batchPage) {
-                                        loadBatches(p);
-                                    }
-                                }}
-                                onRowsPerPageChange={(n) => {
-                                    setBatchRows(n);
-                                    loadBatches(1);
-                                }}
-                            />
-                        )}
-                    </div>
-                </div>
-
-                {/* Kolom 2 - FINISHED */}
-                <div className="card bg-base-100 border rounded-2xl shadow-sm">
-                    <div className="card-body p-4 md:p-5">
-                        <div className="flex items-center justify-between">
-                            <h2 className="card-title text-base md:text-lg">Batch Selesai</h2>
-                        </div>
-
-                        <div className="max-h-96 overflow-auto pr-1">
-                            {finishedBatches.length === 0 && loadingFinished ? (
-                                <div className="space-y-2">
-                                    {Array.from({ length: 4 }).map((_, i) => (
-                                        <div key={i} className="skeleton h-14 w-full rounded-xl" />
-                                    ))}
-                                </div>
-                            ) : finishedBatches.length === 0 ? (
-                                <div className="text-sm opacity-70">Belum ada batch selesai.</div>
-                            ) : (
-                                <ul className="menu w-full">
-                                    {finishedBatches.map((b) => {
-                                        const quota = toNum(b.quota);
-                                        const passed = toNum(b.totalPassed ?? b.passed);
-                                        const total = toNum(b.totalParticipants);
-                                        const failed = Math.max(total - passed, 0);
-                                        const filled = passed + failed;
-                                        const chip = getRuleCode(b);
-
-                                        return (
-                                            <li key={b.id} className="!p-0">
-                                                <button
-                                                    className="w-full text-left hover:bg-base-200 rounded-xl p-2"
-                                                    onClick={() => navigate(`/batch/${b.id}`)}
-                                                >
-                                                    <div className="min-w-0">
-                                                        <div className="font-medium truncate text-sm">
-                                                            {b.name || b.batchName}
-                                                        </div>
-                                                        <div className="text-[11px] opacity-70 truncate">
-                                                            {chip && chip !== "-" ? chip : b.type || "-"} •{" "}
-                                                            {b.startDate} – {b.endDate}
-                                                            {b.institutionName ? ` • ${b.institutionName}` : ""}
-                                                        </div>
-                                                        <div className="mt-1">
-                                                            <QuotaBar filled={filled} quota={quota} />
-                                                        </div>
-                                                        <div className="mt-1 text-[11px] opacity-70">
-                                                            Lulus: <span className="font-medium">{passed}</span> •
-                                                            Gagal: <span className="font-medium">{failed}</span> •
-                                                            Peserta: <span className="font-medium">{total}</span>
-                                                        </div>
-                                                    </div>
-                                                </button>
-                                            </li>
-                                        );
-                                    })}
-                                </ul>
-                            )}
-                        </div>
-
-                        {finishedTotalElements > 0 && (
-                            <PaginationSimple
-                                page={finishedPage}
-                                totalPages={finishedTotalPages}
-                                totalElements={finishedTotalElements}
-                                rowsPerPage={finishedRows}
-                                onPageChange={(p) => {
-                                    if (p !== finishedPage) {
-                                        loadFinishedBatches(p);
-                                    }
-                                }}
-                                onRowsPerPageChange={(n) => {
-                                    setFinishedRows(n);
-                                    loadFinishedBatches(1);
-                                }}
-                            />
-                        )}
-                    </div>
-                </div>
-
-                {/* Kolom 3 - Belum Bersertifikat */}
-                <div className="card bg-base-100 border rounded-2xl shadow-sm">
-                    <div className="card-body p-4 md:p-5">
-                        <div className="flex items-center justify-between">
-                            <h2 className="card-title text-base md:text-lg text-sky-600">Belum Bersertifikat</h2>
-                        </div>
-                        <div className="overflow-auto max-h-96">
-                            <table className="table table-xs md:table-sm">
-                                <thead>
-                                    <tr>
-                                        <th>NIP</th>
-                                        <th>Nama</th>
-                                        <th>Rule</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {loadingAlert ? (
-                                        Array.from({ length: 6 }).map((_, i) => (
-                                            <tr key={i}>
-                                                <td colSpan={3}>
-                                                    <div className="skeleton h-5 w-full" />
-                                                </td>
-                                            </tr>
-                                        ))
-                                    ) : notYetList.length === 0 ? (
-                                        <tr>
-                                            <td colSpan={3} className="text-sm opacity-60">
-                                                Tidak ada data
-                                            </td>
-                                        </tr>
-                                    ) : (
-                                        notYetPaged.map((x, idx) => (
-                                            <tr
-                                                key={idx}
-                                                className="hover cursor-pointer"
-                                                onClick={(e) => {
-                                                    e.preventDefault();
-                                                    e.stopPropagation();
-                                                    navigate(getPriorityPath(x));
-                                                }}
-                                            >
-                                                <td className="whitespace-nowrap">{x.nip}</td>
-                                                <td className="whitespace-nowrap">{x.employeeName ?? x.name}</td>
-                                                <td className="whitespace-nowrap">{getRuleCode(x)}</td>
-                                            </tr>
-                                        ))
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-
-                        {notYetList.length > 0 && (
-                            <PaginationSimple
-                                page={notYetPage}
-                                totalPages={notYetTotalPages}
-                                totalElements={notYetList.length}
-                                rowsPerPage={notYetRowsPerPage}
-                                onPageChange={setNotYetPage}
-                                onRowsPerPageChange={(n) => {
-                                    setNotYetRowsPerPage(n);
-                                    setNotYetPage(1);
-                                }}
-                            />
-                        )}
-                    </div>
-                </div>
+                <BatchListCard title="Batch Berjalan" status="ONGOING" filters={currentFilters()} initialRows={10} />
+                <BatchListCard title="Batch Selesai" status="FINISHED" filters={currentFilters()} initialRows={10} />
+                <EligibilityPriorityCard
+                    title="Belum Bersertifikat"
+                    status="NOT_YET_CERTIFIED"
+                    accentClass="text-sky-600"
+                    filters={currentFilters()}
+                    initialRowsPerPage={10}
+                />
             </div>
 
-            {/* ====== Due | Kadaluarsa (2 kolom, sama Superadmin) ====== */}
+            {/* ====== Due | Kadaluarsa ====== */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {/* Due */}
-                <div className="card bg-base-100 border rounded-2xl shadow-sm">
-                    <div className="card-body p-4 md:p-5">
-                        <div className="flex items-center justify_between">
-                            <h2 className="card-title text-base md:text-lg text-amber-600">Jatuh Tempo</h2>
-                        </div>
-                        <div className="overflow-auto max-h-96">
-                            <table className="table table-xs md:table-sm">
-                                <thead>
-                                    <tr>
-                                        <th>NIP</th>
-                                        <th>Nama</th>
-                                        <th>Rule</th>
-                                        <th>Jatuh Tempo</th>
-                                        <th>Sisa</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {loadingAlert ? (
-                                        Array.from({ length: 6 }).map((_, i) => (
-                                            <tr key={i}>
-                                                <td colSpan={5}>
-                                                    <div className="skeleton h-5 w-full" />
-                                                </td>
-                                            </tr>
-                                        ))
-                                    ) : dueList.length === 0 ? (
-                                        <tr>
-                                            <td colSpan={5} className="text-sm opacity-60">
-                                                Tidak ada data
-                                            </td>
-                                        </tr>
-                                    ) : (
-                                        duePaged.map((x, idx) => {
-                                            const deadline = getDeadline(x);
-                                            const sisa = deadline ? daysBetween(deadline, new Date()) : null;
-                                            return (
-                                                <tr
-                                                    key={idx}
-                                                    className="hover cursor-pointer"
-                                                    onClick={(e) => {
-                                                        e.preventDefault();
-                                                        e.stopPropagation();
-                                                        navigate(getPriorityPath(x));
-                                                    }}
-                                                >
-                                                    <td className="whitespace-nowrap">{x.nip}</td>
-                                                    <td className="whitespace-nowrap">{x.employeeName ?? x.name}</td>
-                                                    <td className="whitespace-nowrap">{getRuleCode(x)}</td>
-                                                    <td className="whitespace-nowrap">{fmtID(deadline)}</td>
-                                                    <td className="whitespace-nowrap text-amber-600">
-                                                        {sisa != null ? `Tinggal ${sisa} hari` : "-"}
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-
-                        {dueList.length > 0 && (
-                            <PaginationSimple
-                                page={duePage}
-                                totalPages={dueTotalPages}
-                                totalElements={dueList.length}
-                                rowsPerPage={dueRowsPerPage}
-                                onPageChange={setDuePage}
-                                onRowsPerPageChange={(n) => {
-                                    setDueRowsPerPage(n);
-                                    setDuePage(1);
-                                }}
-                            />
-                        )}
-                    </div>
-                </div>
-
-                {/* Kadaluarsa */}
-                <div className="card bg-base-100 border rounded-2xl shadow-sm">
-                    <div className="card-body p-4 md:p-5">
-                        <div className="flex items-center justify-between">
-                            <h2 className="card-title text-base md:text-lg text-red-600">Kadaluarsa</h2>
-                        </div>
-                        <div className="overflow-auto max-h-96">
-                            <table className="table table-xs md:table-sm">
-                                <thead>
-                                    <tr>
-                                        <th>NIP</th>
-                                        <th>Nama</th>
-                                        <th>Rule</th>
-                                        <th>Jatuh Tempo</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {loadingAlert ? (
-                                        Array.from({ length: 6 }).map((_, i) => (
-                                            <tr key={i}>
-                                                <td colSpan={4}>
-                                                    <div className="skeleton h-5 w-full" />
-                                                </td>
-                                            </tr>
-                                        ))
-                                    ) : expiredList.length === 0 ? (
-                                        <tr>
-                                            <td colSpan={4} className="text-sm opacity-60">
-                                                Tidak ada data
-                                            </td>
-                                        </tr>
-                                    ) : (
-                                        expiredPaged.map((x, idx) => {
-                                            const deadline = getDeadline(x);
-                                            return (
-                                                <tr
-                                                    key={idx}
-                                                    className="hover cursor-pointer"
-                                                    onClick={(e) => {
-                                                        e.preventDefault();
-                                                        e.stopPropagation();
-                                                        navigate(getPriorityPath(x));
-                                                    }}
-                                                >
-                                                    <td className="whitespace-nowrap">{x.nip}</td>
-                                                    <td className="whitespace-nowrap">{x.employeeName ?? x.name}</td>
-                                                    <td className="whitespace-nowrap">{getRuleCode(x)}</td>
-                                                    <td className="whitespace-nowrap">{fmtID(deadline)}</td>
-                                                </tr>
-                                            );
-                                        })
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-
-                        {expiredList.length > 0 && (
-                            <PaginationSimple
-                                page={expiredPage}
-                                totalPages={expiredTotalPages}
-                                totalElements={expiredList.length}
-                                rowsPerPage={expiredRowsPerPage}
-                                onPageChange={setExpiredPage}
-                                onRowsPerPageChange={(n) => {
-                                    setExpiredRowsPerPage(n);
-                                    setExpiredPage(1);
-                                }}
-                            />
-                        )}
-                    </div>
-                </div>
+                <EligibilityPriorityCard
+                    title="Jatuh Tempo"
+                    status="DUE"
+                    accentClass="text-amber-600"
+                    filters={currentFilters()}
+                    initialRowsPerPage={10}
+                />
+                <EligibilityPriorityCard
+                    title="Kadaluarsa"
+                    status="EXPIRED"
+                    accentClass="text-red-600"
+                    filters={currentFilters()}
+                    initialRowsPerPage={10}
+                />
             </div>
         </div>
     );

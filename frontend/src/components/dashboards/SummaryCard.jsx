@@ -8,8 +8,10 @@ export default function SummaryCard({ label, value, tone = "neutral", icon = nul
         info: "bg-blue-50 text-blue-700 border-blue-100",
     };
 
+    const toneClass = tones[tone] || tones.neutral;
+
     return (
-        <div className={`card border ${tones[tone] || tones.neutral} shadow-sm rounded-2xl`}>
+        <div className={`card border ${toneClass} shadow-sm rounded-2xl`}>
             <div className="card-body p-4 md:p-5">
                 <div className="flex items-center justify-between gap-3">
                     <div>

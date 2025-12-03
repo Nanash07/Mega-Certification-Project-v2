@@ -1,7 +1,9 @@
+// src/main/java/com/bankmega/certification/controller/EmployeeController.java
 package com.bankmega.certification.controller;
 
 import com.bankmega.certification.dto.EmployeeRequest;
 import com.bankmega.certification.dto.EmployeeResponse;
+import com.bankmega.certification.dto.dashboard.EmployeeCountResponse;
 import com.bankmega.certification.service.EmployeeService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -47,6 +49,17 @@ public class EmployeeController {
         return ResponseEntity.ok(
                 service.searchResigned(employeeIds, regionalIds, divisionIds, unitIds, jobPositionIds, search,
                         pageable));
+    }
+
+    // ======= DASHBOARD COUNT (ACTIVE ONLY) =======
+    @GetMapping("/count")
+    public ResponseEntity<EmployeeCountResponse> countActive(
+            @RequestParam(required = false) Long regionalId,
+            @RequestParam(required = false) Long divisionId,
+            @RequestParam(required = false) Long unitId) {
+
+        long count = service.countActive(regionalId, divisionId, unitId);
+        return ResponseEntity.ok(new EmployeeCountResponse(count));
     }
 
     // All active (for dropdown)

@@ -1,3 +1,4 @@
+// src/main/java/com/bankmega/certification/specification/EmployeeSpecification.java
 package com.bankmega.certification.specification;
 
 import com.bankmega.certification.entity.Employee;
@@ -57,5 +58,25 @@ public class EmployeeSpecification {
         return (root, query, cb) -> (ids == null || ids.isEmpty())
                 ? cb.conjunction()
                 : root.get("jobPosition").get("id").in(ids);
+    }
+
+    // ===== Single-id filter (buat dashboard count) =====
+
+    public static Specification<Employee> byRegionalId(Long id) {
+        return (root, query, cb) -> (id == null)
+                ? cb.conjunction()
+                : cb.equal(root.get("regional").get("id"), id);
+    }
+
+    public static Specification<Employee> byDivisionId(Long id) {
+        return (root, query, cb) -> (id == null)
+                ? cb.conjunction()
+                : cb.equal(root.get("division").get("id"), id);
+    }
+
+    public static Specification<Employee> byUnitId(Long id) {
+        return (root, query, cb) -> (id == null)
+                ? cb.conjunction()
+                : cb.equal(root.get("unit").get("id"), id);
     }
 }

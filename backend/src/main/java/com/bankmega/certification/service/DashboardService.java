@@ -34,10 +34,6 @@ public class DashboardService {
                 .build();
     }
 
-    public List<MonthlyPoint> getMonthly(DashboardFilters f) {
-        return repo.fetchMonthly(ensureFilters(f));
-    }
-
     private DashboardFilters ensureFilters(DashboardFilters f) {
         return f == null
                 ? DashboardFilters.builder().build()

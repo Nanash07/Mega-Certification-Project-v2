@@ -12,9 +12,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.lang.reflect.Method;
 import java.time.LocalDate;
-import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 
 @RestController
@@ -156,27 +154,6 @@ public class DashboardController {
         f = applyPicScope(f, auth, userId);
         return svc.getSummary(f);
     }
-
-    @GetMapping("/monthly")
-    public List<MonthlyPoint> monthly(
-            @RequestParam(required = false) Long regionalId,
-            @RequestParam(required = false) Long divisionId,
-            @RequestParam(required = false) Long unitId,
-            @RequestParam(required = false) Long certificationId,
-            @RequestParam(required = false) Long levelId,
-            @RequestParam(required = false) Long subFieldId,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
-            @RequestParam(required = false) String batchType,
-            Authentication auth,
-            @AuthenticationPrincipal(expression = "id") Long userId) {
-        DashboardFilters f = toFilters(regionalId, divisionId, unitId,
-                certificationId, levelId, subFieldId,
-                startDate, endDate, batchType);
-        f = applyPicScope(f, auth, userId);
-        return svc.getMonthly(f);
-    }
-
     /* ================= endpoints khusus Pegawai ================= */
 
     @GetMapping("/employee/summary")
@@ -200,22 +177,5 @@ public class DashboardController {
         // NOTE: tidak pakai applyPicScope, karena ini mode pegawai (scope by
         // employeeId)
         return svc.getSummary(f);
-    }
-
-    @GetMapping("/employee/monthly")
-    public List<MonthlyPoint> employeeMonthly(
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
-            @RequestParam(required = false) String batchType,
-            Authentication auth,
-            @AuthenticationPrincipal(expression = "employeeId") Long employeeIdFromPrincipal) {
-
-        Long employeeId = extractEmployeeId(auth, employeeIdFromPrincipal);
-        if (employeeId == null) {
-            return List.of();
-        }
-
-        DashboardFilters f = toEmployeeFilters(employeeId, startDate, endDate, batchType);
-        return svc.getMonthly(f);
     }
 }
