@@ -6,7 +6,7 @@ import { createException } from "../../services/employeeExceptionService";
 import { fetchCertificationRules } from "../../services/certificationRuleService";
 import { fetchEmployees } from "../../services/employeeService";
 
-export default function CreateExceptionModal({ open, onClose, onSaved }) {
+export default function CreateExceptionModal({ open, onClose, onSaved, picCertCodes }) {
     const [rules, setRules] = useState([]);
     const [defaultEmployees, setDefaultEmployees] = useState([]);
     const [form, setForm] = useState({
@@ -19,10 +19,24 @@ export default function CreateExceptionModal({ open, onClose, onSaved }) {
     useEffect(() => {
         if (!open) return;
 
+        const picSet =
+            picCertCodes instanceof Set ? picCertCodes : Array.isArray(picCertCodes) ? new Set(picCertCodes) : null;
+
+        // load rules
         fetchCertificationRules()
-            .then(setRules)
+            .then((allRules) => {
+                let effective = allRules || [];
+
+                // kalau PIC punya scope → filter rule by certificationCode
+                if (picSet && picSet.size > 0) {
+                    effective = effective.filter((r) => r.certificationCode && picSet.has(r.certificationCode));
+                }
+
+                setRules(effective);
+            })
             .catch(() => toast.error("Gagal memuat aturan sertifikasi"));
 
+        // load default employees
         fetchEmployees({ page: 0, size: 10 })
             .then((res) => {
                 const opts = (res.content || []).map((e) => ({
@@ -36,14 +50,26 @@ export default function CreateExceptionModal({ open, onClose, onSaved }) {
                 setDefaultEmployees([]);
             });
 
+        // reset form tiap kali modal kebuka
         setForm({ employeeId: null, employeeLabel: "", certificationRuleId: null, notes: "" });
-    }, [open]);
+    }, [open, picCertCodes]);
 
     async function onSubmit() {
         if (!form.employeeId || !form.certificationRuleId) {
             toast.error("Pilih pegawai & sertifikasi dulu");
             return;
         }
+
+        // double guard di FE kalau PIC scope dikirim
+        const rule = rules.find((r) => r.id === form.certificationRuleId);
+        const picSet =
+            picCertCodes instanceof Set ? picCertCodes : Array.isArray(picCertCodes) ? new Set(picCertCodes) : null;
+
+        if (picSet && picSet.size > 0 && rule?.certificationCode && !picSet.has(rule.certificationCode)) {
+            toast.error("Sertifikasi di luar scope PIC");
+            return;
+        }
+
         try {
             await createException({
                 employeeId: form.employeeId,
@@ -54,7 +80,7 @@ export default function CreateExceptionModal({ open, onClose, onSaved }) {
             onSaved?.();
             onClose();
         } catch (err) {
-            toast.error(err.response?.data?.message || "Gagal menambah exception");
+            toast.error(err?.response?.data?.message || "Gagal menambah exception");
         }
     }
 
@@ -85,10 +111,10 @@ export default function CreateExceptionModal({ open, onClose, onSaved }) {
         menuPortal: (base) => ({ ...base, zIndex: 99999 }),
         control: (base, state) => ({
             ...base,
-            minHeight: 32, // tinggi kecil (mirip text-xs)
+            minHeight: 32,
             height: 32,
-            fontSize: "0.75rem", // text-xs
-            borderColor: state.isFocused ? "#60a5fa" : base.borderColor, // fokus = biru-300-ish
+            fontSize: "0.75rem",
+            borderColor: state.isFocused ? "#60a5fa" : base.borderColor,
             boxShadow: "none",
             ":hover": { borderColor: "#60a5fa" },
         }),
@@ -185,6 +211,11 @@ export default function CreateExceptionModal({ open, onClose, onSaved }) {
                             menuShouldScrollIntoView={false}
                             isClearable
                         />
+                        {picCertCodes && (
+                            <p className="text-[10px] text-gray-400 mt-1">
+                                *PIC hanya dapat memilih sertifikasi dalam scope yang diberikan.
+                            </p>
+                        )}
                     </div>
 
                     {/* Catatan */}

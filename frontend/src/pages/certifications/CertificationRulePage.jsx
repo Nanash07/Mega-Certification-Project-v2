@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import Select from "react-select";
-import { Plus, History as HistoryIcon, Eraser, Pencil, Trash2, ChevronDown } from "lucide-react";
+import { Plus, History as HistoryIcon, Pencil, Trash2, ChevronDown, Eraser } from "lucide-react";
 
 import Pagination from "../../components/common/Pagination";
 import {
@@ -13,13 +13,33 @@ import {
 import { fetchCertifications } from "../../services/certificationService";
 import { fetchCertificationLevels } from "../../services/certificationLevelService";
 import { fetchSubFields } from "../../services/subFieldService";
+import { fetchMyPicScope } from "../../services/picScopeService";
 import CreateCertificationRuleModal from "../../components/certification-rules/CreateCertificationRuleModal";
 import EditCertificationRuleModal from "../../components/certification-rules/EditCertificationRuleModal";
 
 const TABLE_COLS = 11;
 
+// ===== helper role dari localStorage =====
+function getCurrentRole() {
+    if (typeof window === "undefined") return "";
+    try {
+        const user = JSON.parse(localStorage.getItem("user") || "{}");
+        const fromUser = (user.role || "").toString().toUpperCase();
+        if (fromUser) return fromUser;
+    } catch {
+        // ignore
+    }
+    return (localStorage.getItem("role") || "").toString().toUpperCase();
+}
+
 export default function CertificationRulePage() {
     const navigate = useNavigate();
+
+    const [role] = useState(() => getCurrentRole());
+    const isSuperadmin = role === "SUPERADMIN";
+    const isPic = role === "PIC";
+    const isEmployee = role === "EMPLOYEE" || role === "PEGAWAI";
+
     const [rows, setRows] = useState([]);
     const [loading, setLoading] = useState(false);
     const [openCreate, setOpenCreate] = useState(false);
@@ -48,11 +68,14 @@ export default function CertificationRulePage() {
         label: "Semua",
     });
 
+    // Scope PIC (kode sertifikasi yang boleh di-manage PIC)
+    const [picCertCodes, setPicCertCodes] = useState(null);
+
     // 🔹 Helper tanggal + jam
     function formatDateTime(value) {
         if (!value) return "-";
         const d = new Date(value);
-        if (isNaN(d.getTime())) return "-";
+        if (Number.isNaN(d.getTime())) return "-";
         return d.toLocaleString("id-ID", {
             day: "2-digit",
             month: "short",
@@ -103,6 +126,9 @@ export default function CertificationRulePage() {
 
     // 🔹 Load data
     async function load() {
+        // Employee seharusnya sudah di-redirect, tapi guard ekstra
+        if (isEmployee) return;
+
         setLoading(true);
         try {
             const params = {
@@ -116,7 +142,14 @@ export default function CertificationRulePage() {
             if (filterSub.length > 0) params.subIds = filterSub.map((f) => f.value);
 
             const res = await fetchCertificationRulesPaged(params);
-            setRows(res.content || []);
+            let content = res.content || [];
+
+            // PIC: filter lagi di FE supaya hanya lihat rule dengan certificationCode yang ada di scope PIC
+            if (isPic && picCertCodes && picCertCodes.size > 0) {
+                content = content.filter((r) => r.certificationCode && picCertCodes.has(r.certificationCode));
+            }
+
+            setRows(content);
             setTotalPages(res.totalPages || 1);
             setTotalElements(res.totalElements || 0);
         } catch (err) {
@@ -127,7 +160,11 @@ export default function CertificationRulePage() {
         }
     }
 
+    // 🔹 Load filter master (role aware)
     async function loadFilters() {
+        // Employee gak perlu load filter karena gak boleh akses
+        if (isEmployee) return;
+
         try {
             const [certs, levels, subs] = await Promise.all([
                 fetchCertifications(),
@@ -135,21 +172,72 @@ export default function CertificationRulePage() {
                 fetchSubFields(),
             ]);
 
-            setCertOptions(certs.map((c) => ({ value: c.id, label: c.code })));
-            setLevelOptions(levels.map((l) => ({ value: l.id, label: `${l.level}` })));
-            setSubOptions(subs.map((s) => ({ value: s.id, label: s.code })));
-        } catch {
+            let effectiveCerts = certs || [];
+
+            if (isPic) {
+                // PIC → batasi sertifikasi berdasarkan scope PIC (pakai certificationCode)
+                try {
+                    const scope = await fetchMyPicScope();
+                    const scopeCerts = scope?.certifications || [];
+                    const codes = new Set(
+                        scopeCerts.map((s) => s.certificationCode).filter((code) => code && String(code).trim() !== "")
+                    );
+
+                    setPicCertCodes(codes);
+
+                    effectiveCerts = effectiveCerts.filter((c) => codes.has(c.code));
+                } catch (e) {
+                    console.error("load PIC scope error:", e);
+                    toast.error("Gagal memuat scope sertifikasi PIC");
+                }
+            }
+
+            // Sertifikasi
+            setCertOptions(
+                (effectiveCerts || []).map((c) => ({
+                    value: c.id,
+                    label: c.code,
+                }))
+            );
+
+            // Level
+            setLevelOptions(
+                (levels || []).map((l) => ({
+                    value: l.id,
+                    label: `${l.level}`,
+                }))
+            );
+
+            // Sub bidang
+            setSubOptions(
+                (subs || []).map((s) => ({
+                    value: s.id,
+                    label: s.code,
+                }))
+            );
+        } catch (e) {
+            console.error("loadFilters error:", e);
             toast.error("Gagal memuat data filter");
         }
     }
 
     useEffect(() => {
+        // kalau role PEGAWAI, langsung tendang keluar
+        if (isEmployee) {
+            toast.error("Anda tidak berwenang mengakses halaman ini");
+            navigate("/", { replace: true });
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isEmployee]);
+
+    useEffect(() => {
         load();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [page, rowsPerPage, filterCert, filterLevel, filterSub, filterStatus]);
+    }, [page, rowsPerPage, filterCert, filterLevel, filterSub, filterStatus, picCertCodes]);
 
     useEffect(() => {
         loadFilters();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     // 🔹 Delete
@@ -194,12 +282,16 @@ export default function CertificationRulePage() {
 
     const startIdx = totalElements === 0 ? 0 : (page - 1) * rowsPerPage + 1;
 
+    // Kalau lagi redirect sebagai PEGAWAI, jangan render apa-apa dulu
+    if (isEmployee) {
+        return null;
+    }
+
     return (
         <div>
             {/* Toolbar Filter + Actions */}
             <div className="mb-4 space-y-3">
-                {/* Row 2: filters + clear */}
-                <div className="grid grid-cols-1 md:grid-cols-6 gap-3 items-end text-xs">
+                <div className="grid grid-cols-1 md:grid-cols-7 gap-3 items-end text-xs">
                     {/* Filter Sertifikasi */}
                     <div className="col-span-1">
                         <Select
@@ -250,6 +342,7 @@ export default function CertificationRulePage() {
                         />
                     </div>
 
+                    {/* Tambah aturan (hanya untuk admin/PIC) */}
                     <div className="col-span-1">
                         <button
                             type="button"
@@ -261,19 +354,29 @@ export default function CertificationRulePage() {
                         </button>
                     </div>
 
+                    {/* Histori */}
                     <div className="col-span-1">
                         <button
                             type="button"
                             className="btn btn-accent btn-sm w-full"
-                            onClick={() => navigate("/sertifikasi/aturan-sertifikat/histories")}
+                            onClick={() => navigate("/sertifikat/aturan-sertifikat/histories")}
                         >
                             <HistoryIcon className="w-4 h-4" />
                             <span>Histori</span>
                         </button>
                     </div>
 
-                    {/* Spacer supaya grid tetap 6 kolom */}
-                    <div className="col-span-1 hidden md:block" />
+                    {/* Clear Filter */}
+                    <div className="col-span-1">
+                        <button
+                            type="button"
+                            className="btn btn-accent btn-soft border-accent btn-sm w-full"
+                            onClick={resetFilter}
+                        >
+                            <Eraser className="w-4 h-4" />
+                            Clear Filter
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -313,24 +416,26 @@ export default function CertificationRulePage() {
                                 <tr key={r.id}>
                                     <td>{startIdx + idx}</td>
 
-                                    {/* Aksi: edit + delete (icon) */}
+                                    {/* Aksi: edit + delete (icon + tooltip) */}
                                     <td className="space-x-1">
-                                        <button
-                                            type="button"
-                                            className="btn btn-xs btn-soft btn-warning border-warning"
-                                            onClick={() => setEditItem(r)}
-                                            title="Edit aturan"
-                                        >
-                                            <Pencil className="w-3 h-3" />
-                                        </button>
-                                        <button
-                                            type="button"
-                                            className="btn btn-xs btn-soft btn-error border-error"
-                                            onClick={() => setConfirm({ open: true, id: r.id })}
-                                            title="Hapus aturan"
-                                        >
-                                            <Trash2 className="w-3 h-3" />
-                                        </button>
+                                        <div className="inline-block tooltip" data-tip="Edit aturan">
+                                            <button
+                                                type="button"
+                                                className="btn btn-xs btn-soft btn-warning border-warning"
+                                                onClick={() => setEditItem(r)}
+                                            >
+                                                <Pencil className="w-3 h-3" />
+                                            </button>
+                                        </div>
+                                        <div className="inline-block tooltip" data-tip="Hapus aturan">
+                                            <button
+                                                type="button"
+                                                className="btn btn-xs btn-soft btn-error border-error"
+                                                onClick={() => setConfirm({ open: true, id: r.id })}
+                                            >
+                                                <Trash2 className="w-3 h-3" />
+                                            </button>
+                                        </div>
                                     </td>
 
                                     <td>{r.certificationCode}</td>

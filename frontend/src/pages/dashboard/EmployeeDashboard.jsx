@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import Select from "react-select";
 import api from "../../services/api";
 
-import { fetchEmployeeEligibilityPaged } from "../../services/employeeEligibilityService";
+import { fetchEmployeeEligibilityPaged, fetchEligibilityCount } from "../../services/employeeEligibilityService";
 import { fetchEmployeeOngoingBatchesPaged, fetchMonthlyBatches } from "../../services/batchService";
 
 import { formatShortIdDateTime } from "../../utils/date";
@@ -36,39 +36,6 @@ function getCurrentEmployeeId() {
     if (raw == null || raw === "") return null;
     const num = Number(raw);
     return Number.isNaN(num) ? null : num;
-}
-
-/* ========= mapping SummaryDTO dari /dashboard/employee/summary ========= */
-function mapSummaryDto(dto) {
-    const employeeCount = Number(dto?.employeeCount ?? 0);
-    const certifiedIncDue = Number(dto?.certifiedCount ?? 0);
-    const dueCount = Number(dto?.dueCount ?? 0);
-    const expiredCount = Number(dto?.expiredCount ?? 0);
-    const notYetCount = Number(dto?.notYetCount ?? 0);
-    const eligibleTotal = Number(dto?.eligiblePopulation ?? 0);
-    const ongoingBatchCnt = Number(dto?.ongoingBatchCount ?? 0);
-
-    const activeOnly = Math.max(0, certifiedIncDue - dueCount); // ACTIVE only
-
-    const mappedSummary = {
-        employees: { active: employeeCount },
-        certifications: {
-            active: certifiedIncDue, // ACTIVE + DUE
-            due: dueCount,
-            expired: expiredCount,
-        },
-        batches: { ongoing: ongoingBatchCnt },
-        eligibility: { total: eligibleTotal },
-    };
-
-    const mappedKpi = {
-        notYetCertified: notYetCount,
-        active: activeOnly,
-        due: dueCount,
-        expired: expiredCount,
-    };
-
-    return { mappedSummary, mappedKpi };
 }
 
 /* ========= small components ========= */
@@ -110,7 +77,6 @@ function QuotaBar({ filled = 0, quota = 0, className }) {
 
     const pct = Math.min(100, Math.round((f / q) * 100));
     const label = `${f}/${q} (${pct}%)`;
-
     const barColor = f >= q ? "bg-success" : "bg-warning";
 
     return (
@@ -194,7 +160,7 @@ function SummaryCardsRow({ summary, cardConfigs }) {
 
 function OwnershipPieSection({ kpi, real }) {
     return (
-        <div className="card bg-base-100 border rounded-2xl shadow-sm xl:col-span-2">
+        <div className="card bg-base-100 border rounded-2xl shadow-sm">
             <div className="card-body p-4 md:p-5">
                 <h2 className="card-title text-base md:text-lg">Kepemilikan Sertifikat</h2>
                 {!kpi ? (
@@ -261,7 +227,7 @@ function OwnershipPieSection({ kpi, real }) {
 
 function BatchExecutionSection({ batchTypeOptions, batchType, setBatchType, monthly }) {
     return (
-        <div className="card bg-base-100 border rounded-2xl shadow-sm xl:col-span-2">
+        <div className="card bg-base-100 border rounded-2xl shadow-sm">
             <div className="card-body p-4 md:p-5">
                 <div className="flex items-center justify-between gap-2">
                     <h2 className="card-title text-base md:text-lg">Pelaksanaan Batch</h2>
@@ -315,7 +281,7 @@ function OngoingBatchSection({
     const navigate = useNavigate();
 
     return (
-        <div className="card bg-base-100 border rounded-2xl shadow-sm xl:col-span-1">
+        <div className="card bg-base-100 border rounded-2xl shadow-sm">
             <div className="card-body p-4 md:p-5">
                 <div className="flex items-center justify-between">
                     <h2 className="card-title text-base md:text-lg">Batch Berjalan</h2>
@@ -413,7 +379,7 @@ function EligibilitySection({
     const navigate = useNavigate();
 
     return (
-        <div className="card bg-base-100 border rounded-2xl shadow-sm xl:col-span-4">
+        <div className="card bg-base-100 border rounded-2xl shadow-sm">
             <div className="card-body p-4 md:p-5 space-y-3">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                     <h2 className="card-title text-base md:text-lg">Eligibility Sertifikasi</h2>
@@ -528,9 +494,9 @@ function FinishedBatchSection({
     const navigate = useNavigate();
 
     return (
-        <div className="card bg-base-100 border rounded-2xl shadow-sm xl:col-span-1">
+        <div className="card bg-base-100 border rounded-2xl shadow-sm">
             <div className="card-body p-4 md:p-5">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify_between">
                     <h2 className="card-title text-base md:text-lg">Batch Selesai</h2>
                 </div>
 
@@ -665,17 +631,61 @@ export default function EmployeeDashboard() {
         batchType: batchType?.value || undefined,
     });
 
-    // ===== pakai API /dashboard/employee/summary (khusus pegawai) =====
+    // ===== summary & KPI (pakai count eligibility + batch employee) =====
     async function loadSummaryAndKpi() {
         try {
             const filters = currentFilters();
-            const { data } = await api.get("/dashboard/employee/summary", {
-                params: {
-                    batchType: filters.batchType,
-                },
-            });
+            const employeeId = getCurrentEmployeeId();
+            if (!employeeId) {
+                setSummary(null);
+                setKpi(null);
+                setComputedAt(null);
+                return;
+            }
 
-            const { mappedSummary, mappedKpi } = mapSummaryDto(data || {});
+            const baseEligFilters = {
+                employeeIds: [employeeId],
+                batchType: filters.batchType,
+            };
+
+            const [active, due, expired, notYet, ongoingRes] = await Promise.all([
+                fetchEligibilityCount({ ...baseEligFilters, status: "ACTIVE" }),
+                fetchEligibilityCount({ ...baseEligFilters, status: "DUE" }),
+                fetchEligibilityCount({ ...baseEligFilters, status: "EXPIRED" }),
+                fetchEligibilityCount({ ...baseEligFilters, status: "NOT_YET_CERTIFIED" }),
+                fetchEmployeeOngoingBatchesPaged({
+                    page: 0,
+                    size: 1,
+                }),
+            ]);
+
+            const activeNum = Number(active ?? 0);
+            const dueNum = Number(due ?? 0);
+            const expiredNum = Number(expired ?? 0);
+            const notYetNum = Number(notYet ?? 0);
+
+            const eligibleTotal = activeNum + dueNum + expiredNum + notYetNum;
+            const certifiedIncDue = activeNum + dueNum;
+            const ongoingCount = Number(ongoingRes?.totalElements ?? 0);
+
+            const mappedSummary = {
+                employees: { active: 1 },
+                certifications: {
+                    active: certifiedIncDue,
+                    due: dueNum,
+                    expired: expiredNum,
+                },
+                batches: { ongoing: ongoingCount },
+                eligibility: { total: eligibleTotal },
+            };
+
+            const mappedKpi = {
+                notYetCertified: notYetNum,
+                active: activeNum,
+                due: dueNum,
+                expired: expiredNum,
+            };
+
             setSummary(mappedSummary);
             setKpi(mappedKpi);
             setComputedAt(new Date().toISOString());
@@ -691,7 +701,7 @@ export default function EmployeeDashboard() {
         setLoadingBatch(true);
         try {
             const res = await fetchEmployeeOngoingBatchesPaged({
-                page: page - 1, // BE zero-based
+                page: page - 1,
                 size: batchRows,
             });
             const data = res || { content: [], totalPages: 0, totalElements: 0 };
@@ -732,7 +742,6 @@ export default function EmployeeDashboard() {
             const typeVal = batchType?.value || undefined;
             const data = await fetchMonthlyBatches({
                 type: typeVal,
-                // di employee, gak pakai filter org lain
             });
 
             const byIdx = Array(12).fill(0);
@@ -765,7 +774,7 @@ export default function EmployeeDashboard() {
             const params = {
                 employeeIds: [employeeId],
                 statuses: statusFilter.value ? [statusFilter.value] : undefined,
-                page: page - 1, // BE zero-based
+                page: page - 1,
                 size: pageSize,
             };
 
@@ -780,18 +789,15 @@ export default function EmployeeDashboard() {
         }
     }
 
-    // initial + reload ketika batchType berubah
     useEffect(() => {
         (async () => {
             await loadSummaryAndKpi();
             await loadMonthly();
 
-            // ONGOING (reset ke page 1)
             setBatchPage(1);
             setBatches([]);
             await loadBatches(1);
 
-            // FINISHED (reset ke page 1)
             setFinishedPage(1);
             setFinishedBatches([]);
             await loadFinishedBatches(1);
@@ -799,12 +805,10 @@ export default function EmployeeDashboard() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [batchType]);
 
-    // reset paging eligibility saat filter status berubah
     useEffect(() => {
         setEligPage(1);
     }, [statusFilter]);
 
-    // load eligibility ketika page / rows / filter berubah
     useEffect(() => {
         (async () => {
             await loadEligibility(eligPage, eligRowsPerPage);
@@ -844,7 +848,6 @@ export default function EmployeeDashboard() {
         };
     }, [summary, kpi]);
 
-    // Kartu ringkas
     const cardConfigs = useMemo(() => {
         return [
             {
@@ -901,11 +904,11 @@ export default function EmployeeDashboard() {
                 </p>
             </div>
 
-            {/* Kartu ringkas (row pertama) */}
+            {/* Kartu ringkas */}
             <SummaryCardsRow summary={summary} cardConfigs={cardConfigs} />
 
-            {/* Row kedua: Kepemilikan Sertifikat + Pelaksanaan Batch + Batch Berjalan */}
-            <div className="grid grid-cols-1 xl:grid-cols-5 gap-4">
+            {/* Row 1: PIE + BAR */}
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                 <OwnershipPieSection kpi={kpi} real={real} />
                 <BatchExecutionSection
                     batchTypeOptions={batchTypeOptions}
@@ -913,6 +916,10 @@ export default function EmployeeDashboard() {
                     setBatchType={setBatchType}
                     monthly={monthly}
                 />
+            </div>
+
+            {/* Row 2: BATCH BERJALAN + BATCH SELESAI */}
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                 <OngoingBatchSection
                     batches={batches}
                     loadingBatch={loadingBatch}
@@ -923,10 +930,20 @@ export default function EmployeeDashboard() {
                     setBatchRows={setBatchRows}
                     loadBatches={loadBatches}
                 />
+                <FinishedBatchSection
+                    finishedBatches={finishedBatches}
+                    loadingFinished={loadingFinished}
+                    finishedTotalElements={finishedTotalElements}
+                    finishedTotalPages={finishedTotalPages}
+                    finishedPage={finishedPage}
+                    finishedRows={finishedRows}
+                    setFinishedRows={setFinishedRows}
+                    loadFinishedBatches={loadFinishedBatches}
+                />
             </div>
 
-            {/* Row ketiga: Eligibility (kiri lebar) + Batch Selesai (kanan) */}
-            <div className="grid grid-cols-1 xl:grid-cols-5 gap-4">
+            {/* Row 3: LIST ELIGIBILITY */}
+            <div className="grid grid-cols-1 gap-4">
                 <EligibilitySection
                     statusFilterOptions={statusFilterOptions}
                     statusFilter={statusFilter}
@@ -939,16 +956,6 @@ export default function EmployeeDashboard() {
                     eligTotalPages={eligTotalPages}
                     setEligPage={setEligPage}
                     setEligRowsPerPage={setEligRowsPerPage}
-                />
-                <FinishedBatchSection
-                    finishedBatches={finishedBatches}
-                    loadingFinished={loadingFinished}
-                    finishedTotalElements={finishedTotalElements}
-                    finishedTotalPages={finishedTotalPages}
-                    finishedPage={finishedPage}
-                    finishedRows={finishedRows}
-                    setFinishedRows={setFinishedRows}
-                    loadFinishedBatches={loadFinishedBatches}
                 />
             </div>
         </div>

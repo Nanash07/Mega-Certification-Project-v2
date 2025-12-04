@@ -450,12 +450,21 @@ public class EmployeeEligibilityService {
 
         List<CertificationRule> manualRules = exceptionRuleMap.getOrDefault(employee.getId(), List.of());
 
+        // Precompute ID set supaya gampang dan gak stream2 mulu
+        Set<Long> jobRuleIds = mappingRules.stream()
+                .map(CertificationRule::getId)
+                .collect(Collectors.toSet());
+
+        Set<Long> manualRuleIds = manualRules.stream()
+                .map(CertificationRule::getId)
+                .collect(Collectors.toSet());
+
         List<EmployeeEligibility> toSave = new ArrayList<>();
 
-        // deactivate outdated
+        // ===== 1) Deactivate outdated =====
         Set<Long> requiredIds = new HashSet<>();
-        mappingRules.forEach(r -> requiredIds.add(r.getId()));
-        manualRules.forEach(r -> requiredIds.add(r.getId()));
+        requiredIds.addAll(jobRuleIds);
+        requiredIds.addAll(manualRuleIds);
 
         Instant now = Instant.now();
         for (EmployeeEligibility ee : existingElig) {
@@ -474,8 +483,18 @@ public class EmployeeEligibilityService {
             }
         }
 
-        // add or reactivate valid
+        // Index existing by ruleId biar gak stream tiap loop
+        Map<Long, EmployeeEligibility> existingByRuleId = existingElig.stream()
+                .filter(ee -> ee.getCertificationRule() != null)
+                .collect(Collectors.toMap(
+                        ee -> ee.getCertificationRule().getId(),
+                        ee -> ee,
+                        (e1, e2) -> e1 // kalau duplikat, ambil yang pertama aja
+                ));
+
+        // ===== 2) Add or reactivate valid & SET SOURCE ULANG SELALU =====
         for (Long ruleId : requiredIds) {
+            // Ambil rule dari salah satu list
             CertificationRule rule = Stream.concat(manualRules.stream(), mappingRules.stream())
                     .filter(r -> r.getId().equals(ruleId))
                     .findFirst()
@@ -483,18 +502,32 @@ public class EmployeeEligibilityService {
             if (rule == null)
                 continue;
 
-            EmployeeEligibility eligibility = existingElig.stream()
-                    .filter(ee -> ee.getCertificationRule() != null
-                            && ee.getCertificationRule().getId().equals(ruleId))
-                    .findFirst()
-                    .orElseGet(EmployeeEligibility::new);
+            EmployeeEligibility eligibility = existingByRuleId.get(ruleId);
+            if (eligibility == null) {
+                eligibility = new EmployeeEligibility();
+                eligibility.setEmployee(employee);
+                eligibility.setCertificationRule(rule);
+            } else {
+                eligibility.setEmployee(employee);
+                eligibility.setCertificationRule(rule);
+            }
 
-            eligibility.setEmployee(employee);
-            eligibility.setCertificationRule(rule);
-            eligibility.setSource(
-                    manualRules.stream().anyMatch(r -> r.getId().equals(ruleId))
-                            ? EmployeeEligibility.EligibilitySource.BY_NAME
-                            : EmployeeEligibility.EligibilitySource.BY_JOB);
+            boolean fromJob = jobRuleIds.contains(ruleId);
+            boolean fromName = manualRuleIds.contains(ruleId);
+
+            // ==== DI SINI KUNCI-NYA BRO ====
+            // Selalu hitung ulang source, status ACTIVE/DUE/EXPIRED gak ngaruh.
+            if (fromJob) {
+                // Kalau rule ada di mapping job → SELALU BY_JOB (prioritas utama)
+                eligibility.setSource(EmployeeEligibility.EligibilitySource.BY_JOB);
+            } else if (fromName) {
+                // Hanya kalau TIDAK dari job tapi ada di exception by-name
+                eligibility.setSource(EmployeeEligibility.EligibilitySource.BY_NAME);
+            } else {
+                // Fallback: kalau entah gimana ruleId gak ada di dua-duanya
+                eligibility.setSource(null);
+            }
+
             if (eligibility.getStatus() == null) {
                 eligibility.setStatus(EmployeeEligibility.EligibilityStatus.NOT_YET_CERTIFIED);
             }

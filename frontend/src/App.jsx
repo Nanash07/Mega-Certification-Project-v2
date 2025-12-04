@@ -127,7 +127,7 @@ export default function App() {
                 <Route
                     path="/employee/eligibility"
                     element={
-                        <ProtectedRoute roles={["SUPERADMIN"]}>
+                        <ProtectedRoute roles={["SUPERADMIN", "PIC", "PEGAWAI"]}>
                             <MainLayout>
                                 <EmployeeEligibilityPage />
                             </MainLayout>
@@ -137,7 +137,7 @@ export default function App() {
                 <Route
                     path="/employee/exception"
                     element={
-                        <ProtectedRoute roles={["SUPERADMIN"]}>
+                        <ProtectedRoute roles={["SUPERADMIN", "PIC"]}>
                             <MainLayout>
                                 <EmployeeExceptionPage />
                             </MainLayout>
@@ -167,7 +167,7 @@ export default function App() {
                 <Route
                     path="/employee/data/histories"
                     element={
-                        <ProtectedRoute roles={["SUPERADMIN"]}>
+                        <ProtectedRoute roles={["SUPERADMIN", "PIC"]}>
                             <MainLayout>
                                 <EmployeeHistoryPage />
                             </MainLayout>
@@ -253,7 +253,7 @@ export default function App() {
                 <Route
                     path="/batch"
                     element={
-                        <ProtectedRoute roles={["SUPERADMIN"]}>
+                        <ProtectedRoute roles={["SUPERADMIN", "PIC"]}>
                             <MainLayout>
                                 <BatchPage />
                             </MainLayout>
@@ -305,7 +305,7 @@ export default function App() {
                 <Route
                     path="/sertifikat/aturan-sertifikat"
                     element={
-                        <ProtectedRoute roles={["SUPERADMIN"]}>
+                        <ProtectedRoute roles={["SUPERADMIN", "PIC"]}>
                             <MainLayout>
                                 <CertificationRulePage />
                             </MainLayout>
@@ -315,7 +315,7 @@ export default function App() {
                 <Route
                     path="/sertifikat/aturan-sertifikat/histories"
                     element={
-                        <ProtectedRoute roles={["SUPERADMIN"]}>
+                        <ProtectedRoute roles={["SUPERADMIN", "PIC"]}>
                             <MainLayout>
                                 <CertificationRuleHistoryPage />
                             </MainLayout>
@@ -325,7 +325,7 @@ export default function App() {
                 <Route
                     path="/sertifikat/lembaga"
                     element={
-                        <ProtectedRoute roles={["SUPERADMIN"]}>
+                        <ProtectedRoute roles={["SUPERADMIN", "PIC"]}>
                             <MainLayout>
                                 <InstitutionPage />
                             </MainLayout>

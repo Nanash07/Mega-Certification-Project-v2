@@ -11,7 +11,8 @@ import { fetchUnits } from "../../services/unitService";
 import { fetchCertificationLevels } from "../../services/certificationLevelService";
 import { fetchSubFields } from "../../services/subFieldService";
 import { fetchMyPicScope } from "../../services/picScopeService";
-import { fetchMonthlyBatches } from "../../services/batchService";
+import { fetchBatches, fetchMonthlyBatches } from "../../services/batchService";
+import { fetchEligibilityCount } from "../../services/employeeEligibilityService";
 
 import { formatShortIdDateTime } from "../../utils/date";
 
@@ -49,40 +50,6 @@ function SelectTop(props) {
 function toOptions(data, labelPicker) {
     const arr = Array.isArray(data?.content) ? data.content : Array.isArray(data) ? data : [];
     return arr.filter(Boolean).map((x) => ({ value: x.id, label: labelPicker(x), raw: x }));
-}
-
-/** mapping SummaryDTO backend -> summary + kpi (sama persis dengan Superadmin) */
-function mapSummaryDto(dto) {
-    const employeeCount = Number(dto?.employeeCount ?? 0);
-    const certifiedIncDue = Number(dto?.certifiedCount ?? 0); // ACTIVE + DUE
-    const dueCount = Number(dto?.dueCount ?? 0);
-    const expiredCount = Number(dto?.expiredCount ?? 0);
-    const notYetCount = Number(dto?.notYetCount ?? 0);
-    const eligibleTotal = Number(dto?.eligiblePopulation ?? 0);
-    const ongoingBatchCnt = Number(dto?.ongoingBatchCount ?? 0);
-
-    // ACTIVE only = (ACTIVE + DUE) - DUE
-    const activeOnly = Math.max(0, certifiedIncDue - dueCount);
-
-    const mappedSummary = {
-        employees: { active: employeeCount },
-        certifications: {
-            active: certifiedIncDue, // definisi "Tersertifikasi" = ACTIVE + DUE
-            due: dueCount,
-            expired: expiredCount,
-        },
-        batches: { ongoing: ongoingBatchCnt },
-        eligibility: { total: eligibleTotal },
-    };
-
-    const mappedKpi = {
-        notYetCertified: notYetCount,
-        active: activeOnly,
-        due: dueCount,
-        expired: expiredCount,
-    };
-
-    return { mappedSummary, mappedKpi };
 }
 
 export default function PicDashboard() {
@@ -215,23 +182,74 @@ export default function PicDashboard() {
         };
     };
 
-    /* ===== loader summary + KPI: sekarang pakai /dashboard/summary ===== */
+    /* ===== loader summary + KPI: pakai count API (employees, eligibility, batch) ===== */
     async function loadSummaryAndKpi() {
-        const filters = currentFilters();
-        try {
-            const { data } = await api.get("/dashboard/summary", {
-                params: {
-                    regionalId: filters.regionalId,
-                    divisionId: filters.divisionId,
-                    unitId: filters.unitId,
-                    certificationId: filters.certificationId,
-                    levelId: filters.levelId,
-                    subFieldId: filters.subFieldId,
-                    // startDate, endDate, batchType tidak dipakai di summary (sama seperti Superadmin)
-                },
-            });
+        const f = currentFilters();
 
-            const { mappedSummary, mappedKpi } = mapSummaryDto(data || {});
+        const baseEligFilters = {
+            regionalId: f.regionalId,
+            divisionId: f.divisionId,
+            unitId: f.unitId,
+            certificationId: f.certificationId,
+            levelId: f.levelId,
+            subFieldId: f.subFieldId,
+        };
+
+        try {
+            const [employeeCountRes, active, due, expired, notYet, ongoingPage] = await Promise.all([
+                // count pegawai di scope org (regional/division/unit)
+                api.get("/employees/count", {
+                    params: {
+                        regionalId: f.regionalId,
+                        divisionId: f.divisionId,
+                        unitId: f.unitId,
+                    },
+                }),
+                // KPI eligibility dengan filter + scope PIC
+                fetchEligibilityCount({ ...baseEligFilters, status: "ACTIVE" }),
+                fetchEligibilityCount({ ...baseEligFilters, status: "DUE" }),
+                fetchEligibilityCount({ ...baseEligFilters, status: "EXPIRED" }),
+                fetchEligibilityCount({ ...baseEligFilters, status: "NOT_YET_CERTIFIED" }),
+                // Count batch ONGOING
+                fetchBatches({
+                    ...baseEligFilters,
+                    status: "ONGOING",
+                    page: 0,
+                    size: 1,
+                    sortField: "startDate",
+                    sortDirection: "desc",
+                }),
+            ]);
+
+            const employeeCount = Number(employeeCountRes?.data ?? 0) || 0;
+
+            const activeNum = Number(active ?? 0);
+            const dueNum = Number(due ?? 0);
+            const expiredNum = Number(expired ?? 0);
+            const notYetNum = Number(notYet ?? 0);
+
+            const eligibleTotal = activeNum + dueNum + expiredNum + notYetNum;
+            const certifiedIncDue = activeNum + dueNum;
+            const ongoingCount = Number(ongoingPage?.totalElements ?? 0);
+
+            const mappedSummary = {
+                employees: { active: employeeCount },
+                certifications: {
+                    active: certifiedIncDue,
+                    due: dueNum,
+                    expired: expiredNum,
+                },
+                batches: { ongoing: ongoingCount },
+                eligibility: { total: eligibleTotal },
+            };
+
+            const mappedKpi = {
+                notYetCertified: notYetNum,
+                active: activeNum,
+                due: dueNum,
+                expired: expiredNum,
+            };
+
             setSummary(mappedSummary);
             setKpi(mappedKpi);
             setComputedAt(new Date().toISOString());

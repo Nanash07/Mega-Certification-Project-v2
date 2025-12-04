@@ -5,6 +5,7 @@ import api from "../../services/api";
 import Select from "react-select";
 
 import { fetchBatches, fetchMonthlyBatches } from "../../services/batchService";
+import { fetchEligibilityCount } from "../../services/employeeEligibilityService";
 
 import { formatShortIdDateTime } from "../../utils/date";
 
@@ -30,7 +31,7 @@ import {
 import BatchListCard from "../../components/dashboards/BatchListCard";
 import EligibilityPriorityCard from "../../components/dashboards/EligibilityPriorityCard";
 
-// ====== MONTHS lokal (pengganti dari dashboardService) ======
+// ====== MONTHS lokal ======
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
 
 /* ========= helpers ========= */
@@ -75,39 +76,6 @@ function MiniCard({ label, value, sub, onClick, tip }) {
             </button>
         </div>
     );
-}
-
-/** mapping langsung dari SummaryDTO backend (/dashboard/summary) */
-function mapSummaryDto(dto) {
-    const employeeCount = Number(dto?.employeeCount ?? 0);
-    const certifiedIncDue = Number(dto?.certifiedCount ?? 0);
-    const dueCount = Number(dto?.dueCount ?? 0);
-    const expiredCount = Number(dto?.expiredCount ?? 0);
-    const notYetCount = Number(dto?.notYetCount ?? 0);
-    const eligibleTotal = Number(dto?.eligiblePopulation ?? 0);
-    const ongoingBatchCnt = Number(dto?.ongoingBatchCount ?? 0);
-
-    const activeOnly = Math.max(0, certifiedIncDue - dueCount); // ACTIVE only
-
-    const mappedSummary = {
-        employees: { active: employeeCount },
-        certifications: {
-            active: certifiedIncDue, // ACTIVE + DUE (definisi "tersretifikasi")
-            due: dueCount,
-            expired: expiredCount,
-        },
-        batches: { ongoing: ongoingBatchCnt },
-        eligibility: { total: eligibleTotal },
-    };
-
-    const mappedKpi = {
-        notYetCertified: notYetCount,
-        active: activeOnly,
-        due: dueCount,
-        expired: expiredCount,
-    };
-
-    return { mappedSummary, mappedKpi };
 }
 
 export default function SuperadminDashboard() {
@@ -232,20 +200,72 @@ export default function SuperadminDashboard() {
     const params = currentFilters;
 
     async function loadSummaryAndKpi() {
-        const filters = params();
-        try {
-            const { data } = await api.get("/dashboard/summary", {
-                params: {
-                    regionalId: filters.regionalId,
-                    divisionId: filters.divisionId,
-                    unitId: filters.unitId,
-                    certificationId: filters.certificationId,
-                    levelId: filters.levelId,
-                    subFieldId: filters.subFieldId,
-                },
-            });
+        const f = params();
 
-            const { mappedSummary, mappedKpi } = mapSummaryDto(data || {});
+        const baseEligFilters = {
+            regionalId: f.regionalId,
+            divisionId: f.divisionId,
+            unitId: f.unitId,
+            certificationId: f.certificationId,
+            levelId: f.levelId,
+            subFieldId: f.subFieldId,
+        };
+
+        try {
+            const [employeeCountRes, active, due, expired, notYet, ongoingPage] = await Promise.all([
+                // count pegawai by org filter
+                api.get("/employees/count", {
+                    params: {
+                        regionalId: f.regionalId,
+                        divisionId: f.divisionId,
+                        unitId: f.unitId,
+                    },
+                }),
+                // KPI eligibility: ACTIVE, DUE, EXPIRED, NOT_YET_CERTIFIED
+                fetchEligibilityCount({ ...baseEligFilters, status: "ACTIVE" }),
+                fetchEligibilityCount({ ...baseEligFilters, status: "DUE" }),
+                fetchEligibilityCount({ ...baseEligFilters, status: "EXPIRED" }),
+                fetchEligibilityCount({ ...baseEligFilters, status: "NOT_YET_CERTIFIED" }),
+                // count batch ONGOING (totalElements)
+                fetchBatches({
+                    ...baseEligFilters,
+                    status: "ONGOING",
+                    page: 0,
+                    size: 1,
+                    sortField: "startDate",
+                    sortDirection: "desc",
+                }),
+            ]);
+
+            const employeeCount = Number(employeeCountRes?.data ?? 0) || 0;
+
+            const activeNum = Number(active ?? 0);
+            const dueNum = Number(due ?? 0);
+            const expiredNum = Number(expired ?? 0);
+            const notYetNum = Number(notYet ?? 0);
+
+            const eligibleTotal = activeNum + dueNum + expiredNum + notYetNum;
+            const certifiedIncDue = activeNum + dueNum;
+            const ongoingCount = Number(ongoingPage?.totalElements ?? 0);
+
+            const mappedSummary = {
+                employees: { active: employeeCount },
+                certifications: {
+                    active: certifiedIncDue, // ACTIVE + DUE
+                    due: dueNum,
+                    expired: expiredNum,
+                },
+                batches: { ongoing: ongoingCount },
+                eligibility: { total: eligibleTotal },
+            };
+
+            const mappedKpi = {
+                notYetCertified: notYetNum,
+                active: activeNum, // ACTIVE only
+                due: dueNum,
+                expired: expiredNum,
+            };
+
             setSummary(mappedSummary);
             setKpi(mappedKpi);
             setComputedAt(new Date().toISOString());

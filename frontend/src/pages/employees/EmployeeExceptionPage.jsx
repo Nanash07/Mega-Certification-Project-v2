@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import Select from "react-select";
 import AsyncSelect from "react-select/async";
@@ -15,12 +15,46 @@ import { fetchCertifications } from "../../services/certificationService";
 import { fetchCertificationLevels } from "../../services/certificationLevelService";
 import { fetchSubFields } from "../../services/subFieldService";
 import { searchEmployees } from "../../services/employeeService";
+import { fetchMyPicScope } from "../../services/picScopeService";
+
 import CreateExceptionModal from "../../components/exceptions/CreateExceptionModal";
 import EditExceptionModal from "../../components/exceptions/EditExceptionModal";
 import ImportExceptionModal from "../../components/exceptions/ImportExceptionModal";
 import { Plus, Upload, Download, Eraser, Eye, Pencil, Trash2, ChevronDown } from "lucide-react";
 
+const TABLE_COLS = 11;
+
+// ===== helper role dari localStorage =====
+function getCurrentRole() {
+    if (typeof window === "undefined") return "";
+    try {
+        const user = JSON.parse(localStorage.getItem("user") || "{}");
+        const fromUser = (user.role || "").toString().toUpperCase();
+        if (fromUser) return fromUser;
+    } catch {
+        // ignore
+    }
+    return (localStorage.getItem("role") || "").toString().toUpperCase();
+}
+
 export default function EmployeeExceptionPage() {
+    const navigate = useNavigate();
+
+    // ===== ROLE STATE =====
+    const [role, setRole] = useState(null);
+    useEffect(() => {
+        setRole(getCurrentRole());
+    }, []);
+
+    const isRoleLoaded = role !== null;
+    const isSuperadmin = role === "SUPERADMIN";
+    const isPic = role === "PIC";
+    const isEmployee = role === "EMPLOYEE" || role === "PEGAWAI";
+
+    // scope PIC (kode sertifikasi)
+    const [picCertCodes, setPicCertCodes] = useState(null);
+
+    // ===== DATA & UI STATE =====
     const [rows, setRows] = useState([]);
     const [loading, setLoading] = useState(false);
 
@@ -30,12 +64,13 @@ export default function EmployeeExceptionPage() {
     const [totalPages, setTotalPages] = useState(0);
     const [totalElements, setTotalElements] = useState(0);
 
-    // Filters
+    // Filters options
     const [jobOptions, setJobOptions] = useState([]);
     const [certOptions, setCertOptions] = useState([]);
     const [levelOptions, setLevelOptions] = useState([]);
     const [subOptions, setSubOptions] = useState([]);
 
+    // Filters value
     const [filterEmployee, setFilterEmployee] = useState(null);
     const [filterJob, setFilterJob] = useState([]);
     const [filterCert, setFilterCert] = useState([]);
@@ -55,23 +90,90 @@ export default function EmployeeExceptionPage() {
     // 🔹 Floating status menu: { row, x, y }
     const [statusMenu, setStatusMenu] = useState(null);
 
-    // Load data
+    // ===================== LOAD FILTER MASTER (role aware) =====================
+    async function loadFilters() {
+        if (!isRoleLoaded || isEmployee) return;
+
+        try {
+            const [jobs, certs, levels, subs] = await Promise.all([
+                fetchAllJobPositions(),
+                fetchCertifications(),
+                fetchCertificationLevels(),
+                fetchSubFields(),
+            ]);
+
+            let effectiveCerts = certs || [];
+
+            if (isPic) {
+                try {
+                    const scope = await fetchMyPicScope();
+                    const scopeCerts = scope?.certifications || [];
+                    const codes = new Set(
+                        scopeCerts.map((s) => s.certificationCode).filter((code) => code && String(code).trim() !== "")
+                    );
+                    setPicCertCodes(codes);
+
+                    // PIC hanya boleh lihat sertifikasi dalam scope
+                    effectiveCerts = effectiveCerts.filter((c) => codes.has(c.code));
+                } catch (e) {
+                    console.error("load PIC scope error:", e);
+                    toast.error("Gagal memuat scope sertifikasi PIC");
+                }
+            }
+
+            setJobOptions((jobs || []).map((j) => ({ value: j.id, label: j.name })));
+            setCertOptions(
+                (effectiveCerts || []).map((c) => ({
+                    value: c.code,
+                    label: c.code,
+                }))
+            );
+            setLevelOptions((levels || []).map((l) => ({ value: l.level, label: l.level })));
+            setSubOptions((subs || []).map((s) => ({ value: s.code, label: s.code })));
+        } catch (err) {
+            console.error("loadFilters error:", err);
+            toast.error("Gagal memuat filter");
+        }
+    }
+
+    // ===================== LOAD DATA =====================
     async function load() {
+        if (!isRoleLoaded || isEmployee) return;
+
         setLoading(true);
         try {
+            // siapkan filter certCodes yang sudah diintersect dengan scope PIC
+            let certCodesFilter = filterCert.map((f) => f.value);
+
+            if (isPic && picCertCodes && picCertCodes.size > 0) {
+                if (certCodesFilter.length > 0) {
+                    certCodesFilter = certCodesFilter.filter((code) => picCertCodes.has(code));
+                } else {
+                    // kalau PIC tidak pilih filter sertifikasi, default ke semua kode dalam scope
+                    certCodesFilter = Array.from(picCertCodes);
+                }
+            }
+
             const params = {
                 page: page - 1,
                 size: rowsPerPage,
                 employeeIds: filterEmployee ? [filterEmployee.value] : [],
                 jobIds: filterJob.map((f) => f.value),
-                certCodes: filterCert.map((f) => f.value),
+                certCodes: certCodesFilter,
                 levels: filterLevel.map((f) => f.value),
                 subCodes: filterSub.map((f) => f.value),
                 statuses: filterStatus.map((f) => f.value),
             };
 
             const res = await fetchExceptions(params);
-            setRows(res.content || []);
+            let content = res.content || [];
+
+            // PIC: guard tambahan di FE (kalau backend belum enforce)
+            if (isPic && picCertCodes && picCertCodes.size > 0) {
+                content = content.filter((r) => !r.certificationCode || picCertCodes.has(r.certificationCode));
+            }
+
+            setRows(content);
             setTotalPages(res.totalPages || 1);
             setTotalElements(res.totalElements || 0);
         } catch {
@@ -81,6 +183,7 @@ export default function EmployeeExceptionPage() {
         }
     }
 
+    // ===================== DELETE & STATUS =====================
     async function onDelete(id) {
         try {
             await deleteException(id);
@@ -119,29 +222,10 @@ export default function EmployeeExceptionPage() {
         }
     }
 
-    async function loadFilters() {
-        try {
-            const [jobs, certs, levels, subs] = await Promise.all([
-                fetchAllJobPositions(),
-                fetchCertifications(),
-                fetchCertificationLevels(),
-                fetchSubFields(),
-            ]);
-
-            setJobOptions(jobs.map((j) => ({ value: j.id, label: j.name })));
-            setCertOptions(certs.map((c) => ({ value: c.code, label: c.code })));
-            setLevelOptions(levels.map((l) => ({ value: l.level, label: l.level })));
-            setSubOptions(subs.map((s) => ({ value: s.code, label: s.code })));
-        } catch (err) {
-            console.error("loadFilters error:", err);
-            toast.error("Gagal memuat filter");
-        }
-    }
-
     const loadEmployees = async (inputValue) => {
         try {
             const res = await searchEmployees({ search: inputValue, page: 0, size: 20 });
-            return res.content.map((e) => ({
+            return (res.content || []).map((e) => ({
                 value: e.id,
                 label: `${e.nip} - ${e.name}`,
             }));
@@ -150,18 +234,42 @@ export default function EmployeeExceptionPage() {
         }
     };
 
+    // ===================== EFFECTS =====================
+    // redirect pegawai
+    useEffect(() => {
+        if (!isRoleLoaded) return;
+        if (isEmployee) {
+            toast.error("Anda tidak berwenang mengakses halaman ini");
+            navigate("/", { replace: true });
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isRoleLoaded, isEmployee]);
+
+    useEffect(() => {
+        loadFilters();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isRoleLoaded, role]);
+
     useEffect(() => {
         load();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [page, rowsPerPage, filterEmployee, filterJob, filterCert, filterLevel, filterSub, filterStatus]);
+    }, [
+        isRoleLoaded,
+        role,
+        page,
+        rowsPerPage,
+        filterEmployee,
+        filterJob,
+        filterCert,
+        filterLevel,
+        filterSub,
+        filterStatus,
+        picCertCodes,
+    ]);
 
     useEffect(() => {
         setPage(1);
     }, [filterEmployee, filterJob, filterCert, filterLevel, filterSub, filterStatus]);
-
-    useEffect(() => {
-        loadFilters();
-    }, []);
 
     const startIdx = totalElements === 0 ? 0 : (page - 1) * rowsPerPage + 1;
 
@@ -189,6 +297,11 @@ export default function EmployeeExceptionPage() {
             </button>
         );
     };
+
+    // kalau role belum kebaca / sedang redirect pegawai, jangan render dulu
+    if (!isRoleLoaded || isEmployee) {
+        return null;
+    }
 
     return (
         <div>
@@ -347,13 +460,13 @@ export default function EmployeeExceptionPage() {
                     <tbody className="text-xs">
                         {loading ? (
                             <tr>
-                                <td colSpan={11} className="text-center py-10">
+                                <td colSpan={TABLE_COLS} className="text-center py-10">
                                     <span className="loading loading-dots loading-md" />
                                 </td>
                             </tr>
                         ) : rows.length === 0 ? (
                             <tr>
-                                <td colSpan={11} className="text-center text-gray-400 py-10">
+                                <td colSpan={TABLE_COLS} className="text-center text-gray-400 py-10">
                                     Tidak ada data
                                 </td>
                             </tr>
@@ -436,7 +549,13 @@ export default function EmployeeExceptionPage() {
 
             {/* Modal Create */}
             {showCreateModal && (
-                <CreateExceptionModal open={showCreateModal} onClose={() => setShowCreateModal(false)} onSaved={load} />
+                <CreateExceptionModal
+                    open={showCreateModal}
+                    onClose={() => setShowCreateModal(false)}
+                    onSaved={load}
+                    // PIC hanya boleh create sesuai scope (kalau modal support prop ini)
+                    picCertCodes={isPic ? picCertCodes : null}
+                />
             )}
 
             {/* Modal Edit */}
@@ -446,6 +565,7 @@ export default function EmployeeExceptionPage() {
                     onClose={() => setShowEditModal(false)}
                     onSaved={load}
                     initial={selectedRow}
+                    picCertCodes={isPic ? picCertCodes : null}
                 />
             )}
 
@@ -458,6 +578,7 @@ export default function EmployeeExceptionPage() {
                         setPage(1);
                         load();
                     }}
+                    picCertCodes={isPic ? picCertCodes : null}
                 />
             )}
 
@@ -494,7 +615,7 @@ export default function EmployeeExceptionPage() {
                     <div
                         className="absolute"
                         style={{ top: statusMenu.y, left: statusMenu.x }}
-                        onClick={(e) => e.stopPropagation()} // biar klik di dalam menu ga nutup overlay
+                        onClick={(e) => e.stopPropagation()}
                     >
                         <div className="bg-base-100 shadow-xl rounded-2xl p-3 text-xs flex flex-col gap-2">
                             <button

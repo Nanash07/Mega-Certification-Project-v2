@@ -5,17 +5,31 @@ import Select from "react-select";
 import AsyncSelect from "react-select/async";
 import Pagination from "../../components/common/Pagination";
 import { Plus, Pencil, Trash2, Eye, ChevronDown, Eraser } from "lucide-react";
-import {
-    fetchBatches,
-    deleteBatch,
-    searchBatches,
-    updateBatch, // 🔹 DITAMBAH: import updateBatch
-} from "../../services/batchService";
+import { fetchBatches, deleteBatch, searchBatches, updateBatch } from "../../services/batchService";
 import { fetchCertificationRules } from "../../services/certificationRuleService";
+import { fetchMyPicScope } from "../../services/picScopeService";
 import CreateBatchModal from "../../components/batches/CreateBatchModal";
 import EditBatchModal from "../../components/batches/EditBatchModal";
 
+// ===== helpers role =====
+function getCurrentRole() {
+    if (typeof window === "undefined") return "";
+    try {
+        const user = JSON.parse(localStorage.getItem("user") || "{}");
+        const fromUser = (user.role || "").toString().toUpperCase();
+        if (fromUser) return fromUser;
+    } catch {
+        // ignore
+    }
+    return (localStorage.getItem("role") || "").toString().toUpperCase();
+}
+
 export default function BatchPage() {
+    const [role] = useState(() => getCurrentRole());
+    const isSuperadmin = role === "SUPERADMIN";
+    const isPic = role === "PIC";
+    const isEmployee = role === "EMPLOYEE" || role === "PEGAWAI";
+
     const [rows, setRows] = useState([]);
     const [loading, setLoading] = useState(false);
 
@@ -45,10 +59,10 @@ export default function BatchPage() {
     const [editItem, setEditItem] = useState(null);
     const [confirmDelete, setConfirmDelete] = useState({ open: false, id: null });
 
-    // 🔹 Floating status menu: { row, x, y }
+    // Floating status menu
     const [statusMenu, setStatusMenu] = useState(null);
 
-    const TABLE_COLS = 12; // total kolom tabel
+    const TABLE_COLS = 12;
 
     // Badge jenis batch
     function renderTypeBadge(type) {
@@ -57,20 +71,18 @@ export default function BatchPage() {
             CERTIFICATION: { label: "Sertifikasi", cls: "badge-info text-white" },
             TRAINING: { label: "Training", cls: "badge-primary text-white" },
             REFRESHMENT: { label: "Refreshment", cls: "badge-secondary text-white" },
-            EXTENSION: { label: "Perpanjang", cls: "badge-success text-white" }, // 🔹 baru
+            EXTENSION: { label: "Perpanjang", cls: "badge-success text-white" },
         };
         const m = map[type] || { label: type, cls: "badge-neutral" };
         return <span className={`badge badge-sm ${m.cls}`}>{m.label}</span>;
     }
 
-    // Format status: "PLANNED" -> "Planned"
     function formatStatusLabel(s) {
         if (!s) return "-";
         const val = s.toString().toLowerCase();
         return val.charAt(0).toUpperCase() + val.slice(1);
     }
 
-    // Mapping style status (badge + button)
     function getStatusStyle(status) {
         switch (status) {
             case "PLANNED":
@@ -85,11 +97,15 @@ export default function BatchPage() {
         }
     }
 
-    // 🔹 Badge status: trigger, dropdown dirender fixed di luar tabel
+    // Status badge: pegawai cuma lihat, PIC/SUPERADMIN bisa klik ganti
     function renderStatusBadge(row) {
         if (!row.status) return "-";
 
         const { label, badgeCls } = getStatusStyle(row.status);
+
+        if (isEmployee) {
+            return <span className={`badge badge-sm whitespace-nowrap ${badgeCls} text-white`}>{label}</span>;
+        }
 
         return (
             <button
@@ -100,7 +116,7 @@ export default function BatchPage() {
                     setStatusMenu({
                         row,
                         x: rect.left,
-                        y: rect.bottom + 4, // sedikit di bawah badge
+                        y: rect.bottom + 4,
                     });
                 }}
             >
@@ -120,11 +136,35 @@ export default function BatchPage() {
         }
     };
 
-    // Load Certification Rules
+    // ===== Load Certification Rules (role-aware) =====
     useEffect(() => {
-        fetchCertificationRules()
-            .then((rules) => {
-                const sorted = [...rules].sort((a, b) => {
+        // Pegawai: ruleOptions akan diisi dari data batch di load(), jadi di sini skip
+        if (isEmployee) return;
+
+        async function loadRules() {
+            try {
+                const rules = await fetchCertificationRules();
+                let filtered = rules || [];
+
+                if (isPic) {
+                    // PIC: batasi rule berdasarkan PIC scope (pakai certificationCode aja biar simple & robust)
+                    try {
+                        const scope = await fetchMyPicScope();
+                        const scopeCerts = scope?.certifications || [];
+                        const allowedCodes = new Set(
+                            scopeCerts
+                                .map((c) => c.certificationCode)
+                                .filter((code) => code && String(code).trim() !== "")
+                        );
+
+                        filtered = filtered.filter((r) => allowedCodes.has(r.certificationCode));
+                    } catch (e) {
+                        console.error("load PIC scope error", e);
+                        toast.error("Gagal memuat scope sertifikasi PIC");
+                    }
+                }
+
+                const sorted = [...filtered].sort((a, b) => {
                     const keyA = `${a.certificationCode || ""} ${a.certificationLevelName || ""} ${
                         a.subFieldCode || ""
                     }`.toLowerCase();
@@ -133,6 +173,7 @@ export default function BatchPage() {
                     }`.toLowerCase();
                     return keyA.localeCompare(keyB);
                 });
+
                 setRuleOptions(
                     sorted.map((r) => {
                         const parts = [r.certificationCode, r.certificationLevelName, r.subFieldCode].filter(
@@ -141,11 +182,17 @@ export default function BatchPage() {
                         return { value: r.id, label: parts.join(" - ") };
                     })
                 );
-            })
-            .catch(() => toast.error("Gagal memuat certification rules"));
-    }, []);
+            } catch (e) {
+                console.error("load rules error", e);
+                toast.error("Gagal memuat certification rules");
+            }
+        }
 
-    // Load batch list
+        loadRules();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isPic, isEmployee, isSuperadmin]);
+
+    // ===== Load batch list (role-aware) =====
     async function load() {
         setLoading(true);
         try {
@@ -156,11 +203,36 @@ export default function BatchPage() {
                 status: status?.value,
                 certificationRuleId: certRule?.value,
             };
+
             const res = await fetchBatches(params);
-            setRows(res.content || []);
+            const content = res.content || [];
+
+            // PEGAWAI: generate Certification Rule filter dari batch yang dia lihat
+            if (isEmployee) {
+                const uniqueRules = new Map();
+                content.forEach((b) => {
+                    if (!b.certificationRuleId) return;
+                    const id = b.certificationRuleId;
+                    if (uniqueRules.has(id)) return;
+
+                    const labelParts = [
+                        b.certificationCode,
+                        b.certificationLevelName,
+                        b.subFieldCode ?? b.subBidangCode,
+                    ].filter((x) => x && String(x).trim() !== "");
+                    uniqueRules.set(id, {
+                        value: id,
+                        label: labelParts.join(" - "),
+                    });
+                });
+                setRuleOptions(Array.from(uniqueRules.values()));
+            }
+
+            setRows(content);
             setTotalPages(res.totalPages || 1);
             setTotalElements(res.totalElements || 0);
-        } catch {
+        } catch (e) {
+            console.error("load batches error", e);
             toast.error("Gagal memuat data batch");
         } finally {
             setLoading(false);
@@ -181,7 +253,7 @@ export default function BatchPage() {
         toast.success("Clear filter berhasil");
     }
 
-    // Delete batch
+    // Delete batch (non-pegawai)
     async function handleDelete(id) {
         try {
             await deleteBatch(id);
@@ -194,23 +266,15 @@ export default function BatchPage() {
         }
     }
 
-    // 🔹 Ubah status batch → sekarang call API updateBatch
+    // Ubah status batch (non-pegawai)
     async function handleChangeStatus(batch, newStatus) {
+        if (isEmployee) return;
         if (batch.status === newStatus) return;
 
         try {
-            const payload = {
-                status: newStatus,
-                // Field lain dibiarkan undefined/null → di backend lo
-                // nggak akan dioverwrite karena pakai pattern:
-                // existing.setX(req.getX() != null ? req.getX() : existing.getX());
-            };
-
+            const payload = { status: newStatus };
             await updateBatch(batch.id, payload);
-
-            // reload dari server supaya data konsisten
             await load();
-
             toast.success(`Status diubah ke ${formatStatusLabel(newStatus)}`);
         } catch (err) {
             console.error("handleChangeStatus error:", err);
@@ -224,7 +288,6 @@ export default function BatchPage() {
         <div>
             {/* Toolbar */}
             <div className="mb-4 space-y-3">
-                {/* Filters */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 text-xs">
                     <AsyncSelect
                         cacheOptions
@@ -250,15 +313,18 @@ export default function BatchPage() {
                         isClearable
                     />
                     <div className="col-span-1" />
+                    {/* Tambah Batch hanya untuk non-pegawai */}
                     <div className="col-span-1">
-                        <button
-                            type="button"
-                            className="btn btn-primary btn-sm w-full"
-                            onClick={() => setOpenCreate(true)}
-                        >
-                            <Plus className="w-4 h-4" />
-                            Tambah Batch
-                        </button>
+                        {!isEmployee && (
+                            <button
+                                type="button"
+                                className="btn btn-primary btn-sm w-full"
+                                onClick={() => setOpenCreate(true)}
+                            >
+                                <Plus className="w-4 h-4" />
+                                Tambah Batch
+                            </button>
+                        )}
                     </div>
                     <div className="col-span-1">
                         <button
@@ -310,10 +376,10 @@ export default function BatchPage() {
                                 <tr key={b.id}>
                                     <td>{startIdx + idx}</td>
 
-                                    {/* Aksi: detail + edit + hapus (icon + tooltip) */}
+                                    {/* Aksi */}
                                     <td>
                                         <div className="flex gap-2">
-                                            {/* Detail */}
+                                            {/* Detail – semua role boleh */}
                                             <div className="tooltip" data-tip="Lihat detail batch">
                                                 <Link
                                                     to={`/batch/${b.id}`}
@@ -323,33 +389,34 @@ export default function BatchPage() {
                                                 </Link>
                                             </div>
 
-                                            {/* Edit */}
-                                            <div className="tooltip" data-tip="Edit batch">
-                                                <button
-                                                    type="button"
-                                                    className="btn btn-xs btn-warning btn-soft border-warning"
-                                                    onClick={() => setEditItem(b)}
-                                                >
-                                                    <Pencil className="w-3 h-3" />
-                                                </button>
-                                            </div>
+                                            {/* Edit & Hapus hanya non-pegawai */}
+                                            {!isEmployee && (
+                                                <>
+                                                    <div className="tooltip" data-tip="Edit batch">
+                                                        <button
+                                                            type="button"
+                                                            className="btn btn-xs btn-warning btn-soft border-warning"
+                                                            onClick={() => setEditItem(b)}
+                                                        >
+                                                            <Pencil className="w-3 h-3" />
+                                                        </button>
+                                                    </div>
 
-                                            {/* Hapus */}
-                                            <div className="tooltip" data-tip="Hapus batch">
-                                                <button
-                                                    type="button"
-                                                    className="btn btn-xs btn-error btn-soft border-error"
-                                                    onClick={() => setConfirmDelete({ open: true, id: b.id })}
-                                                >
-                                                    <Trash2 className="w-3 h-3" />
-                                                </button>
-                                            </div>
+                                                    <div className="tooltip" data-tip="Hapus batch">
+                                                        <button
+                                                            type="button"
+                                                            className="btn btn-xs btn-error btn-soft border-error"
+                                                            onClick={() => setConfirmDelete({ open: true, id: b.id })}
+                                                        >
+                                                            <Trash2 className="w-3 h-3" />
+                                                        </button>
+                                                    </div>
+                                                </>
+                                            )}
                                         </div>
                                     </td>
 
-                                    {/* Nama batch: teks biasa */}
                                     <td>{b.batchName}</td>
-
                                     <td>{renderTypeBadge(b.type)}</td>
                                     <td>
                                         {[
@@ -414,8 +481,8 @@ export default function BatchPage() {
                 </form>
             </dialog>
 
-            {/* 🔹 Floating status menu (fixed, di atas semua layer, gak ngubah tabel) */}
-            {statusMenu && (
+            {/* Floating status menu – hanya non-pegawai */}
+            {statusMenu && !isEmployee && (
                 <div className="fixed inset-0 z-[999]" onClick={() => setStatusMenu(null)}>
                     <div
                         className="absolute"
