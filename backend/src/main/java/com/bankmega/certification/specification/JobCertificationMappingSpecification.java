@@ -12,10 +12,9 @@ public class JobCertificationMappingSpecification {
     }
 
     public static Specification<JobCertificationMapping> byEmployeeIds(List<Long> employeeIds) {
-        return (root, query, cb) ->
-                (employeeIds == null || employeeIds.isEmpty())
-                        ? cb.conjunction()
-                        : root.get("employee").get("id").in(employeeIds);
+        return (root, query, cb) -> (employeeIds == null || employeeIds.isEmpty())
+                ? cb.conjunction()
+                : root.get("employee").get("id").in(employeeIds);
     }
 
     public static Specification<JobCertificationMapping> byJobIds(List<Long> jobIds) {
@@ -42,6 +41,21 @@ public class JobCertificationMappingSpecification {
                 : root.get("certificationRule").get("subField").get("code").in(subCodes);
     }
 
+    /**
+     * Filter berdasarkan daftar certification.id yang diizinkan (misal dari PIC
+     * scope).
+     * Kalau null/empty → cb.conjunction() (no-op), supaya aman digabung dengan
+     * .and().
+     */
+    public static Specification<JobCertificationMapping> byAllowedCertificationIds(List<Long> allowedCertificationIds) {
+        return (root, query, cb) -> (allowedCertificationIds == null || allowedCertificationIds.isEmpty())
+                ? cb.conjunction()
+                : root.get("certificationRule")
+                        .get("certification")
+                        .get("id")
+                        .in(allowedCertificationIds);
+    }
+
     public static Specification<JobCertificationMapping> byStatus(String status) {
         return (root, query, cb) -> {
             if (status == null || status.equalsIgnoreCase("all")) {
@@ -66,8 +80,7 @@ public class JobCertificationMappingSpecification {
             return cb.or(
                     cb.like(cb.lower(root.get("jobPosition").get("name")), likePattern),
                     cb.like(cb.lower(root.get("certificationRule").get("certification").get("code")), likePattern),
-                    cb.like(cb.lower(root.get("certificationRule").get("certification").get("name")), likePattern)
-            );
+                    cb.like(cb.lower(root.get("certificationRule").get("certification").get("name")), likePattern));
         };
     }
 }

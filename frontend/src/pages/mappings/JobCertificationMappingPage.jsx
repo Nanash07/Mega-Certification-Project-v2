@@ -1,3 +1,4 @@
+// src/pages/job-certification/JobCertificationMappingPage.jsx
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
@@ -14,14 +15,34 @@ import { fetchCertifications } from "../../services/certificationService";
 import { fetchCertificationLevels } from "../../services/certificationLevelService";
 import { fetchSubFields } from "../../services/subFieldService";
 import { fetchAllJobPositions } from "../../services/jobPositionService";
+import { fetchMyPicScope } from "../../services/picScopeService";
 import EditJobCertificationMappingModal from "../../components/job-certification-mapping/EditJobCertificationMappingModal";
 import { downloadJobCertTemplate } from "../../services/jobCertificationImportService";
 import ImportJobCertificationMappingModal from "../../components/job-certification-mapping/ImportJobCertificationMappingModal";
 
 const TABLE_COLS = 8;
 
+// ===== helper role dari localStorage =====
+function getCurrentRole() {
+    if (typeof window === "undefined") return "";
+    try {
+        const user = JSON.parse(localStorage.getItem("user") || "{}");
+        const fromUser = (user.role || "").toString().toUpperCase();
+        if (fromUser) return fromUser;
+    } catch {
+        // ignore
+    }
+    return (localStorage.getItem("role") || "").toString().toUpperCase();
+}
+
 export default function JobCertificationMappingPage() {
     const navigate = useNavigate();
+
+    // ===== role flags =====
+    const [role] = useState(() => getCurrentRole());
+    const isSuperadmin = role === "SUPERADMIN";
+    const isPic = role === "PIC";
+    const isEmployee = role === "EMPLOYEE" || role === "PEGAWAI";
 
     const [rows, setRows] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -32,17 +53,21 @@ export default function JobCertificationMappingPage() {
     const [totalPages, setTotalPages] = useState(0);
     const [totalElements, setTotalElements] = useState(0);
 
-    // Filters
+    // Filters master options
     const [jobOptions, setJobOptions] = useState([]);
     const [certOptions, setCertOptions] = useState([]);
     const [levelOptions, setLevelOptions] = useState([]);
     const [subOptions, setSubOptions] = useState([]);
 
+    // Filter values
     const [filterJob, setFilterJob] = useState([]);
     const [filterCert, setFilterCert] = useState([]);
     const [filterLevel, setFilterLevel] = useState([]);
     const [filterSub, setFilterSub] = useState([]);
     const [filterStatus, setFilterStatus] = useState({ value: "all", label: "Semua" });
+
+    // PIC scope → certification IDs yg boleh (buat param allowedCertificationIds)
+    const [allowedCertificationIds, setAllowedCertificationIds] = useState(null);
 
     // Modals
     const [editItem, setEditItem] = useState(null);
@@ -56,7 +81,7 @@ export default function JobCertificationMappingPage() {
     function formatDateTime(value) {
         if (!value) return "-";
         const d = new Date(value);
-        if (isNaN(d.getTime())) return "-";
+        if (Number.isNaN(d.getTime())) return "-";
         return d.toLocaleString("id-ID", {
             day: "2-digit",
             month: "short",
@@ -107,6 +132,9 @@ export default function JobCertificationMappingPage() {
 
     // 🔹 Load data
     async function load() {
+        // extra guard: pegawai tidak boleh load
+        if (isEmployee) return;
+
         setLoading(true);
         try {
             const params = {
@@ -119,44 +147,92 @@ export default function JobCertificationMappingPage() {
                 status: filterStatus?.value || "all",
             };
 
+            // PIC → batasi berdasarkan certification IDs yang diizinkan (PIC scope)
+            if (isPic && Array.isArray(allowedCertificationIds) && allowedCertificationIds.length > 0) {
+                params.allowedCertificationIds = allowedCertificationIds;
+            }
+
             const res = await fetchJobCertificationMappingsPaged(params);
             setRows(res.content || []);
             setTotalPages(res.totalPages || 1);
             setTotalElements(res.totalElements || 0);
-        } catch {
+        } catch (e) {
+            console.error("fetchJobCertificationMappingsPaged error:", e);
             toast.error("❌ Gagal memuat mapping");
         } finally {
             setLoading(false);
         }
     }
 
-    // 🔹 Load filter options
+    // 🔹 Load filter options (aware PIC scope)
     async function loadFilters() {
-        try {
-            const [jobs, certs, levels, subs] = await Promise.all([
-                fetchAllJobPositions(),
-                fetchCertifications(),
-                fetchCertificationLevels(),
-                fetchSubFields(),
-            ]);
+        // employee tidak perlu load apa-apa
+        if (isEmployee) return;
 
-            setJobOptions(jobs.map((j) => ({ value: j.id, label: j.name })));
-            setCertOptions(certs.map((c) => ({ value: c.code, label: c.code })));
-            setLevelOptions(levels.map((l) => ({ value: l.level, label: l.name })));
-            setSubOptions(subs.map((s) => ({ value: s.code, label: s.code })));
+        try {
+            if (isPic) {
+                // PIC: ambil scope + master data, lalu filter sertifikasi berdasarkan scope
+                const [jobs, certs, levels, subs, scope] = await Promise.all([
+                    fetchAllJobPositions(),
+                    fetchCertifications(),
+                    fetchCertificationLevels(),
+                    fetchSubFields(),
+                    fetchMyPicScope(),
+                ]);
+
+                const scopeCerts = scope?.certifications || [];
+                const codesSet = new Set(
+                    scopeCerts.map((s) => s.certificationCode).filter((c) => c && String(c).trim() !== "")
+                );
+                const ids = scopeCerts.map((s) => s.certificationId).filter((id) => id != null);
+
+                setAllowedCertificationIds(ids);
+
+                const filteredCerts = (certs || []).filter((c) => codesSet.has(c.code));
+
+                setJobOptions((jobs || []).map((j) => ({ value: j.id, label: j.name })));
+                setCertOptions(filteredCerts.map((c) => ({ value: c.code, label: c.code })));
+                setLevelOptions((levels || []).map((l) => ({ value: l.level, label: l.name })));
+                setSubOptions((subs || []).map((s) => ({ value: s.code, label: s.code })));
+            } else {
+                // SUPERADMIN (dan role lain non-employee) → full master data
+                const [jobs, certs, levels, subs] = await Promise.all([
+                    fetchAllJobPositions(),
+                    fetchCertifications(),
+                    fetchCertificationLevels(),
+                    fetchSubFields(),
+                ]);
+
+                setJobOptions((jobs || []).map((j) => ({ value: j.id, label: j.name })));
+                setCertOptions((certs || []).map((c) => ({ value: c.code, label: c.code })));
+                setLevelOptions((levels || []).map((l) => ({ value: l.level, label: l.name })));
+                setSubOptions((subs || []).map((s) => ({ value: s.code, label: s.code })));
+            }
         } catch (err) {
             console.error("❌ loadFilters error:", err);
             toast.error("❌ Gagal memuat filter");
         }
     }
 
+    // redirect kalau pegawai
+    useEffect(() => {
+        if (isEmployee) {
+            toast.error("Anda tidak berwenang mengakses halaman ini");
+            navigate("/", { replace: true });
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isEmployee]);
+
+    // load data
     useEffect(() => {
         load();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [page, rowsPerPage, filterJob, filterCert, filterLevel, filterSub, filterStatus]);
+    }, [page, rowsPerPage, filterJob, filterCert, filterLevel, filterSub, filterStatus, allowedCertificationIds]);
 
+    // load filter master
     useEffect(() => {
         loadFilters();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     // Reset filter
@@ -185,6 +261,11 @@ export default function JobCertificationMappingPage() {
     }
 
     const startIdx = totalElements === 0 ? 0 : (page - 1) * rowsPerPage + 1;
+
+    // Selama redirect pegawai, jangan render apapun
+    if (isEmployee) {
+        return null;
+    }
 
     return (
         <div>
@@ -311,7 +392,7 @@ export default function JobCertificationMappingPage() {
                                 <tr key={r.id}>
                                     <td>{startIdx + idx}</td>
 
-                                    {/* Aksi: cuma edit + delete (icon) */}
+                                    {/* Aksi: edit + delete */}
                                     <td className="space-x-1">
                                         <button
                                             type="button"

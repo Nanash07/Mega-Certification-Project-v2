@@ -107,7 +107,7 @@ export default function App() {
                 <Route
                     path="/employee/resigned"
                     element={
-                        <ProtectedRoute roles={["SUPERADMIN"]}>
+                        <ProtectedRoute roles={["SUPERADMIN", "PIC"]}>
                             <MainLayout>
                                 <EmployeeResignedPage />
                             </MainLayout>
@@ -221,7 +221,7 @@ export default function App() {
                 <Route
                     path="/mapping/job-certification"
                     element={
-                        <ProtectedRoute roles={["SUPERADMIN"]}>
+                        <ProtectedRoute roles={["SUPERADMIN", "PIC"]}>
                             <MainLayout>
                                 <JobCertificationMappingPage />
                             </MainLayout>
@@ -231,7 +231,7 @@ export default function App() {
                 <Route
                     path="/mapping/job-certification/histories"
                     element={
-                        <ProtectedRoute roles={["SUPERADMIN"]}>
+                        <ProtectedRoute roles={["SUPERADMIN", "PIC"]}>
                             <MainLayout>
                                 <JobCertificationMappingHistoryPage />
                             </MainLayout>

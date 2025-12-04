@@ -27,10 +27,21 @@ public class JobCertificationMappingController {
             @RequestParam(required = false) List<Integer> levels,
             @RequestParam(required = false) List<String> subCodes,
             @RequestParam(defaultValue = "all") String status,
-            @RequestParam(required = false) String search
-    ) {
+            @RequestParam(required = false) String search,
+            // 🔹 optional: filter tambahan berdasarkan certification.id yang diizinkan
+            // (misal dari PIC scope)
+            @RequestParam(required = false) List<Long> allowedCertificationIds) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("updatedAt").descending());
-        return ResponseEntity.ok(service.getPagedFiltered(jobIds, certCodes, levels, subCodes, status, search, pageable));
+        return ResponseEntity.ok(
+                service.getPagedFiltered(
+                        jobIds,
+                        certCodes,
+                        levels,
+                        subCodes,
+                        status,
+                        search,
+                        allowedCertificationIds,
+                        pageable));
     }
 
     @PostMapping
@@ -40,8 +51,7 @@ public class JobCertificationMappingController {
 
     @PutMapping("/{id}")
     public ResponseEntity<JobCertificationMappingResponse> update(
-            @PathVariable Long id, @RequestBody JobCertificationMappingRequest req
-    ) {
+            @PathVariable Long id, @RequestBody JobCertificationMappingRequest req) {
         return ResponseEntity.ok(service.update(id, req));
     }
 

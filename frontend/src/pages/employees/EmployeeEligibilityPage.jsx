@@ -18,7 +18,7 @@ import { Eye, RotateCw, Eraser } from "lucide-react";
 
 const TABLE_COLS = 15;
 
-// ===== helpers role & employee =====
+// ==================== Role / Employee Helper ====================
 function getCurrentEmployeeId() {
     if (typeof window === "undefined") return null;
     const raw = window.localStorage.getItem("employeeId");
@@ -33,14 +33,13 @@ function getCurrentRole() {
         const user = JSON.parse(localStorage.getItem("user") || "{}");
         const fromUser = (user.role || "").toString().toUpperCase();
         if (fromUser) return fromUser;
-    } catch {
-        // ignore
-    }
+    } catch {}
+
     return (localStorage.getItem("role") || "").toString().toUpperCase();
 }
 
 export default function EmployeeEligibilityPage() {
-    // ===== role flags =====
+    // Role flags
     const [role] = useState(() => getCurrentRole());
     const isSuperadmin = role === "SUPERADMIN";
     const isPic = role === "PIC";
@@ -60,7 +59,7 @@ export default function EmployeeEligibilityPage() {
     const [totalPages, setTotalPages] = useState(0);
     const [totalElements, setTotalElements] = useState(0);
 
-    // FILTER STATE (single select)
+    // Filters
     const [filterEmployee, setFilterEmployee] = useState(null);
     const [filterJob, setFilterJob] = useState(null);
     const [filterCert, setFilterCert] = useState(null);
@@ -69,12 +68,13 @@ export default function EmployeeEligibilityPage() {
     const [filterStatus, setFilterStatus] = useState(null);
     const [filterSource, setFilterSource] = useState(null);
 
-    // Master options
+    // Master filter options
     const [jobOptions, setJobOptions] = useState([]);
     const [certOptions, setCertOptions] = useState([]);
     const [levelOptions, setLevelOptions] = useState([]);
     const [subOptions, setSubOptions] = useState([]);
 
+    // ==================== Status Badge Style ====================
     const statusBadgeClass = useMemo(
         () => ({
             ACTIVE: "badge-success",
@@ -85,30 +85,26 @@ export default function EmployeeEligibilityPage() {
         []
     );
 
-    function formatStatusLabel(status) {
-        if (!status) return "-";
-        switch (status) {
+    function formatStatusLabel(s) {
+        switch (s) {
             case "NOT_YET_CERTIFIED":
                 return "Belum Sertifikasi";
             case "ACTIVE":
-                return "Active";
             case "DUE":
-                return "Due";
             case "EXPIRED":
-                return "Expired";
+                return s.charAt(0) + s.slice(1).toLowerCase();
             default:
-                return status;
+                return s || "-";
         }
     }
 
-    function formatSourceLabel(source) {
-        if (!source) return "-";
-        if (source === "BY_JOB") return "By Job";
-        if (source === "BY_NAME") return "By Name";
-        return source;
+    function formatSourceLabel(s) {
+        if (s === "BY_JOB") return "By Job";
+        if (s === "BY_NAME") return "By Name";
+        return s ?? "-";
     }
 
-    // ============ LOAD DATA TABLE ============
+    // ==================== LOAD TABLE ====================
     async function load() {
         setLoading(true);
         try {
@@ -136,49 +132,42 @@ export default function EmployeeEligibilityPage() {
 
             const res = await fetchEmployeeEligibilityPaged(params);
 
-            // khusus PEGAWAI: generate opsi sertifikasi dari data eligibility yang tampil
+            // PEGAWAI → cert options berdasarkan list eligibility
             if (isSelfMode) {
                 const uniqueCodes = Array.from(
                     new Set((res?.content || []).map((r) => r.certificationCode).filter(Boolean))
                 );
 
-                setCertOptions(
-                    uniqueCodes.map((code) => ({
-                        value: code,
-                        label: code,
-                    }))
-                );
+                setCertOptions(uniqueCodes.map((code) => ({ value: code, label: code })));
             }
 
             setRows(res?.content || []);
             setTotalPages(res?.totalPages || 1);
             setTotalElements(res?.totalElements || 0);
         } catch (e) {
-            console.error("load eligibility error", e);
             toast.error("Gagal memuat eligibility");
         } finally {
             setLoading(false);
         }
     }
 
-    // ============ REFRESH ELIGIBILITY ============
+    // ==================== REFRESH ELIGIBILITY ====================
     async function onRefresh() {
-        // guard tambahan: PEGAWAI gak boleh refresh
         if (!canRefresh || isSelfMode) return;
+
         setRefreshing(true);
         try {
             await refreshEmployeeEligibility();
             toast.success("Eligibility berhasil di-refresh");
             await load();
-        } catch (e) {
-            console.error("refresh eligibility error", e);
+        } catch {
             toast.error("Gagal refresh eligibility");
         } finally {
             setRefreshing(false);
         }
     }
 
-    // ============ LOAD MASTER FILTER OPTIONS ============
+    // ==================== LOAD FILTER MASTER ====================
     async function loadFilters() {
         try {
             const [jobs, levels, subs] = await Promise.all([
@@ -187,52 +176,32 @@ export default function EmployeeEligibilityPage() {
                 fetchSubFields(),
             ]);
 
-            setJobOptions((jobs || []).map((j) => ({ value: j.id, label: j.name })));
-            setLevelOptions((levels || []).map((l) => ({ value: l.level, label: String(l.level) })));
-            setSubOptions((subs || []).map((s) => ({ value: s.code, label: s.code })));
+            setJobOptions(jobs.map((j) => ({ value: j.id, label: j.name })));
+            setLevelOptions(levels.map((l) => ({ value: l.level, label: String(l.level) })));
+            setSubOptions(subs.map((s) => ({ value: s.code, label: s.code })));
 
             if (isPic) {
-                // PIC → sertifikasi dari scope PIC
-                try {
-                    const scope = await fetchMyPicScope();
-                    const certsFromScope = (scope?.certifications || []).map((s) => ({
+                const scope = await fetchMyPicScope();
+                setCertOptions(
+                    (scope?.certifications || []).map((s) => ({
                         value: s.certificationCode,
                         label: s.certificationCode,
-                    }));
-                    setCertOptions(certsFromScope);
-                } catch (e) {
-                    console.error("load PIC scope error", e);
-                    toast.error("Gagal memuat scope sertifikasi PIC");
-                    setCertOptions([]);
-                }
+                    }))
+                );
             } else if (isSuperadmin) {
-                // SUPERADMIN → semua sertifikasi dari /certifications
-                try {
-                    const certs = await fetchCertifications();
-                    setCertOptions(
-                        (certs || []).map((c) => ({
-                            value: c.code,
-                            label: c.code,
-                        }))
-                    );
-                } catch (e) {
-                    console.error("load certifications error", e);
-                    toast.error("Gagal memuat daftar sertifikasi");
-                    setCertOptions([]);
-                }
+                const certs = await fetchCertifications();
+                setCertOptions(certs.map((c) => ({ value: c.code, label: c.code })));
             }
-            // PEGAWAI → certOptions di-set di fungsi load() dari data eligibility, jadi di sini gak perlu call /certifications
-        } catch (err) {
-            console.error("loadFilters error:", err);
+        } catch {
             toast.error("Gagal memuat filter");
         }
     }
 
-    // Async search employees (untuk filter pegawai SUPERADMIN & PIC)
-    const loadEmployees = async (inputValue) => {
+    // Employees search
+    const loadEmployees = async (input) => {
         try {
-            const res = await searchEmployees({ search: inputValue, page: 0, size: 20 });
-            return (res?.content || []).map((e) => ({
+            const res = await searchEmployees({ search: input, page: 0, size: 20 });
+            return res.content.map((e) => ({
                 value: e.id,
                 label: `${e.nip} - ${e.name}`,
             }));
@@ -241,10 +210,9 @@ export default function EmployeeEligibilityPage() {
         }
     };
 
-    // load data tiap dependency berubah
+    // ==================== EFFECTS ====================
     useEffect(() => {
         load();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [
         page,
         rowsPerPage,
@@ -258,40 +226,23 @@ export default function EmployeeEligibilityPage() {
         role,
     ]);
 
-    // reset ke page 1 tiap filter berubah
     useEffect(() => {
         setPage(1);
     }, [filterEmployee, filterJob, filterCert, filterLevel, filterSub, filterStatus, filterSource, role]);
 
     useEffect(() => {
         loadFilters();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const startIdx = totalElements === 0 ? 0 : (page - 1) * rowsPerPage + 1;
 
-    let infoText = "Menampilkan data untuk: Semua pegawai";
-    if (isSelfMode) {
-        infoText = "Menampilkan data untuk: Anda sendiri";
-    } else if (filterEmployee) {
-        infoText = `Menampilkan data untuk: ${filterEmployee.label}`;
-    } else if (isPic) {
-        infoText = "Menampilkan data untuk: Pegawai dalam scope Anda";
-    }
-
     return (
         <div>
-            {/* Info siapa yang ditampilkan */}
-            <p className="mb-2 text-sm">
-                {infoText.split(":")[0]}: <span className="font-semibold">{infoText.split(":")[1]?.trim()}</span>
-            </p>
-
             {/* Toolbar */}
             <div className="mb-4 space-y-3">
-                {/* Row 1: Filter pegawai + tombol kanan */}
+                {/* Row 1 */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 text-xs">
                     <div className="col-span-1">
-                        {/* Pegawai biasa tidak boleh ganti employee */}
                         {!isSelfMode && (
                             <AsyncSelect
                                 cacheOptions
@@ -305,10 +256,8 @@ export default function EmployeeEligibilityPage() {
                         )}
                     </div>
 
-                    {/* spacer biar tombol tetap di kanan */}
                     <div className={showRefreshButton ? "col-span-3" : "col-span-4"} />
 
-                    {/* Tombol Refresh – hanya SUPERADMIN & PIC (bukan PEGAWAI) */}
                     {showRefreshButton && (
                         <div className="col-span-1">
                             <button
@@ -332,7 +281,6 @@ export default function EmployeeEligibilityPage() {
                         </div>
                     )}
 
-                    {/* Tombol Clear – semua role boleh */}
                     <div className="col-span-1">
                         <button
                             type="button"
@@ -355,7 +303,7 @@ export default function EmployeeEligibilityPage() {
                     </div>
                 </div>
 
-                {/* Row 2: Filters detail */}
+                {/* Row 2 */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 text-xs">
                     <Select
                         options={jobOptions}
@@ -432,6 +380,7 @@ export default function EmployeeEligibilityPage() {
                             <th>Perpanjang</th>
                         </tr>
                     </thead>
+
                     <tbody className="text-xs">
                         {loading ? (
                             <tr>
@@ -450,18 +399,13 @@ export default function EmployeeEligibilityPage() {
                                 <tr key={r.id ?? `${r.employeeId}-${r.certificationRuleId}`}>
                                     <td>{startIdx + idx}</td>
 
-                                    {/* Aksi: tombol detail */}
                                     <td>
-                                        <div className="flex gap-2">
-                                            <div className="tooltip" data-tip="Lihat detail pegawai">
-                                                <Link
-                                                    to={`/employee/${r.employeeId}`}
-                                                    className="btn btn-xs btn-info btn-soft border-info"
-                                                >
-                                                    <Eye className="w-3 h-3" />
-                                                </Link>
-                                            </div>
-                                        </div>
+                                        <Link
+                                            to={`/employee/${r.employeeId}`}
+                                            className="btn btn-xs btn-info btn-soft border-info"
+                                        >
+                                            <Eye className="w-3 h-3" />
+                                        </Link>
                                     </td>
 
                                     <td>{r.nip}</td>

@@ -96,12 +96,14 @@ export const filterMenuByRole = (menu, roleRaw) => {
 
     if (role === "PIC") {
         return menu
-            .filter((item) => item.key !== "user")
+            .filter((item) => item.key !== "user" && item.key !== "organization")
             .map((item) => {
                 if (item.key === "sertifikat") {
                     return {
                         ...item,
-                        subMenu: item.subMenu.filter((sub) => sub.label !== "Jenjang" && sub.label !== "Jenis"),
+                        subMenu: item.subMenu.filter(
+                            (sub) => sub.label !== "Jenjang" && sub.label !== "Jenis" && sub.label !== "Sub Bidang"
+                        ),
                     };
                 }
                 return item;

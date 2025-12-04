@@ -29,7 +29,8 @@ public class JobCertificationImportService {
     private final JobPositionRepository jobPositionRepo;
     private final CertificationRuleRepository ruleRepo;
     private final JobCertificationMappingRepository mappingRepo;
-    // private final PicCertificationScopeRepository scopeRepo; // kalau mau validasi PIC scope
+    // private final PicCertificationScopeRepository scopeRepo; // kalau mau
+    // validasi PIC scope
 
     public JobCertImportResponse dryRun(MultipartFile file, User user) {
         return process(file, true, user);
@@ -59,7 +60,8 @@ public class JobCertificationImportService {
             Sheet sheet = workbook.getSheetAt(0);
 
             for (Row row : sheet) {
-                if (row.getRowNum() == 0) continue; // skip header
+                if (row.getRowNum() == 0)
+                    continue; // skip header
                 processed++;
 
                 try {
@@ -89,8 +91,7 @@ public class JobCertificationImportService {
                                     .build();
                         } else {
                             job = jobPositionRepo.save(
-                                    JobPosition.builder().name(jobName.trim()).build()
-                            );
+                                    JobPosition.builder().name(jobName.trim()).build());
                             newJobs++;
                         }
                     } else {
@@ -98,7 +99,8 @@ public class JobCertificationImportService {
                     }
 
                     // 🔹 Cek mapping existing
-                    Optional<JobCertificationMapping> existing = mappingRepo.findByJobPositionAndCertificationRule(job, rule);
+                    Optional<JobCertificationMapping> existing = mappingRepo.findByJobPositionAndCertificationRule(job,
+                            rule);
 
                     if (existing.isEmpty()) {
                         if (!dryRun) {
@@ -157,13 +159,11 @@ public class JobCertificationImportService {
                 .skipped(skipped)
                 .errors(errors)
                 .errorDetails(errorDetails)
-                .message(dryRun 
-                    ? "Dry run completed. Job baru terdeteksi: " + newJobs 
-                    : "Import completed. Job baru dibuat: " + newJobs
-                )
+                .message(dryRun
+                        ? "Dry run completed. Job baru terdeteksi: " + newJobs
+                        : "Import completed. Job baru dibuat: " + newJobs)
                 .build();
     }
-
 
     // 🔹 Helper buat cari CertificationRule
     private CertificationRule findRuleUnique(String certCode, String levelStr, String subFieldCode) {
@@ -180,20 +180,20 @@ public class JobCertificationImportService {
 
         String subCode = (subFieldCode == null || subFieldCode.isBlank()) ? null : subFieldCode.trim();
 
-        return ruleRepo.findByCertification_CodeIgnoreCaseAndCertificationLevel_LevelAndSubField_CodeIgnoreCaseAndDeletedAtIsNull(
+        return ruleRepo
+                .findByCertification_CodeIgnoreCaseAndCertificationLevel_LevelAndSubField_CodeIgnoreCaseAndDeletedAtIsNull(
                         certCode.trim(),
                         level,
-                        subCode
-                )
+                        subCode)
                 .orElseThrow(() -> new IllegalArgumentException(
                         "Certification Rule tidak ditemukan untuk code=" + certCode
                                 + ", level=" + level
-                                + ", subField=" + subCode
-                ));
+                                + ", subField=" + subCode));
     }
 
     private String getCellValue(Cell cell) {
-        if (cell == null) return "";
+        if (cell == null)
+            return "";
         if (cell.getCellType() == CellType.NUMERIC) {
             return String.valueOf((long) cell.getNumericCellValue());
         }
@@ -207,7 +207,8 @@ public class JobCertificationImportService {
 
             // 🔹 Header
             Row header = sheet.createRow(0);
-            String[] columns = {"Job Position", "Certification Code", "Level", "SubField Code", "Status (ACTIVE/INACTIVE)"};
+            String[] columns = { "Job Position", "Certification Code", "Level", "SubField Code",
+                    "Status (ACTIVE/INACTIVE)" };
             CellStyle headerStyle = workbook.createCellStyle();
             Font font = workbook.createFont();
             font.setBold(true);
@@ -238,8 +239,10 @@ public class JobCertificationImportService {
             ByteArrayResource resource = new ByteArrayResource(bytes);
 
             return ResponseEntity.ok()
-                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=job_certification_mapping_template.xlsx")
-                    .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                    .header(HttpHeaders.CONTENT_DISPOSITION,
+                            "attachment; filename=job_certification_mapping_template.xlsx")
+                    .contentType(MediaType
+                            .parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
                     .contentLength(bytes.length)
                     .body(resource);
 

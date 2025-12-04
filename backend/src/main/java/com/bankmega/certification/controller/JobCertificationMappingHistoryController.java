@@ -9,6 +9,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/job-certification-mapping-histories")
@@ -17,9 +18,6 @@ public class JobCertificationMappingHistoryController {
 
     private final JobCertificationMappingHistoryService historyService;
 
-    // ============================================================
-    // 🔹 Get paginated histories
-    // ============================================================
     @GetMapping
     public Page<JobCertificationMappingHistoryResponse> getPagedHistories(
             @RequestParam(required = false) String jobName,
@@ -29,9 +27,18 @@ public class JobCertificationMappingHistoryController {
             @RequestParam(required = false) String search,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant start,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant end,
+            @RequestParam(required = false) List<Long> allowedCertificationIds,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         return historyService.getPagedHistory(
-                jobName, certCode, subField, actionType, search, start, end, PageRequest.of(page, size));
+                jobName,
+                certCode,
+                subField,
+                actionType,
+                search,
+                start,
+                end,
+                allowedCertificationIds,
+                PageRequest.of(page, size));
     }
 }
