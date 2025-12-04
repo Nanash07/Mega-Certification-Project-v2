@@ -337,7 +337,7 @@ export default function App() {
                 <Route
                     path="/user"
                     element={
-                        <ProtectedRoute roles={["SUPERADMIN"]}>
+                        <ProtectedRoute roles={["SUPERADMIN", "PIC"]}>
                             <MainLayout>
                                 <UserPage />
                             </MainLayout>
@@ -349,7 +349,7 @@ export default function App() {
                 <Route
                     path="/settings/email-config"
                     element={
-                        <ProtectedRoute roles={["SUPERADMIN"]}>
+                        <ProtectedRoute roles={["SUPERADMIN", "PIC"]}>
                             <MainLayout>
                                 <EmailConfigPage />
                             </MainLayout>
@@ -359,7 +359,7 @@ export default function App() {
                 <Route
                     path="/settings/notification-settings"
                     element={
-                        <ProtectedRoute roles={["SUPERADMIN"]}>
+                        <ProtectedRoute roles={["SUPERADMIN", "PIC"]}>
                             <MainLayout>
                                 <NotificationSettingsPage />
                             </MainLayout>

@@ -57,9 +57,9 @@ export default function NotificationSettingsPage() {
             setTemplates(tplData);
             setSchedules(schedData);
 
-            // Set tab aktif pertama saat data dimuat
+            // Hanya set tab aktif jika sebelumnya belum ada (first load)
             if (tplData.length > 0) {
-                setActiveTab(tplData[0].code);
+                setActiveTab((prev) => prev ?? tplData[0].code);
             }
         } catch (err) {
             console.error(err);
