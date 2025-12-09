@@ -38,7 +38,6 @@ export default function EmployeePage() {
     const [unitIds, setUnitIds] = useState([]);
     const [jobPositionIds, setJobPositionIds] = useState([]);
     const [statuses, setStatuses] = useState([]);
-    const [includeResigned, setIncludeResigned] = useState(false);
 
     // Master options
     const [regionalOptions, setRegionalOptions] = useState([]);
@@ -74,14 +73,13 @@ export default function EmployeePage() {
             .catch(() => toast.error("Gagal memuat filter master data"));
     }, []);
 
-    // Async search employees (ikut toggle includeResigned)
+    // Async search employees (tanpa toggle resign lagi)
     const loadEmployees = async (inputValue) => {
         try {
             const res = await searchEmployees({
                 search: inputValue,
                 page: 0,
                 size: 20,
-                includeResigned,
             });
             return res.content.map((e) => ({
                 value: e.id,
@@ -105,7 +103,6 @@ export default function EmployeePage() {
                 unitIds: unitIds.map((i) => i.value),
                 jobPositionIds: jobPositionIds.map((i) => i.value),
                 statuses: statuses.map((i) => i.value),
-                includeResigned,
             };
 
             const res = await fetchEmployees(params);
@@ -121,17 +118,7 @@ export default function EmployeePage() {
 
     useEffect(() => {
         load();
-    }, [
-        page,
-        rowsPerPage,
-        filterEmployee,
-        regionalIds,
-        divisionIds,
-        unitIds,
-        jobPositionIds,
-        statuses,
-        includeResigned,
-    ]);
+    }, [page, rowsPerPage, filterEmployee, regionalIds, divisionIds, unitIds, jobPositionIds, statuses]);
 
     // Reset filter
     function resetFilter() {
@@ -141,7 +128,6 @@ export default function EmployeePage() {
         setUnitIds([]);
         setJobPositionIds([]);
         setStatuses([]);
-        setIncludeResigned(false);
         setPage(1);
         toast.success("Clear filter berhasil");
     }
@@ -217,7 +203,6 @@ export default function EmployeePage() {
                 {/* Filters */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 text-xs items-center">
                     <AsyncSelect
-                        key={includeResigned ? "withResign" : "noResign"}
                         cacheOptions
                         defaultOptions
                         loadOptions={loadEmployees}
@@ -261,20 +246,6 @@ export default function EmployeePage() {
                         onChange={setStatuses}
                         placeholder="Filter Status"
                     />
-                </div>
-
-                <div className="flex justify-end mt-2">
-                    <label className="flex items-center gap-2 text-xs cursor-pointer">
-                        <input
-                            type="checkbox"
-                            checked={includeResigned}
-                            onChange={(e) => {
-                                setIncludeResigned(e.target.checked);
-                                setPage(1);
-                            }}
-                        />
-                        <span className="text-gray-500 select-none">Tampilkan pegawai resign</span>
-                    </label>
                 </div>
             </div>
 

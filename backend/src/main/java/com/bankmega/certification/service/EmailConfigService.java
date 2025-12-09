@@ -44,19 +44,14 @@ public class EmailConfigService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Simpan konfigurasi baru, nonaktifkan yang lama (atomic) + enkripsi password
-     */
+    /** Simpan konfigurasi baru, nonaktifkan yang lama + enkripsi password */
     @Transactional
     public EmailConfigResponseDTO saveConfig(EmailConfigRequestDTO dto) {
         validate(dto);
 
-        // Nonaktifkan semua konfigurasi lama
         repository.findAll().forEach(cfg -> cfg.setActive(false));
-        // flush via saveAll
         repository.saveAll(repository.findAll());
 
-        // Simpan konfigurasi baru (password terenkripsi AES)
         EmailConfig config = EmailConfig.builder()
                 .host(dto.getHost())
                 .port(dto.getPort())
@@ -70,10 +65,7 @@ public class EmailConfigService {
         return mapToResponse(config);
     }
 
-    /**
-     * Bangun JavaMailSender berdasarkan konfigurasi aktif (decrypt password, set
-     * props)
-     */
+    /** Bangun JavaMailSender dari konfigurasi aktif */
     public JavaMailSenderImpl createMailSenderFromActive() {
         return buildSender(getActiveConfigEntity());
     }
@@ -126,14 +118,19 @@ public class EmailConfigService {
         props.put("mail.smtp.timeout", "30000");
         props.put("mail.smtp.connectiontimeout", "30000");
         props.put("mail.smtp.writetimeout", "30000");
-        // trust host (opsional, berguna jika cert self-signed)
         props.put("mail.smtp.ssl.trust", config.getHost());
 
         return sender;
     }
 
-    /** Tes koneksi + kirim email HTML sederhana memakai konfigurasi aktif */
     public void testConnection(String to) {
+        testConnection(to, null, null);
+    }
+
+    public void testConnection(String to, String subjectOverride, String bodyOverride) {
+        if (to == null || to.isBlank())
+            throw new IllegalArgumentException("Email tujuan tidak boleh kosong");
+
         try {
             JavaMailSenderImpl sender = createMailSenderFromActive();
 
@@ -143,25 +140,46 @@ public class EmailConfigService {
             String fromAddr = Objects.toString(sender.getUsername(), "no-reply@megacert.local");
             helper.setFrom(fromAddr);
             helper.setTo(to);
-            helper.setSubject("Test SMTP Mega Certification");
 
-            String html = """
-                    <div style='font-family:Arial,sans-serif;line-height:1.6;font-size:14px'>
-                      <p>Halo Bro 👋</p>
-                      <p>Koneksi SMTP berhasil diuji dari sistem <b>Mega Certification</b>.</p>
-                      <p>Kalau lo baca email ini, berarti konfigurasi SMTP aktif dan OK 🔒</p>
-                      <br>
-                      <p style='font-size:12px;color:gray'>--<br>Dikirim otomatis oleh <b>Mega Certification System</b></p>
-                    </div>
-                    """;
+            String defaultSubject = "Test SMTP Mega Certification";
+            String subject = (subjectOverride == null || subjectOverride.isBlank()) ? defaultSubject : subjectOverride;
+            helper.setSubject(subject);
+
+            String defaultBody = "Halo,\n\n" +
+                    "Ini adalah email percobaan dari sistem sertifikasi Bank Mega.\n" +
+                    "Kalau Anda menerima email ini, berarti konfigurasi SMTP sudah berfungsi dengan baik.\n\n" +
+                    "Salam,\n" +
+                    "Divisi Learning & Development\n" +
+                    "Bank Mega";
+
+            String bodyPlain = (bodyOverride == null || bodyOverride.isBlank()) ? defaultBody : bodyOverride;
+
+            String escaped = htmlEscape(bodyPlain).replace("\n", "<br/>");
+            String html = "<div style='font-family:Arial,sans-serif;line-height:1.6;font-size:14px'>" +
+                    escaped +
+                    "<br><p style='font-size:12px;color:gray;margin-top:8px;'>--<br>" +
+                    "Dikirim otomatis oleh <b>Mega Certification System</b></p></div>";
+
             helper.setText(html, true);
-
             sender.send(message);
-            log.info("✅ Test email berhasil dikirim ke: {}", to);
+
+            log.info("Test email OK ke {}", to);
 
         } catch (Exception e) {
-            log.error("❌ Gagal mengirim test email ke {}: {}", to, e.getMessage(), e);
-            throw new RuntimeException("Gagal mengirim test email: " + e.getMessage(), e);
+            log.error("Gagal test email {}: {}", to, e.getMessage());
+            throw new RuntimeException("Gagal mengirim test email: " + e.getMessage());
         }
+    }
+
+    private String htmlEscape(String s) {
+        if (s == null)
+            return "";
+        String out = s;
+        out = out.replace("&", "&amp;");
+        out = out.replace("<", "&lt;");
+        out = out.replace(">", "&gt;");
+        out = out.replace("\"", "&quot;");
+        out = out.replace("'", "&#039;");
+        return out;
     }
 }

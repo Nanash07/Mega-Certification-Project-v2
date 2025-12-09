@@ -4,8 +4,6 @@ import { useNavigate } from "react-router-dom";
 import Select from "react-select";
 import api from "../../services/api";
 
-// HAPUS: fetchDashboardSummary, MONTHS dari dashboardService
-// import { fetchDashboardSummary, MONTHS } from "../../services/dashboardService";
 import { fetchRegionals } from "../../services/regionalService";
 import { fetchUnits } from "../../services/unitService";
 import { fetchCertificationLevels } from "../../services/certificationLevelService";
@@ -37,16 +35,6 @@ const MONTHS = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "
 
 /* ===== utils ===== */
 
-function SelectTop(props) {
-    return (
-        <Select
-            {...props}
-            menuPortalTarget={typeof document !== "undefined" ? document.body : null}
-            menuPosition="fixed"
-        />
-    );
-}
-
 function toOptions(data, labelPicker) {
     const arr = Array.isArray(data?.content) ? data.content : Array.isArray(data) ? data : [];
     return arr.filter(Boolean).map((x) => ({ value: x.id, label: labelPicker(x), raw: x }));
@@ -54,6 +42,9 @@ function toOptions(data, labelPicker) {
 
 export default function PicDashboard() {
     const navigate = useNavigate();
+
+    // untuk menuPortal react-select
+    const menuPortalTarget = typeof document !== "undefined" ? document.body : null;
 
     // ===== filter organisasi =====
     const [divisionSel, setDivisionSel] = useState(null);
@@ -126,16 +117,14 @@ export default function PicDashboard() {
                     label: s.certificationCode || `SERT-${s.certificationId}`,
                     raw: s,
                 }));
+
                 setCertOptions(opts);
 
-                if (opts.length === 0) {
-                    setCertSel(null);
-                } else {
-                    setCertSel((prev) => {
-                        if (prev && opts.some((o) => o.value === prev.value)) return prev;
-                        return opts[0];
-                    });
-                }
+                // kalau sebelumnya udah pilih & masih ada di scope, pertahankan
+                setCertSel((prev) => {
+                    if (prev && opts.some((o) => o.value === prev.value)) return prev;
+                    return null; // default: semua scope, tidak pilih apapun
+                });
             } catch {
                 setCertOptions([]);
                 setCertSel(null);
@@ -166,14 +155,12 @@ export default function PicDashboard() {
 
     /* ===== helper: current filter ===== */
     const currentFilters = () => {
-        // pastikan selalu ada certificationId dari scope PIC
-        const certIdFallback = certSel?.value ?? (certOptions.length > 0 ? certOptions[0].value : undefined);
-
+        // ❗ certSel null = semua sertifikat dalam scope PIC
         return {
             regionalId: regionalSel?.value,
             divisionId: divisionSel?.value,
             unitId: unitSel?.value,
-            certificationId: certIdFallback,
+            certificationId: certSel?.value, // <- TIDAK ada fallback ke opsi pertama
             levelId: levelSel?.value,
             subFieldId: subSel?.value,
             batchType: batchType?.value || undefined,
@@ -182,7 +169,7 @@ export default function PicDashboard() {
         };
     };
 
-    /* ===== loader summary + KPI: pakai count API (employees, eligibility, batch) ===== */
+    /* ===== loader summary + KPI: pakai count API (eligibility & batch) ===== */
     async function loadSummaryAndKpi() {
         const f = currentFilters();
 
@@ -196,21 +183,11 @@ export default function PicDashboard() {
         };
 
         try {
-            const [employeeCountRes, active, due, expired, notYet, ongoingPage] = await Promise.all([
-                // count pegawai di scope org (regional/division/unit)
-                api.get("/employees/count", {
-                    params: {
-                        regionalId: f.regionalId,
-                        divisionId: f.divisionId,
-                        unitId: f.unitId,
-                    },
-                }),
-                // KPI eligibility dengan filter + scope PIC
+            const [active, due, expired, notYet, ongoingPage] = await Promise.all([
                 fetchEligibilityCount({ ...baseEligFilters, status: "ACTIVE" }),
                 fetchEligibilityCount({ ...baseEligFilters, status: "DUE" }),
                 fetchEligibilityCount({ ...baseEligFilters, status: "EXPIRED" }),
                 fetchEligibilityCount({ ...baseEligFilters, status: "NOT_YET_CERTIFIED" }),
-                // Count batch ONGOING
                 fetchBatches({
                     ...baseEligFilters,
                     status: "ONGOING",
@@ -221,21 +198,21 @@ export default function PicDashboard() {
                 }),
             ]);
 
-            const employeeCount = Number(employeeCountRes?.data ?? 0) || 0;
-
             const activeNum = Number(active ?? 0);
             const dueNum = Number(due ?? 0);
             const expiredNum = Number(expired ?? 0);
             const notYetNum = Number(notYet ?? 0);
 
+            // TOTAL KEWAJIBAN = semua status eligibility (sama dengan superadmin)
             const eligibleTotal = activeNum + dueNum + expiredNum + notYetNum;
             const certifiedIncDue = activeNum + dueNum;
             const ongoingCount = Number(ongoingPage?.totalElements ?? 0);
 
             const mappedSummary = {
-                employees: { active: employeeCount },
+                // employees.active = Total Kewajiban Sertifikasi
+                employees: { active: eligibleTotal },
                 certifications: {
-                    active: certifiedIncDue,
+                    active: certifiedIncDue, // ACTIVE + DUE
                     due: dueNum,
                     expired: expiredNum,
                 },
@@ -295,10 +272,9 @@ export default function PicDashboard() {
         }
     }
 
-    // Jangan fetch sebelum scope-ready & sertifikat terpilih
+    // Jangan fetch sebelum scope-ready
     useEffect(() => {
         if (!scopeReady) return;
-        if (certOptions.length > 0 && !certSel) return;
 
         (async () => {
             await loadSummaryAndKpi();
@@ -315,7 +291,6 @@ export default function PicDashboard() {
         return (s.active ?? 0) + (s.due ?? 0) + (s.expired ?? 0) + (s.notYetCertified ?? 0);
     }, [summary, kpi]);
 
-    // data untuk pie chart & legend: 4 kategori (ACTIVE, DUE, EXPIRED, NOT_YET)
     const real = useMemo(() => {
         const k = kpi || {};
 
@@ -339,7 +314,7 @@ export default function PicDashboard() {
         };
     }, [kpi]);
 
-    // kartu kecil summary (sama seperti Superadmin)
+    // kartu kecil summary (sama seperti Superadmin, tapi scope PIC)
     const cardConfigs = useMemo(() => {
         const q = new URLSearchParams(
             Object.entries(currentFilters()).reduce((acc, [k, v]) => {
@@ -351,9 +326,9 @@ export default function PicDashboard() {
         return [
             {
                 key: "employees",
-                label: "Jumlah Pegawai",
+                label: "Total Kewajiban Sertifikasi",
                 value: summary?.employees?.active,
-                tip: "Jumlah pegawai",
+                tip: "Total kewajiban sertifikasi",
                 href: `/employee/data${q ? `?${q}` : ""}`,
             },
             {
@@ -364,28 +339,28 @@ export default function PicDashboard() {
                     eligibleTotal > 0
                         ? `${((Number(summary?.certifications?.active ?? 0) / eligibleTotal) * 100).toFixed(1)}%`
                         : undefined,
-                tip: "Tersertifikasi",
+                tip: "Kewajiban sertifikasi yang sudah dipenuhi",
                 href: `/employee/eligibility${q ? `?${q}` : ""}`,
             },
             {
                 key: "due",
                 label: "Jatuh Tempo",
                 value: summary?.certifications?.due,
-                tip: "Akan jatuh tempo",
+                tip: "Sertifikasi yang akan jatuh tempo",
                 href: `/employee/certification${q ? `?${q}&status=DUE` : "?status=DUE"}`,
             },
             {
                 key: "expired",
                 label: "Kadaluarsa",
                 value: summary?.certifications?.expired,
-                tip: "Sudah kadaluarsa",
+                tip: "Sertifikasi yang sudah kadaluarsa",
                 href: `/employee/certification${q ? `?${q}&status=EXPIRED` : "?status=EXPIRED"}`,
             },
             {
                 key: "notyet",
                 label: "Belum Bersertifikat",
                 value: kpi?.notYetCertified ?? 0,
-                tip: "Belum bersertifikat",
+                tip: "Kewajiban sertifikasi yang belum dipenuhi",
                 href: `/employee/certification${q ? `?${q}&status=NOT_YET_CERTIFIED` : "?status=NOT_YET_CERTIFIED"}`,
             },
             {
@@ -405,15 +380,17 @@ export default function PicDashboard() {
             <div>
                 <h1 className="text-2xl md:text-3xl font-bold">Dashboard PIC</h1>
                 <p className="text-sm opacity-70">
-                    Ringkasan PIC{computedAt ? ` • ${formatShortIdDateTime(computedAt)}` : ""}
+                    Snapshot PIC{computedAt ? ` • ${formatShortIdDateTime(computedAt)}` : ""}
                 </p>
             </div>
 
             {/* Filter organisasi/sertifikasi */}
             <div className="grid grid-cols-1 md:grid-cols-6 gap-2">
                 <div className="tooltip tooltip-top" data-tip="Regional" title="Regional">
-                    <SelectTop
+                    <Select
                         className="w-full"
+                        menuPortalTarget={menuPortalTarget}
+                        menuPosition="fixed"
                         options={regionalOptions}
                         value={regionalSel}
                         onChange={setRegionalSel}
@@ -423,8 +400,10 @@ export default function PicDashboard() {
                     />
                 </div>
                 <div className="tooltip tooltip-top" data-tip="Divisi" title="Divisi">
-                    <SelectTop
+                    <Select
                         className="w-full"
+                        menuPortalTarget={menuPortalTarget}
+                        menuPosition="fixed"
                         options={divisionOptions}
                         value={divisionSel}
                         onChange={setDivisionSel}
@@ -434,8 +413,10 @@ export default function PicDashboard() {
                     />
                 </div>
                 <div className="tooltip tooltip-top" data-tip="Unit" title="Unit">
-                    <SelectTop
+                    <Select
                         className="w-full"
+                        menuPortalTarget={menuPortalTarget}
+                        menuPosition="fixed"
                         options={unitOptions}
                         value={unitSel}
                         onChange={setUnitSel}
@@ -444,20 +425,28 @@ export default function PicDashboard() {
                         isSearchable
                     />
                 </div>
-                <div className="tooltip tooltip-top" data-tip="Sertifikat (dibatasi scope PIC)" title="Sertifikat">
-                    <SelectTop
+                <div
+                    className="tooltip tooltip-top"
+                    data-tip="Filter Sertifikasi (sesuai scope PIC)"
+                    title="Sertifikat"
+                >
+                    <Select
                         className="w-full"
+                        menuPortalTarget={menuPortalTarget}
+                        menuPosition="fixed"
                         options={certOptions}
                         value={certSel}
                         onChange={setCertSel}
-                        placeholder="Sertifikat"
-                        isClearable={false}
+                        placeholder="Filter Sertifikasi"
+                        isClearable
                         isSearchable
                     />
                 </div>
                 <div className="tooltip tooltip-top" data-tip="Jenjang" title="Jenjang">
-                    <SelectTop
+                    <Select
                         className="w-full"
+                        menuPortalTarget={menuPortalTarget}
+                        menuPosition="fixed"
                         options={levelOptions}
                         value={levelSel}
                         onChange={setLevelSel}
@@ -467,8 +456,10 @@ export default function PicDashboard() {
                     />
                 </div>
                 <div className="tooltip tooltip-top" data-tip="Sub Bidang" title="Sub Bidang">
-                    <SelectTop
+                    <Select
                         className="w-full"
+                        menuPortalTarget={menuPortalTarget}
+                        menuPosition="fixed"
                         options={subFieldOptions}
                         value={subSel}
                         onChange={setSubSel}
@@ -515,8 +506,8 @@ export default function PicDashboard() {
                     ? Array.from({ length: 6 }).map((_, i) => (
                           <div key={i} className="card bg-base-100 border rounded-2xl shadow-sm">
                               <div className="card-body p-4 min-h-[88px] justify-center">
-                                  <div className="skeleton h-3 w-24 mb-3"></div>
-                                  <div className="skeleton h-6 w-20"></div>
+                                  <div className="skeleton h-3 w-24 mb-3" />
+                                  <div className="skeleton h-6 w-20" />
                               </div>
                           </div>
                       ))
@@ -544,7 +535,7 @@ export default function PicDashboard() {
                 {/* Realisasi */}
                 <div className="card bg-base-100 border rounded-2xl shadow-sm">
                     <div className="card-body p-4 md:p-5">
-                        <h2 className="card-title text-base md:text-lg">Realisasi</h2>
+                        <h2 className="card-title text-base md:text-lg">Capaian Sertifikasi Wajib</h2>
                         {!kpi ? (
                             <div className="skeleton h-56 w-full rounded-xl" />
                         ) : (
@@ -623,7 +614,9 @@ export default function PicDashboard() {
                         <div className="flex items-center justify-between gap-2">
                             <h2 className="card-title text-base md:text-lg">Pelaksanaan Batch</h2>
                             <div className="min-w-[160px]">
-                                <SelectTop
+                                <Select
+                                    menuPortalTarget={menuPortalTarget}
+                                    menuPosition="fixed"
                                     options={batchTypeOptions}
                                     value={batchType}
                                     onChange={(v) => setBatchType(v || batchTypeOptions[0])}

@@ -31,20 +31,10 @@ import {
 import BatchListCard from "../../components/dashboards/BatchListCard";
 import EligibilityPriorityCard from "../../components/dashboards/EligibilityPriorityCard";
 
-// ====== MONTHS lokal ======
+/* ===== MONTHS (lokal, sama kayak PicDashboard) ===== */
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
 
-/* ========= helpers ========= */
-
-function SelectTop(props) {
-    return (
-        <Select
-            {...props}
-            menuPortalTarget={typeof document !== "undefined" ? document.body : null}
-            menuPosition="fixed"
-        />
-    );
-}
+/* ===== helpers ===== */
 
 function buildQueryFromFilters(f) {
     const params = new URLSearchParams();
@@ -62,7 +52,7 @@ function toOptions(data, labelPicker) {
     return arr.filter(Boolean).map((x) => ({ value: x.id, label: labelPicker(x), raw: x }));
 }
 
-/* ========= small components ========= */
+/* ===== Mini card ===== */
 function MiniCard({ label, value, sub, onClick, tip }) {
     return (
         <div className="tooltip tooltip-top w-full" data-tip={tip || label} title={tip || label}>
@@ -80,6 +70,9 @@ function MiniCard({ label, value, sub, onClick, tip }) {
 
 export default function SuperadminDashboard() {
     const navigate = useNavigate();
+
+    // untuk react-select menuPortal
+    const menuPortalTarget = typeof document !== "undefined" ? document.body : null;
 
     // ===== filter organisasi
     const [divisionSel, setDivisionSel] = useState(null);
@@ -114,7 +107,7 @@ export default function SuperadminDashboard() {
     const [kpi, setKpi] = useState(null);
     const [computedAt, setComputedAt] = useState(null);
 
-    // ===== batch ONGOING (paging)
+    // ===== batch ONGOING (legacy state, tapi nggak ganggu UI baru)
     const [batches, setBatches] = useState([]);
     const [batchPage, setBatchPage] = useState(1);
     const [batchRows, setBatchRows] = useState(5);
@@ -122,7 +115,7 @@ export default function SuperadminDashboard() {
     const [batchTotalElements, setBatchTotalElements] = useState(0);
     const [loadingBatch, setLoadingBatch] = useState(false);
 
-    // ===== batch FINISHED (paging)
+    // ===== batch FINISHED (legacy state)
     const [finishedBatches, setFinishedBatches] = useState([]);
     const [finishedPage, setFinishedPage] = useState(1);
     const [finishedRows, setFinishedRows] = useState(5);
@@ -162,7 +155,6 @@ export default function SuperadminDashboard() {
                     setCertOptions((arr || []).map((c) => ({ value: c.id, label: `${c.code || c.name || c.id}` })))
                 )
                 .catch(() => {});
-
             fetchCertificationLevels()
                 .then((arr) =>
                     setLevelOptions(
@@ -212,21 +204,11 @@ export default function SuperadminDashboard() {
         };
 
         try {
-            const [employeeCountRes, active, due, expired, notYet, ongoingPage] = await Promise.all([
-                // count pegawai by org filter
-                api.get("/employees/count", {
-                    params: {
-                        regionalId: f.regionalId,
-                        divisionId: f.divisionId,
-                        unitId: f.unitId,
-                    },
-                }),
-                // KPI eligibility: ACTIVE, DUE, EXPIRED, NOT_YET_CERTIFIED
+            const [active, due, expired, notYet, ongoingPage] = await Promise.all([
                 fetchEligibilityCount({ ...baseEligFilters, status: "ACTIVE" }),
                 fetchEligibilityCount({ ...baseEligFilters, status: "DUE" }),
                 fetchEligibilityCount({ ...baseEligFilters, status: "EXPIRED" }),
                 fetchEligibilityCount({ ...baseEligFilters, status: "NOT_YET_CERTIFIED" }),
-                // count batch ONGOING (totalElements)
                 fetchBatches({
                     ...baseEligFilters,
                     status: "ONGOING",
@@ -236,8 +218,6 @@ export default function SuperadminDashboard() {
                     sortDirection: "desc",
                 }),
             ]);
-
-            const employeeCount = Number(employeeCountRes?.data ?? 0) || 0;
 
             const activeNum = Number(active ?? 0);
             const dueNum = Number(due ?? 0);
@@ -249,9 +229,9 @@ export default function SuperadminDashboard() {
             const ongoingCount = Number(ongoingPage?.totalElements ?? 0);
 
             const mappedSummary = {
-                employees: { active: employeeCount },
+                employees: { active: eligibleTotal },
                 certifications: {
-                    active: certifiedIncDue, // ACTIVE + DUE
+                    active: certifiedIncDue,
                     due: dueNum,
                     expired: expiredNum,
                 },
@@ -261,7 +241,7 @@ export default function SuperadminDashboard() {
 
             const mappedKpi = {
                 notYetCertified: notYetNum,
-                active: activeNum, // ACTIVE only
+                active: activeNum,
                 due: dueNum,
                 expired: expiredNum,
             };
@@ -408,9 +388,9 @@ export default function SuperadminDashboard() {
         return [
             {
                 key: "employees",
-                label: "Jumlah Pegawai",
+                label: "Total Kewajiban Sertifikasi",
                 value: summary?.employees?.active,
-                tip: "Jumlah pegawai",
+                tip: "Total kewajiban sertifikasi",
                 href: `/employee/data${q ? `?${q}` : ""}`,
             },
             {
@@ -421,28 +401,28 @@ export default function SuperadminDashboard() {
                     eligibleTotal > 0
                         ? `${((Number(summary?.certifications?.active ?? 0) / eligibleTotal) * 100).toFixed(1)}%`
                         : undefined,
-                tip: "Tersertifikasi",
+                tip: "Kewajiban sertifikasi yang sudah dipenuhi",
                 href: `/employee/eligibility${q ? `?${q}` : ""}`,
             },
             {
                 key: "due",
                 label: "Jatuh Tempo",
                 value: summary?.certifications?.due,
-                tip: "Akan jatuh tempo",
+                tip: "Sertifikasi yang akan jatuh tempo",
                 href: `/employee/certification${q ? `?${q}&status=DUE` : "?status=DUE"}`,
             },
             {
                 key: "expired",
                 label: "Kadaluarsa",
                 value: summary?.certifications?.expired,
-                tip: "Sudah kadaluarsa",
+                tip: "Sertifikasi yang sudah kadaluarsa",
                 href: `/employee/certification${q ? `?${q}&status=EXPIRED` : "?status=EXPIRED"}`,
             },
             {
                 key: "notyet",
                 label: "Belum Bersertifikat",
                 value: kpi?.notYetCertified ?? 0,
-                tip: "Belum bersertifikat",
+                tip: "Kewajiban sertifikasi yang belum dipenuhi",
                 href: `/employee/certification${q ? `?${q}&status=NOT_YET_CERTIFIED` : "?status=NOT_YET_CERTIFIED"}`,
             },
             {
@@ -455,7 +435,7 @@ export default function SuperadminDashboard() {
         ];
     }, [summary, kpi, divisionSel, regionalSel, unitSel, certSel, levelSel, subSel, eligibleTotal]);
 
-    /* ========= render ========= */
+    /* ===== UI ===== */
     return (
         <div className="p-4 md:p-6 space-y-6">
             {/* Judul */}
@@ -469,8 +449,10 @@ export default function SuperadminDashboard() {
             {/* Filter organisasi/sertifikasi */}
             <div className="grid grid-cols-1 md:grid-cols-6 gap-2">
                 <div className="tooltip tooltip-top" data-tip="Regional" title="Regional">
-                    <SelectTop
+                    <Select
                         className="w-full"
+                        menuPortalTarget={menuPortalTarget}
+                        menuPosition="fixed"
                         options={regionalOptions}
                         value={regionalSel}
                         onChange={setRegionalSel}
@@ -480,8 +462,10 @@ export default function SuperadminDashboard() {
                     />
                 </div>
                 <div className="tooltip tooltip-top" data-tip="Divisi" title="Divisi">
-                    <SelectTop
+                    <Select
                         className="w-full"
+                        menuPortalTarget={menuPortalTarget}
+                        menuPosition="fixed"
                         options={divisionOptions}
                         value={divisionSel}
                         onChange={setDivisionSel}
@@ -491,8 +475,10 @@ export default function SuperadminDashboard() {
                     />
                 </div>
                 <div className="tooltip tooltip-top" data-tip="Unit" title="Unit">
-                    <SelectTop
+                    <Select
                         className="w-full"
+                        menuPortalTarget={menuPortalTarget}
+                        menuPosition="fixed"
                         options={unitOptions}
                         value={unitSel}
                         onChange={setUnitSel}
@@ -502,19 +488,23 @@ export default function SuperadminDashboard() {
                     />
                 </div>
                 <div className="tooltip tooltip-top" data-tip="Sertifikat" title="Sertifikat">
-                    <SelectTop
+                    <Select
                         className="w-full"
+                        menuPortalTarget={menuPortalTarget}
+                        menuPosition="fixed"
                         options={certOptions}
                         value={certSel}
                         onChange={setCertSel}
-                        placeholder="Jenis Sertifikat"
+                        placeholder="Filter Sertifikasi"
                         isClearable
                         isSearchable
                     />
                 </div>
                 <div className="tooltip tooltip-top" data-tip="Jenjang" title="Jenjang">
-                    <SelectTop
+                    <Select
                         className="w-full"
+                        menuPortalTarget={menuPortalTarget}
+                        menuPosition="fixed"
                         options={levelOptions}
                         value={levelSel}
                         onChange={setLevelSel}
@@ -524,8 +514,10 @@ export default function SuperadminDashboard() {
                     />
                 </div>
                 <div className="tooltip tooltip-top" data-tip="Sub Bidang" title="Sub Bidang">
-                    <SelectTop
+                    <Select
                         className="w-full"
+                        menuPortalTarget={menuPortalTarget}
+                        menuPosition="fixed"
                         options={subFieldOptions}
                         value={subSel}
                         onChange={setSubSel}
@@ -566,14 +558,14 @@ export default function SuperadminDashboard() {
                 </div>
             </div>
 
-            {/* Kartu ringkas */}
+            {/* Summary cards */}
             <div className="grid grid-cols-2 md:grid-cols-6 gap-3 md:gap-4">
                 {!summary
                     ? Array.from({ length: 6 }).map((_, i) => (
                           <div key={i} className="card bg-base-100 border rounded-2xl shadow-sm">
                               <div className="card-body p-4 min-h-[88px] justify-center">
-                                  <div className="skeleton h-3 w-24 mb-3"></div>
-                                  <div className="skeleton h-6 w-20"></div>
+                                  <div className="skeleton h-3 w-24 mb-3" />
+                                  <div className="skeleton h-6 w-20" />
                               </div>
                           </div>
                       ))
@@ -591,10 +583,10 @@ export default function SuperadminDashboard() {
 
             {/* Realisasi & Bulanan */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {/* Realisasi */}
+                {/* Capaian Sertifikasi Wajib */}
                 <div className="card bg-base-100 border rounded-2xl shadow-sm">
                     <div className="card-body p-4 md:p-5">
-                        <h2 className="card-title text-base md:text-lg">Realisasi</h2>
+                        <h2 className="card-title text-base md:text-lg">Capaian Sertifikasi Wajib</h2>
                         {!kpi ? (
                             <div className="skeleton h-56 w-full rounded-xl" />
                         ) : (
@@ -673,7 +665,9 @@ export default function SuperadminDashboard() {
                         <div className="flex items-center justify-between gap-2">
                             <h2 className="card-title text-base md:text-lg">Pelaksanaan Batch</h2>
                             <div className="min-w-[160px]">
-                                <SelectTop
+                                <Select
+                                    menuPortalTarget={menuPortalTarget}
+                                    menuPosition="fixed"
                                     options={batchTypeOptions}
                                     value={batchType}
                                     onChange={(v) => setBatchType(v || batchTypeOptions[0])}
@@ -702,12 +696,10 @@ export default function SuperadminDashboard() {
                 </div>
             </div>
 
-            {/* ====== Batch Berjalan & Selesai ====== */}
+            {/* Batch Berjalan & Selesai & Belum Bersertifikat */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                 <BatchListCard title="Batch Berjalan" status="ONGOING" filters={currentFilters()} initialRows={5} />
-
                 <BatchListCard title="Batch Selesai" status="FINISHED" filters={currentFilters()} initialRows={5} />
-
                 <EligibilityPriorityCard
                     title="Belum Bersertifikat"
                     status="NOT_YET_CERTIFIED"
@@ -717,7 +709,7 @@ export default function SuperadminDashboard() {
                 />
             </div>
 
-            {/* ====== Due | Kadaluarsa ====== */}
+            {/* Due | Kadaluarsa */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <EligibilityPriorityCard
                     title="Jatuh Tempo"
@@ -726,7 +718,6 @@ export default function SuperadminDashboard() {
                     filters={currentFilters()}
                     initialRowsPerPage={10}
                 />
-
                 <EligibilityPriorityCard
                     title="Kadaluarsa"
                     status="EXPIRED"

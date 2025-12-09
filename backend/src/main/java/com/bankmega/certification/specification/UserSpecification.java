@@ -1,8 +1,11 @@
 package com.bankmega.certification.specification;
 
 import com.bankmega.certification.entity.User;
+import jakarta.persistence.criteria.Join;
 import jakarta.persistence.criteria.JoinType;
 import org.springframework.data.jpa.domain.Specification;
+
+import java.util.List;
 
 public class UserSpecification {
 
@@ -57,6 +60,26 @@ public class UserSpecification {
                     cb.like(cb.lower(root.get("email")), like),
                     cb.like(cb.lower(empJoin.get("name")), like),
                     cb.like(cb.lower(empJoin.get("nip")), like));
+        };
+    }
+
+    /**
+     * 🔐 Exclude users dengan role tertentu (misal SUPERADMIN, PIC)
+     */
+    public static Specification<User> excludeRoles(List<String> roleNames) {
+        return (root, query, cb) -> {
+            if (roleNames == null || roleNames.isEmpty()) {
+                return cb.conjunction();
+            }
+
+            Join<User, ?> roleJoin = root.join("role", JoinType.LEFT);
+
+            var upperNames = roleNames.stream()
+                    .filter(n -> n != null && !n.isBlank())
+                    .map(String::toUpperCase)
+                    .toList();
+
+            return cb.not(cb.upper(roleJoin.get("name")).in(upperNames));
         };
     }
 }

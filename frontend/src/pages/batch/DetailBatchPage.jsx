@@ -60,10 +60,10 @@ export default function DetailBatchPage() {
     function renderTypeBadge(type) {
         if (!type) return "-";
         const map = {
-            CERTIFICATION: { label: "Sertifikasi", cls: "badge-info" },
-            TRAINING: { label: "Training", cls: "badge-primary" },
-            REFRESHMENT: { label: "Refreshment", cls: "badge-secondary" },
-            EXTENSION: { label: "Perpanjang", cls: "badge-success" }, // 🔹 baru
+            CERTIFICATION: { label: "Sertifikasi", cls: "badge-info text-white" },
+            TRAINING: { label: "Training", cls: "badge-primary text-white" },
+            REFRESHMENT: { label: "Refreshment", cls: "badge-secondary text-white" },
+            EXTENSION: { label: "Perpanjang", cls: "badge-success text-white" }, // 🔹 baru
         };
         const m = map[type] || { label: type, cls: "badge-neutral" };
         return <span className={`badge badge-sm ${m.cls}`}>{m.label}</span>;
@@ -294,15 +294,23 @@ export default function DetailBatchPage() {
                                 <span
                                     className={`badge badge-sm text-white ${
                                         batch.status === "PLANNED"
-                                            ? "badge-info"
-                                            : batch.status === "ONGOING"
                                             ? "badge-warning"
+                                            : batch.status === "ONGOING"
+                                            ? "badge-info"
                                             : batch.status === "FINISHED"
                                             ? "badge-success"
                                             : "badge-error"
                                     }`}
                                 >
-                                    {batch.status}
+                                    {batch.status === "ONGOING"
+                                        ? "Ongoing"
+                                        : batch.status === "PLANNED"
+                                        ? "Planned"
+                                        : batch.status === "FINISHED"
+                                        ? "Finished"
+                                        : batch.status === "CANCELLED"
+                                        ? "Cancelled"
+                                        : batch.status}
                                 </span>
                             </div>
                         </div>

@@ -28,7 +28,7 @@ export const MENU = [
         key: "employee",
         subMenu: [
             { label: "Data Pegawai", href: "/employee/data" },
-            { label: "Data Pegawai Resign", href: "/employee/resigned" }, // 🔹 NEW
+            { label: "Data Pegawai Resign", href: "/employee/resigned" },
             { label: "Eligibility", href: "/employee/eligibility" },
             { label: "Eligibility Manual", href: "/employee/exception" },
             { label: "Sertifikat Pegawai", href: "/employee/certification" },
@@ -81,7 +81,8 @@ export const MENU = [
         key: "settings",
         subMenu: [
             { label: "Template & Jadwal", href: "/settings/notification-settings" },
-            { label: "Konfigurasi Email (SMTP)", href: "/settings/email-config" },
+            { label: "Konfigurasi Email", href: "/settings/email-config" },
+            { label: "Test Koneksi Email", href: "/settings/email-test" },
         ],
     },
 ];
@@ -96,7 +97,7 @@ export const filterMenuByRole = (menu, roleRaw) => {
 
     if (role === "PIC") {
         return menu
-            .filter((item) => item.key !== "user" && item.key !== "organization")
+            .filter((item) => item.key !== "organization")
             .map((item) => {
                 if (item.key === "sertifikat") {
                     return {
@@ -106,13 +107,20 @@ export const filterMenuByRole = (menu, roleRaw) => {
                         ),
                     };
                 }
+                if (item.key === "settings") {
+                    return {
+                        ...item,
+                        subMenu: item.subMenu.filter(
+                            (sub) => sub.label === "Konfigurasi Email" || sub.label === "Test Koneksi Email"
+                        ),
+                    };
+                }
                 return item;
             });
     }
 
     if (role === "EMPLOYEE" || role === "PEGAWAI") {
         const employeeMenu = menu.filter((item) => item.key === "dashboard" || item.key === "employee");
-
         return [
             ...employeeMenu,
             {
@@ -140,23 +148,29 @@ export default function Sidebar({ open, setOpen }) {
 
     const visibleMenu = filterMenuByRole(MENU, role);
 
+    const isActive = (href) => location.pathname === href || location.pathname.startsWith(href + "/");
+    const isParentActive = (submenu) => submenu.some((sub) => isActive(sub.href));
+    const isMenuActive = (item) => (item.subMenu ? isParentActive(item.subMenu) : isActive(item.href));
+
     useEffect(() => {
         const parent = visibleMenu.find(
             (m) => m.subMenu && m.subMenu.some((s) => location.pathname.startsWith(s.href))
         );
-        if (parent) setOpenMenu(parent.key);
-    }, [location.pathname, visibleMenu]);
+        if (parent) {
+            setOpenMenu(parent.key);
+        } else {
+            setOpenMenu("");
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [location.pathname]);
 
-    const handleMenuClick = (key) => setOpenMenu((prev) => (prev === key ? "" : key));
+    const handleMenuClick = (key) => {
+        setOpenMenu((prev) => (prev === key ? "" : key));
+    };
+
     const handleLinkClick = () => {
         if (window.innerWidth < 1024) setOpen(false);
     };
-
-    const isActive = (href) => location.pathname === href || location.pathname.startsWith(href + "/");
-
-    const isParentActive = (submenu) => submenu.some((sub) => isActive(sub.href));
-
-    const isMenuActive = (item) => (item.subMenu ? isParentActive(item.subMenu) : isActive(item.href));
 
     return (
         <>
@@ -189,14 +203,10 @@ export default function Sidebar({ open, setOpen }) {
                                 >
                                     {item.icon}
                                     <span className="flex-1 text-left text-xs">{item.label}</span>
-                                    {openMenu === item.key || isParentActive(item.subMenu) ? (
-                                        <ChevronUp size={16} />
-                                    ) : (
-                                        <ChevronDown size={16} />
-                                    )}
+                                    {openMenu === item.key ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                                 </button>
 
-                                {(openMenu === item.key || isParentActive(item.subMenu)) && (
+                                {openMenu === item.key && (
                                     <div className="ml-4 space-y-1">
                                         {item.subMenu.map((sub, idx) => (
                                             <Link

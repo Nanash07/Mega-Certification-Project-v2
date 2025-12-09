@@ -173,6 +173,7 @@ export default function NotificationSettingsPage() {
             berlakuSampai: "31 Desember 2025",
             namaBatch: "SMR-7-DES-2025",
             mulaiTanggal: "1 Desember 2025",
+            jenisBatch: "Sertifikasi",
         };
 
         // SUBJECT: plain (email subject tidak support HTML)

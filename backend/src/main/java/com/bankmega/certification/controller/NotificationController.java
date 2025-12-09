@@ -101,12 +101,6 @@ public class NotificationController {
         return ResponseEntity.ok().build();
     }
 
-    @PostMapping("/test-email")
-    public ResponseEntity<String> testEmail(@RequestParam String email) {
-        notificationService.testEmail(email);
-        return ResponseEntity.ok("Email test terkirim ke " + email);
-    }
-
     @PostMapping("/batches/{batchId}/send")
     public ResponseEntity<?> sendBatchNotifications(
             @PathVariable Long batchId,

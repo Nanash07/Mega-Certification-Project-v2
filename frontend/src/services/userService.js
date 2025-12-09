@@ -23,7 +23,7 @@ export async function fetchUsers({ page = 0, size = 10, roleId, isActive, q } = 
             }
         );
     } catch (err) {
-        console.error("❌ fetchUsers error:", err);
+        console.error("fetchUsers error:", err);
         return {
             content: [],
             totalPages: 0,
@@ -40,7 +40,7 @@ export async function fetchUserById(id) {
         const { data } = await api.get(`${BASE_URL}/${id}`);
         return data || null;
     } catch (err) {
-        console.error("❌ fetchUserById error:", err);
+        console.error("fetchUserById error:", err);
         return null;
     }
 }
@@ -53,7 +53,7 @@ export async function createUser(payload) {
         const { data } = await api.post(BASE_URL, payload);
         return data;
     } catch (err) {
-        console.error("❌ createUser error:", err);
+        console.error("createUser error:", err);
         throw err;
     }
 }
@@ -64,7 +64,7 @@ export async function updateUser(id, payload) {
         const { data } = await api.put(`${BASE_URL}/${id}`, payload);
         return data;
     } catch (err) {
-        console.error("❌ updateUser error:", err);
+        console.error("updateUser error:", err);
         throw err;
     }
 }
@@ -77,7 +77,7 @@ export async function deleteUser(id) {
         await api.delete(`${BASE_URL}/${id}`);
         return true;
     } catch (err) {
-        console.error("❌ deleteUser error:", err);
+        console.error("deleteUser error:", err);
         throw err;
     }
 }
@@ -88,7 +88,7 @@ export async function toggleUser(id) {
         const { data } = await api.put(`${BASE_URL}/${id}/toggle`);
         return data;
     } catch (err) {
-        console.error("❌ toggleUser error:", err);
+        console.error("toggleUser error:", err);
         throw err;
     }
 }
@@ -102,7 +102,7 @@ export async function fetchActiveUsers(q = "") {
         const { data } = await api.get(`${BASE_URL}/active`, { params });
         return Array.isArray(data) ? data : [];
     } catch (err) {
-        console.error("❌ fetchActiveUsers error:", err);
+        console.error("fetchActiveUsers error:", err);
         return [];
     }
 }
@@ -116,7 +116,7 @@ export async function fetchUserSelectOptions(q = "") {
             label: `${u.username}${u.employeeName ? ` - ${u.employeeName}` : ""}`,
         }));
     } catch (err) {
-        console.error("❌ fetchUserSelectOptions error:", err);
+        console.error("fetchUserSelectOptions error:", err);
         return [];
     }
 }

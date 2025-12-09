@@ -65,33 +65,76 @@ public class UserService {
                 .build();
     }
 
+    // ===================== ROLE HELPERS (PIC restriction) =====================
+
+    private static boolean isPrivilegedRole(Role role) {
+        if (role == null || role.getName() == null)
+            return false;
+        String name = role.getName().toUpperCase();
+        return "SUPERADMIN".equals(name) || "PIC".equals(name) || "ROLE_PIC".equals(name);
+    }
+
+    private static void ensurePicCannotManageRole(boolean callerIsPic, Role targetRole) {
+        if (callerIsPic && isPrivilegedRole(targetRole)) {
+            throw new IllegalArgumentException("PIC tidak diperbolehkan mengelola user dengan role " +
+                    targetRole.getName());
+        }
+    }
+
     // ===================== PAGE & GET =====================
     @Transactional(readOnly = true)
-    public Page<UserResponse> getPage(Long roleId, Boolean isActive, String q, Pageable pageable) {
+    public Page<UserResponse> getPage(Long roleId,
+            Boolean isActive,
+            String q,
+            Pageable pageable,
+            boolean callerIsPic) {
         Specification<User> spec = UserSpecification.notDeleted()
                 .and(UserSpecification.byRoleId(roleId))
                 .and(UserSpecification.byIsActive(isActive))
                 .and(UserSpecification.bySearch(q));
+
+        // 🔐 PIC tidak boleh lihat user SUPERADMIN / PIC
+        if (callerIsPic) {
+            spec = spec.and(UserSpecification.excludeRoles(List.of("SUPERADMIN", "PIC", "ROLE_PIC")));
+        }
 
         Pageable sorted = pageable.getSort().isUnsorted()
                 ? PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), Sort.by(Sort.Order.asc("username")))
                 : pageable;
 
         // Saran: tambahkan @EntityGraph(attributePaths = {"role", "employee"}) di
-        // UserRepository untuk hilangin N+1
+        // UserRepository
+        // untuk hilangin N+1
         return userRepo.findAll(spec, sorted).map(UserService::toResponse);
+    }
+
+    // versi lama (non PIC) biar kompatibel ke pemakaian lain
+    @Transactional(readOnly = true)
+    public Page<UserResponse> getPage(Long roleId, Boolean isActive, String q, Pageable pageable) {
+        return getPage(roleId, isActive, q, pageable, false);
+    }
+
+    @Transactional(readOnly = true)
+    public UserResponse getById(Long id, boolean callerIsPic) {
+        User user = userRepo.findByIdAndDeletedAtIsNull(id)
+                .orElseThrow(() -> new NotFoundException("User dengan id " + id + " tidak ditemukan"));
+
+        if (callerIsPic && isPrivilegedRole(user.getRole())) {
+            // dari perspektif PIC pura-pura not found
+            throw new NotFoundException("User dengan id " + id + " tidak ditemukan");
+        }
+
+        return toResponse(user);
     }
 
     @Transactional(readOnly = true)
     public UserResponse getById(Long id) {
-        return userRepo.findByIdAndDeletedAtIsNull(id)
-                .map(UserService::toResponse)
-                .orElseThrow(() -> new NotFoundException("User dengan id " + id + " tidak ditemukan"));
+        return getById(id, false);
     }
 
     // ===================== CREATE / UPDATE / DELETE =====================
     @Transactional
-    public UserResponse create(UserRequest req) {
+    public UserResponse create(UserRequest req, boolean callerIsPic) {
         String username = normalizeUsername(req.getUsername());
         if (username == null || username.isBlank()) {
             throw new ConflictException("Username wajib diisi");
@@ -99,6 +142,9 @@ public class UserService {
 
         Role role = roleRepo.findById(req.getRoleId())
                 .orElseThrow(() -> new NotFoundException("Role tidak ditemukan dengan id " + req.getRoleId()));
+
+        // 🔐 PIC tidak boleh create user dengan role SUPERADMIN / PIC
+        ensurePicCannotManageRole(callerIsPic, role);
 
         Employee emp = null;
         if (req.getEmployeeId() != null) {
@@ -132,9 +178,20 @@ public class UserService {
     }
 
     @Transactional
-    public UserResponse update(Long id, UserRequest req) {
+    public UserResponse create(UserRequest req) {
+        return create(req, false);
+    }
+
+    @Transactional
+    public UserResponse update(Long id, UserRequest req, boolean callerIsPic) {
         User user = userRepo.findByIdAndDeletedAtIsNull(id)
                 .orElseThrow(() -> new NotFoundException("User tidak ditemukan dengan id " + id));
+
+        // 🔐 PIC tidak boleh mengelola user SUPERADMIN/PIC
+        if (callerIsPic && isPrivilegedRole(user.getRole())) {
+            throw new IllegalArgumentException("PIC tidak diperbolehkan mengelola user dengan role " +
+                    user.getRole().getName());
+        }
 
         boolean changed = false;
 
@@ -148,8 +205,9 @@ public class UserService {
         }
 
         // email (boleh null & dupe)
-        if (!Objects.equals(user.getEmail(), trimToNull(req.getEmail()))) {
-            user.setEmail(trimToNull(req.getEmail()));
+        String newEmail = trimToNull(req.getEmail());
+        if (!Objects.equals(user.getEmail(), newEmail)) {
+            user.setEmail(newEmail);
             changed = true;
         }
 
@@ -166,6 +224,10 @@ public class UserService {
             if (!Objects.equals(currentRoleId, req.getRoleId())) {
                 Role role = roleRepo.findById(req.getRoleId())
                         .orElseThrow(() -> new NotFoundException("Role tidak ditemukan dengan id " + req.getRoleId()));
+
+                // 🔐 PIC tidak boleh ubah role menjadi SUPERADMIN/PIC
+                ensurePicCannotManageRole(callerIsPic, role);
+
                 user.setRole(role);
                 changed = true;
             }
@@ -203,9 +265,20 @@ public class UserService {
     }
 
     @Transactional
-    public void softDelete(Long id) {
+    public UserResponse update(Long id, UserRequest req) {
+        return update(id, req, false);
+    }
+
+    @Transactional
+    public void softDelete(Long id, boolean callerIsPic) {
         User user = userRepo.findByIdAndDeletedAtIsNull(id)
                 .orElseThrow(() -> new NotFoundException("User tidak ditemukan dengan id " + id));
+
+        if (callerIsPic && isPrivilegedRole(user.getRole())) {
+            throw new IllegalArgumentException("PIC tidak diperbolehkan menghapus user dengan role " +
+                    user.getRole().getName());
+        }
+
         user.setIsActive(false);
         user.setDeletedAt(Instant.now());
         user.setUpdatedAt(Instant.now());
@@ -213,12 +286,28 @@ public class UserService {
     }
 
     @Transactional
-    public UserResponse toggleStatus(Long id) {
+    public void softDelete(Long id) {
+        softDelete(id, false);
+    }
+
+    @Transactional
+    public UserResponse toggleStatus(Long id, boolean callerIsPic) {
         User user = userRepo.findByIdAndDeletedAtIsNull(id)
                 .orElseThrow(() -> new NotFoundException("User tidak ditemukan dengan id " + id));
+
+        if (callerIsPic && isPrivilegedRole(user.getRole())) {
+            throw new IllegalArgumentException("PIC tidak diperbolehkan mengubah status user dengan role " +
+                    user.getRole().getName());
+        }
+
         user.setIsActive(!user.getIsActive());
         user.setUpdatedAt(Instant.now());
         return toResponse(userRepo.save(user));
+    }
+
+    @Transactional
+    public UserResponse toggleStatus(Long id) {
+        return toggleStatus(id, false);
     }
 
     @Transactional
@@ -436,13 +525,23 @@ public class UserService {
     }
 
     @Transactional(readOnly = true)
-    public List<UserResponse> searchActiveUsers(String q) {
+    public List<UserResponse> searchActiveUsers(String q, boolean callerIsPic) {
         Specification<User> spec = UserSpecification.notDeleted()
                 .and(UserSpecification.byIsActive(true))
                 .and(UserSpecification.bySearch(q));
+
+        if (callerIsPic) {
+            spec = spec.and(UserSpecification.excludeRoles(List.of("SUPERADMIN", "PIC", "ROLE_PIC")));
+        }
+
         return userRepo.findAll(spec).stream()
                 .map(UserService::toResponse)
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<UserResponse> searchActiveUsers(String q) {
+        return searchActiveUsers(q, false);
     }
 
     // ===================== INTERNAL UTILS =====================

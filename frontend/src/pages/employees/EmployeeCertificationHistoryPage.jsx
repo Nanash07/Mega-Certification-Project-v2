@@ -18,8 +18,8 @@ export default function EmployeeCertificationHistoryPage() {
     const [totalPages, setTotalPages] = useState(0);
     const [totalElements, setTotalElements] = useState(0);
 
-    // Filter aksi
-    const [filterAction, setFilterAction] = useState({ value: "all", label: "Semua Aksi" });
+    // Filter aksi — default: tidak ter-filter (null)
+    const [filterAction, setFilterAction] = useState(null);
 
     async function load() {
         setLoading(true);
@@ -27,8 +27,10 @@ export default function EmployeeCertificationHistoryPage() {
             const params = {
                 page: page - 1,
                 size: rowsPerPage,
-                actionType: filterAction?.value || "all",
             };
+            if (filterAction?.value) {
+                params.actionType = filterAction.value;
+            }
 
             const res = await api.get(`/employee-certification-histories`, { params });
             const data = res?.data || {};
@@ -77,10 +79,9 @@ export default function EmployeeCertificationHistoryPage() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 text-xs items-end">
                     {/* Filter aksi */}
-                    <div className="col-span-2">
+                    <div className="col-span-1">
                         <Select
                             options={[
-                                { value: "all", label: "Semua Aksi" },
                                 { value: "CREATED", label: "CREATED" },
                                 { value: "UPDATED", label: "UPDATED" },
                                 { value: "DELETED", label: "DELETED" },
@@ -92,14 +93,14 @@ export default function EmployeeCertificationHistoryPage() {
                         />
                     </div>
 
-                    <div className="col-span-3"></div>
+                    <div className="col-span-4"></div>
 
                     {/* Clear Filter */}
                     <div className="col-span-1">
                         <button
                             className="btn btn-soft btn-accent border-accent btn-sm w-full"
                             onClick={() => {
-                                setFilterAction({ value: "all", label: "Semua Aksi" });
+                                setFilterAction(null); // balik ke tidak ter-filter
                                 setPage(1);
                                 toast.success("Filter direset");
                             }}

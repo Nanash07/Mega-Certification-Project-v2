@@ -4,9 +4,6 @@ import com.bankmega.certification.dto.dashboard.*;
 import com.bankmega.certification.repository.DashboardRepository;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
-import java.util.Map;
-
 @Service
 public class DashboardService {
 

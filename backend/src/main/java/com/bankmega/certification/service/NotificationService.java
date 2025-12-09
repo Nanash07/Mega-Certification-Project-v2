@@ -142,7 +142,6 @@ public class NotificationService {
         final String bodyPlain = templateService.generateMessage(
                 NotificationTemplate.Code.CERT_REMINDER, employee, certName, cert.getValidUntil(), null, null);
 
-        // Build HTML dengan nilai variabel dibold
         Map<String, String> vars = buildCommonVars(employee);
         vars.put("{{namaSertifikasi}}", certName);
         vars.put("{{berlakuSampai}}", formatDateId(cert.getValidUntil()));
@@ -312,7 +311,7 @@ public class NotificationService {
         if (limit <= 0) {
             limit = 5;
         } else if (limit > 50) {
-            limit = 50; // guard biar gak kebanyakan
+            limit = 50;
         }
 
         final List<Notification> list = notificationRepository.findByUserIdOrderByCreatedAtDesc(userId);
@@ -340,20 +339,6 @@ public class NotificationService {
 
     public long getUnreadCount(Long userId) {
         return notificationRepository.countByUserIdAndIsReadFalse(userId);
-    }
-
-    public void testEmail(String to) {
-        if (isBlank(to))
-            return;
-        final String bodyPlain = "Halo,\n\nIni adalah email percobaan dari sistem sertifikasi Bank Mega.\n"
-                + "Kalau Anda menerima email ini, berarti konfigurasi SMTP sudah berfungsi dengan baik.\n\n"
-                + "Salam,\nDivisi Learning & Development\nBank Mega";
-
-        Map<String, String> vars = new LinkedHashMap<>();
-        vars.put("{{dummy}}", ""); // no-op
-        final String bodyHtml = buildHtmlWithBold(bodyPlain, Map.of());
-
-        sendEmailAsync(to, "Test Email dari Mega Certification System", bodyHtml);
     }
 
     private String mapJenisBatch(Batch.BatchType type) {
@@ -411,7 +396,6 @@ public class NotificationService {
 
     private String buildHtmlWithBold(String plain, Map<String, String> variables) {
         String html = htmlEscape(Objects.toString(plain, ""));
-        // bold-kan tiap nilai variabel (setelah di-escape supaya aman)
         for (Map.Entry<String, String> e : variables.entrySet()) {
             String val = e.getValue();
             if (isBlank(val))

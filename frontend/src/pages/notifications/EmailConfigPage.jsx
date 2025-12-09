@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
-import { Save, Send, Eye, EyeOff } from "lucide-react";
-import { fetchActiveEmailConfig, createEmailConfig, testEmailConnection } from "../../services/emailConfigService";
+import { Save, Eye, EyeOff } from "lucide-react";
+import { fetchActiveEmailConfig, createEmailConfig } from "../../services/emailConfigService";
 
 export default function EmailConfigPage() {
     const [loading, setLoading] = useState(true);
@@ -14,8 +14,6 @@ export default function EmailConfigPage() {
     });
 
     const [activeConfig, setActiveConfig] = useState(null);
-    const [testEmail, setTestEmail] = useState("");
-    const [testing, setTesting] = useState(false);
     const [saving, setSaving] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const [passwordChanged, setPasswordChanged] = useState(false);
@@ -54,7 +52,7 @@ export default function EmailConfigPage() {
 
     const handleSave = async () => {
         if (!form.host || !form.username) {
-            toast.error("Host dan Username wajib diisi");
+            toast.error("Host dan Email Pengirim wajib diisi");
             return;
         }
 
@@ -74,24 +72,6 @@ export default function EmailConfigPage() {
         }
     };
 
-    const handleTest = async () => {
-        if (!testEmail) {
-            toast.error("Masukkan alamat email tujuan dulu");
-            return;
-        }
-
-        try {
-            setTesting(true);
-            const res = await testEmailConnection(testEmail);
-            toast.success(res || "Email test berhasil dikirim");
-        } catch (err) {
-            toast.error("Gagal mengirim test email");
-            console.error(err);
-        } finally {
-            setTesting(false);
-        }
-    };
-
     if (loading) {
         return (
             <div className="flex justify-center items-center h-64">
@@ -102,9 +82,7 @@ export default function EmailConfigPage() {
 
     return (
         <div className="space-y-6">
-            {/* Form Config */}
             <div className="card bg-base-100 shadow p-5 space-y-5">
-                {/* Header Card Detail dengan info update */}
                 <div>
                     <h3 className="font-semibold text-lg">Detail Konfigurasi</h3>
                     {activeConfig && (
@@ -122,7 +100,7 @@ export default function EmailConfigPage() {
                 </div>
 
                 {/* Baris 1: Host - Port - TLS */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-5 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
                     <div>
                         <label className="text-gray-500 mb-1 block">SMTP Host</label>
                         <input
@@ -140,7 +118,7 @@ export default function EmailConfigPage() {
                             className="input input-bordered w-full text-xs"
                             placeholder="587"
                             value={form.port}
-                            onChange={(e) => handleChange("port", parseInt(e.target.value))}
+                            onChange={(e) => handleChange("port", parseInt(e.target.value || "0", 10) || 0)}
                         />
                     </div>
 
@@ -148,7 +126,7 @@ export default function EmailConfigPage() {
                         <label className="text-gray-500 mb-1 block">Gunakan TLS</label>
                         <select
                             className="select select-bordered w-full text-xs"
-                            value={form.useTls}
+                            value={String(form.useTls)}
                             onChange={(e) => handleChange("useTls", e.target.value === "true")}
                         >
                             <option value="true">Ya</option>
@@ -158,7 +136,7 @@ export default function EmailConfigPage() {
                 </div>
 
                 {/* Baris 2: Username - Password - Simpan */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-5 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-xs items-end">
                     <div>
                         <label className="text-gray-500 mb-1 block">Email Pengirim</label>
                         <input
@@ -193,7 +171,7 @@ export default function EmailConfigPage() {
                         </div>
                     </div>
 
-                    <div className="flex items-end">
+                    <div className="flex">
                         <button
                             className="btn btn-warning w-full flex items-center justify-center gap-2 text-xs"
                             onClick={handleSave}
@@ -201,33 +179,6 @@ export default function EmailConfigPage() {
                         >
                             <Save size={16} />
                             {saving ? "Menyimpan..." : "Simpan Konfigurasi"}
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            {/* Card Test Email */}
-            <div className="card bg-base-100 shadow p-5">
-                <h3 className="font-semibold text-lg mb-4">Test Pengiriman Email</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-4 text-xs items-center">
-                    <div className="col-span-1">
-                        <input
-                            type="email"
-                            className="input input-bordered w-full text-xs"
-                            placeholder="Masukkan email tujuan test"
-                            value={testEmail}
-                            onChange={(e) => setTestEmail(e.target.value)}
-                        />
-                    </div>
-
-                    <div className="col-span-1">
-                        <button
-                            className="btn btn-accent w-full flex items-center justify-center gap-2 text-xs"
-                            onClick={handleTest}
-                            disabled={testing}
-                        >
-                            <Send size={16} />
-                            {testing ? "Mengirim..." : "Kirim Test"}
                         </button>
                     </div>
                 </div>

@@ -54,6 +54,7 @@ import UserPage from "./pages/users/UserPage";
 
 // ================= SETTINGS / NOTIFICATIONS =================
 import EmailConfigPage from "./pages/notifications/EmailConfigPage";
+import EmailTestPage from "./pages/notifications/EmailTestPage";
 import NotificationSettingsPage from "./pages/notifications/NotificationSettingsPage";
 import NotificationPage from "./pages/notifications/NotificationPage";
 
@@ -362,6 +363,16 @@ export default function App() {
                         <ProtectedRoute roles={["SUPERADMIN", "PIC"]}>
                             <MainLayout>
                                 <NotificationSettingsPage />
+                            </MainLayout>
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/settings/email-test"
+                    element={
+                        <ProtectedRoute roles={["SUPERADMIN", "PIC"]}>
+                            <MainLayout>
+                                <EmailTestPage />
                             </MainLayout>
                         </ProtectedRoute>
                     }

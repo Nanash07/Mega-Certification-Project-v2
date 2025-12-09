@@ -10,9 +10,33 @@ import CreateUserModal from "../../components/users/CreateUserModal";
 import EditUserModal from "../../components/users/EditUserModal";
 import { Pencil, Trash2, ChevronDown, Plus, Eraser, Target } from "lucide-react";
 
+// ==================== Role Helper ====================
+function getCurrentRole() {
+    if (typeof window === "undefined") return "";
+    try {
+        const user = JSON.parse(localStorage.getItem("user") || "{}");
+        const fromUser = (user.role || "").toString().toUpperCase();
+        if (fromUser) return fromUser;
+    } catch (e) {
+        // ignore
+    }
+    return (localStorage.getItem("role") || "").toString().toUpperCase();
+}
+
 export default function UserPage() {
-    // ===================== STATE =====================
     const navigate = useNavigate();
+
+    // role flags
+    const [role] = useState(() => getCurrentRole());
+    const isPic = role === "PIC" || role === "ROLE_PIC";
+
+    const isPrivilegedRole = (roleName) => {
+        if (!roleName) return false;
+        const n = String(roleName).toUpperCase();
+        return n === "SUPERADMIN" || n === "PIC" || n === "ROLE_PIC";
+    };
+
+    // ===================== STATE =====================
     const [rows, setRows] = useState([]);
     const [loading, setLoading] = useState(false);
 
@@ -39,6 +63,10 @@ export default function UserPage() {
             .then(setRoles)
             .catch(() => toast.error("Gagal memuat role"));
     }, []);
+
+    // roles yang boleh dipakai PIC di form/filter
+    const safeRolesForPic = roles.filter((r) => !isPrivilegedRole(r.name));
+    const rolesForSelect = isPic ? safeRolesForPic : roles;
 
     // ===================== LOAD USERS =====================
     const loadUsers = useCallback(async () => {
@@ -91,19 +119,25 @@ export default function UserPage() {
         }
         return {
             label: "Nonactive",
-            badgeCls: "badge-warning",
-            btnCls: "btn-warning",
+            badgeCls: "badge-secondary",
+            btnCls: "btn-secondary",
         };
     }
 
     function renderStatusBadge(row) {
         const { label, badgeCls } = getStatusStyle(row.isActive);
+        const targetPrivileged = isPrivilegedRole(row.roleName);
+        const disabledForPic = isPic && targetPrivileged;
 
         return (
             <button
                 type="button"
-                className={`badge badge-sm whitespace-nowrap cursor-pointer flex items-center gap-1 ${badgeCls} text-white`}
+                disabled={disabledForPic}
+                className={`badge badge-sm whitespace-nowrap flex items-center gap-1 ${badgeCls} text-white ${
+                    disabledForPic ? "cursor-not-allowed opacity-70" : "cursor-pointer"
+                }`}
                 onClick={(e) => {
+                    if (disabledForPic) return;
                     const rect = e.currentTarget.getBoundingClientRect();
                     setStatusMenu({
                         row,
@@ -121,8 +155,13 @@ export default function UserPage() {
     async function handleChangeStatus(row, newIsActive) {
         if (row.isActive === newIsActive) return;
 
+        // guard di FE
+        if (isPic && isPrivilegedRole(row.roleName)) {
+            toast.error("PIC tidak boleh mengubah status user ini");
+            return;
+        }
+
         try {
-            // toggleUser diasumsikan flip status
             const updated = await toggleUser(row.id);
             toast.success(`User ${updated.isActive ? "diaktifkan" : "dinonaktifkan"}`);
             loadUsers();
@@ -169,7 +208,7 @@ export default function UserPage() {
                     />
 
                     <Select
-                        options={roles.map((r) => ({ value: r.id, label: r.name }))}
+                        options={rolesForSelect.map((r) => ({ value: r.id, label: r.name }))}
                         value={filterRole}
                         onChange={setFilterRole}
                         placeholder="Filter Role"
@@ -197,14 +236,17 @@ export default function UserPage() {
                         Tambah User
                     </button>
 
-                    <button
-                        className="btn btn-sm btn-info w-full"
-                        type="button"
-                        onClick={() => navigate("/mapping/pic-certification-scope")}
-                    >
-                        <Target className="w-4 h-4" />
-                        Kelola PIC Scope
-                    </button>
+                    {/* PIC tidak boleh kelola PIC Scope */}
+                    {!isPic && (
+                        <button
+                            className="btn btn-sm btn-info w-full"
+                            type="button"
+                            onClick={() => navigate("/mapping/pic-certification-scope")}
+                        >
+                            <Target className="w-4 h-4" />
+                            Kelola PIC Scope
+                        </button>
+                    )}
 
                     <button
                         className="btn btn-sm btn-accent btn-soft border-accent w-full"
@@ -247,50 +289,59 @@ export default function UserPage() {
                                 </td>
                             </tr>
                         ) : (
-                            rows.map((u, idx) => (
-                                <tr key={u.id}>
-                                    <td>{startIdx + idx}</td>
-                                    <td className="whitespace-nowrap">
-                                        <div className="flex gap-2">
-                                            <div className="tooltip" data-tip="Edit user">
-                                                <button
-                                                    type="button"
-                                                    className="btn btn-warning btn-soft btn-xs border border-warning"
-                                                    onClick={() => setEditData(u)}
-                                                >
-                                                    <Pencil className="w-3 h-3" />
-                                                </button>
+                            rows.map((u, idx) => {
+                                const targetPrivileged = isPrivilegedRole(u.roleName);
+                                const disableActions = isPic && targetPrivileged;
+
+                                return (
+                                    <tr key={u.id}>
+                                        <td>{startIdx + idx}</td>
+                                        <td className="whitespace-nowrap">
+                                            <div className="flex gap-2">
+                                                {!disableActions && (
+                                                    <>
+                                                        <div className="tooltip" data-tip="Edit user">
+                                                            <button
+                                                                type="button"
+                                                                className="btn btn-warning btn-soft btn-xs border border-warning"
+                                                                onClick={() => setEditData(u)}
+                                                            >
+                                                                <Pencil className="w-3 h-3" />
+                                                            </button>
+                                                        </div>
+                                                        <div className="tooltip" data-tip="Hapus user">
+                                                            <button
+                                                                type="button"
+                                                                className="btn btn-error btn-soft btn-xs border border-error"
+                                                                onClick={() => setConfirm({ open: true, id: u.id })}
+                                                            >
+                                                                <Trash2 className="w-3 h-3" />
+                                                            </button>
+                                                        </div>
+                                                    </>
+                                                )}
                                             </div>
-                                            <div className="tooltip" data-tip="Hapus user">
-                                                <button
-                                                    type="button"
-                                                    className="btn btn-error btn-soft btn-xs border border-error"
-                                                    onClick={() => setConfirm({ open: true, id: u.id })}
-                                                >
-                                                    <Trash2 className="w-3 h-3" />
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td>{u.username}</td>
-                                    <td>{u.email || "-"}</td>
-                                    <td>{u.employeeName || "-"}</td>
-                                    <td>{u.employeeNip || "-"}</td>
-                                    <td>{renderStatusBadge(u)}</td>
-                                    <td>{u.roleName || "-"}</td>
-                                    <td>
-                                        {u.updatedAt
-                                            ? new Date(u.updatedAt).toLocaleDateString("id-ID", {
-                                                  day: "2-digit",
-                                                  month: "short",
-                                                  year: "numeric",
-                                                  hour: "2-digit",
-                                                  minute: "2-digit",
-                                              })
-                                            : "-"}
-                                    </td>
-                                </tr>
-                            ))
+                                        </td>
+                                        <td>{u.username}</td>
+                                        <td>{u.email || "-"}</td>
+                                        <td>{u.employeeName || "-"}</td>
+                                        <td>{u.employeeNip || "-"}</td>
+                                        <td>{renderStatusBadge(u)}</td>
+                                        <td>{u.roleName || "-"}</td>
+                                        <td>
+                                            {u.updatedAt
+                                                ? new Date(u.updatedAt).toLocaleDateString("id-ID", {
+                                                      day: "2-digit",
+                                                      month: "short",
+                                                      year: "numeric",
+                                                      hour: "2-digit",
+                                                      minute: "2-digit",
+                                                  })
+                                                : "-"}
+                                        </td>
+                                    </tr>
+                                );
+                            })
                         )}
                     </tbody>
                 </table>
@@ -315,7 +366,7 @@ export default function UserPage() {
                     open={showCreateModal}
                     onClose={() => setShowCreateModal(false)}
                     onSaved={loadUsers}
-                    roles={roles}
+                    roles={rolesForSelect}
                 />
             )}
             {editData && (
@@ -323,7 +374,7 @@ export default function UserPage() {
                     open={!!editData}
                     onClose={() => setEditData(null)}
                     onSaved={loadUsers}
-                    roles={roles}
+                    roles={rolesForSelect}
                     initial={editData}
                 />
             )}

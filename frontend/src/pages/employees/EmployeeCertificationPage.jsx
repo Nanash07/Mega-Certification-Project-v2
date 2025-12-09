@@ -213,52 +213,46 @@ export default function EmployeeCertificationPage() {
                 {/* Row tombol (bukan filter) */}
                 <div className="grid grid-cols-1 lg:grid-cols-6 gap-3">
                     <div className="col-span-1">
-                        <div className="tooltip w-full" data-tip="Tambah sertifikat baru">
-                            <button
-                                type="button"
-                                className="btn btn-sm btn-primary w-full"
-                                onClick={() => setShowCreateModal(true)}
-                            >
-                                <Plus className="w-4 h-4" />
-                                <span>Tambah Sertifikat</span>
-                            </button>
-                        </div>
+                        <button
+                            type="button"
+                            className="btn btn-sm btn-primary w-full"
+                            onClick={() => setShowCreateModal(true)}
+                        >
+                            <Plus className="w-4 h-4" />
+                            <span>Tambah Sertifikat</span>
+                        </button>
                     </div>
                     <div className="col-span-3" />
 
                     <div className="col-span-1">
-                        <div className="tooltip w-full" data-tip="Lihat histori perubahan sertifikat">
-                            <button
-                                type="button"
-                                className="btn btn-sm btn-accent w-full"
-                                onClick={() => (window.location.href = "/employee/certification/histories")}
-                            >
-                                <HistoryIcon className="w-4 h-4" />
-                                <span>Histori</span>
-                            </button>
-                        </div>
+                        <button
+                            type="button"
+                            className="btn btn-sm btn-accent w-full"
+                            onClick={() => (window.location.href = "/employee/certification/histories")}
+                        >
+                            <HistoryIcon className="w-4 h-4" />
+                            <span>Histori</span>
+                        </button>
                     </div>
 
                     <div className="col-span-1">
-                        <div className="tooltip w-full" data-tip="Reset semua filter">
-                            <button
-                                type="button"
-                                className="btn btn-sm btn-accent btn-soft border-accent w-full"
-                                onClick={() => {
-                                    setFilterEmployee(null);
-                                    setFilterCertCode([]);
-                                    setFilterLevel([]);
-                                    setFilterSubField([]);
-                                    setFilterInstitution([]);
-                                    setFilterStatus([]);
-                                    setPage(1);
-                                    toast.success("Clear filter berhasil");
-                                }}
-                            >
-                                <Eraser className="w-4 h-4" />
-                                <span>Clear Filter</span>
-                            </button>
-                        </div>
+                        <button
+                            type="button"
+                            className="btn btn-sm btn-accent btn-soft border-accent w-full"
+                            onClick={() => {
+                                setFilterEmployee(null);
+                                setFilterCertCode([]);
+                                setFilterLevel([]);
+                                setFilterSubField([]);
+                                setFilterInstitution([]);
+                                setFilterStatus([]);
+                                setPage(1);
+                                toast.success("Clear filter berhasil");
+                            }}
+                        >
+                            <Eraser className="w-4 h-4" />
+                            <span>Clear Filter</span>
+                        </button>
                     </div>
                 </div>
 
@@ -424,7 +418,7 @@ export default function EmployeeCertificationPage() {
                                     <td>{r.employeeName}</td>
                                     <td>{r.jobPositionTitle || "-"}</td>
 
-                                    {/* Status di sini (setelah jabatan) */}
+                                    {/* Status */}
                                     <td>
                                         <div className="tooltip" data-tip={formatStatusLabel(r.status)}>
                                             <span
