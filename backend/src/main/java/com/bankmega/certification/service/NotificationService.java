@@ -100,14 +100,14 @@ public class NotificationService {
         return notificationRepository.findAll(spec, pageable);
     }
 
-    @Async("mailExecutor")
-    protected void sendEmailAsync(String to, String subject, String htmlContent) {
+    @Async
+    public void sendEmailAsync(String to, String subject, String htmlContent) {
         for (int attempt = 1; attempt <= 2; attempt++) {
             try {
                 final MimeMessage message = reusableMailSender.createMimeMessage();
                 final MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
-                final String fromAddr = Objects.toString(reusableMailSender.getUsername(), "no-reply@megacert.local");
+                final String fromAddr = Objects.toString(getUsernameSafe(), "no-reply@megacert.local");
                 helper.setFrom(fromAddr);
                 helper.setTo(to);
                 helper.setSubject(subject);
@@ -119,15 +119,26 @@ public class NotificationService {
 
                 helper.setText(html, true);
                 reusableMailSender.send(message);
+                log.info("Email notifikasi terkirim ke {}", to);
                 return; // sukses, stop retry
             } catch (Exception e) {
                 if (attempt == 2) {
-                    log.error("Email gagal ke {} setelah {} kali coba: {}", to, attempt, e.getMessage());
+                    log.error("Email gagal ke {} setelah {} kali coba", to, attempt, e);
                 } else {
-                    log.warn("Gagal kirim email ke {} (attempt {}): {}", to, attempt, e.getMessage());
+                    log.warn("Gagal kirim email ke {} (attempt {})", to, attempt, e);
                 }
             }
         }
+    }
+
+    private String getUsernameSafe() {
+        try {
+            if (reusableMailSender instanceof org.springframework.mail.javamail.JavaMailSenderImpl senderImpl) {
+                return senderImpl.getUsername();
+            }
+        } catch (Exception ignored) {
+        }
+        return null;
     }
 
     public void sendCertificationReminder(Employee employee, EmployeeCertification cert) {

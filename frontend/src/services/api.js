@@ -29,7 +29,7 @@ api.interceptors.response.use(
         const msg = err?.response?.data?.message || err?.response?.data?.error || err?.message || "Request error";
 
         // log ke console biar gampang debug
-        console.error("❌ API error:", msg, err?.config?.url);
+        console.error("API error:", msg, err?.config?.url);
 
         return Promise.reject({ ...err, message: msg });
     }

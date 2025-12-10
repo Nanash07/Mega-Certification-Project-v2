@@ -1,56 +1,78 @@
 // src/pages/routes/ProtectedRoute.jsx
-import { Navigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import { jwtDecode } from "jwt-decode";
 
 const isTokenExpired = (token) => {
-  try {
-    const { exp } = jwtDecode(token);
-    if (!exp) return false;
-    return exp < Math.floor(Date.now() / 1000);
-  } catch {
-    return true;
-  }
+    try {
+        const { exp } = jwtDecode(token);
+        if (!exp) return false;
+        return exp < Math.floor(Date.now() / 1000);
+    } catch {
+        return true;
+    }
 };
 
 const extractRoles = (payload) => {
-  // dukung berbagai bentuk claim
-  let raw =
-    payload?.roles ??
-    payload?.authorities ??
-    payload?.role ??
-    payload?.scope ??
-    payload?.scopes;
+    let raw = payload?.roles ?? payload?.authorities ?? payload?.role ?? payload?.scope ?? payload?.scopes;
 
-  if (!raw) return [];
-  if (Array.isArray(raw)) return raw.map((r) => String(r).replace(/^ROLE_/, "").toUpperCase());
-  if (typeof raw === "string") {
-    // bisa "ROLE_SUPERADMIN" atau "SUPERADMIN" atau "ROLE_A,ROLE_B"
-    return raw
-      .split(/[,\s]+/)
-      .filter(Boolean)
-      .map((r) => r.replace(/^ROLE_/, "").toUpperCase());
-  }
-  return [];
+    if (!raw) return [];
+    if (Array.isArray(raw))
+        return raw.map((r) =>
+            String(r)
+                .replace(/^ROLE_/, "")
+                .toUpperCase()
+        );
+    if (typeof raw === "string")
+        return raw
+            .split(/[,\s]+/)
+            .filter(Boolean)
+            .map((r) => r.replace(/^ROLE_/, "").toUpperCase());
+
+    return [];
+};
+
+const getStoredUser = () => {
+    try {
+        const raw = localStorage.getItem("user");
+        return raw ? JSON.parse(raw) : null;
+    } catch {
+        return null;
+    }
 };
 
 export default function ProtectedRoute({ children, roles }) {
-  const token = localStorage.getItem("token");
-  if (!token || isTokenExpired(token)) {
-    localStorage.removeItem("token");
-    return <Navigate to="/login" replace />;
-  }
+    const location = useLocation();
+    const token = localStorage.getItem("token");
 
-  // kalau butuh cek role tertentu
-  if (roles?.length) {
-    try {
-      const payload = jwtDecode(token);
-      const userRoles = extractRoles(payload);
-      const allowed = userRoles.some((r) => roles.includes(r));
-      if (!allowed) return <Navigate to="/dashboard" replace />;
-    } catch {
-      return <Navigate to="/login" replace />;
+    // Token check
+    if (!token || isTokenExpired(token)) {
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        return <Navigate to="/login" replace />;
     }
-  }
 
-  return children;
+    // Role check
+    if (roles?.length) {
+        try {
+            const payload = jwtDecode(token);
+            const userRoles = extractRoles(payload);
+            const allowed = userRoles.some((r) => roles.includes(r));
+            if (!allowed) return <Navigate to="/dashboard" replace />;
+        } catch {
+            return <Navigate to="/login" replace />;
+        }
+    }
+
+    // FIRST LOGIN CHECK (only addition)
+    const user = getStoredUser();
+    if (
+        user &&
+        String(user.role).toUpperCase() === "PEGAWAI" &&
+        user.isFirstLogin === true &&
+        location.pathname !== "/first-login/change-password"
+    ) {
+        return <Navigate to="/first-login/change-password" replace />;
+    }
+
+    return children;
 }

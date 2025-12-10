@@ -1,83 +1,121 @@
 import React, { useState } from "react";
-import axios from "axios";
+import { useNavigate, Link } from "react-router-dom";
+import { login } from "../../services/authService";
+
+const currentYear = new Date().getFullYear();
 
 const Login = () => {
-    const [username, setUsername] = useState("");
-    const [password, setPassword] = useState("");
-    const [error, setError] = useState("");
+    const navigate = useNavigate();
 
-    const handleLogin = async (e) => {
+    const [form, setForm] = useState({
+        username: "",
+        password: "",
+    });
+    const [error, setError] = useState("");
+    const [loading, setLoading] = useState(false);
+
+    const handleChange = (field) => (e) => {
+        setForm((prev) => ({ ...prev, [field]: e.target.value }));
+    };
+
+    const handleSubmit = async (e) => {
         e.preventDefault();
         setError("");
+        setLoading(true);
 
         try {
-            // Call API ke backend lo
-            const res = await axios.post("http://localhost:8080/api/auth/login", {
-                username,
-                password,
+            const res = await login({
+                username: form.username.trim(),
+                password: form.password,
             });
 
-            // Simpan token, role, username, email ke localStorage
-            localStorage.setItem("token", res.data.token);
-            localStorage.setItem("username", res.data.username || "");
-            localStorage.setItem("email", res.data.email || "");
-            localStorage.setItem("employeeId", res.data.employeeId || "");
-            // Role bisa array atau string, cek responsenya
-            if (res.data.roles) {
-                localStorage.setItem("role", res.data.roles[0]);
-            } else if (res.data.role) {
-                localStorage.setItem("role", res.data.role);
-            }
+            // simpan token
+            localStorage.setItem("token", res.token);
 
-            // Redirect ke dashboard
-            window.location.href = "/dashboard";
+            // simpan user
+            const userPayload = {
+                id: res.id ?? null,
+                username: res.username ?? "",
+                email: res.email ?? "",
+                role: res.role ?? null,
+                employeeId: res.employeeId ?? null,
+                isFirstLogin: res.isFirstLogin ?? false,
+            };
+            localStorage.setItem("user", JSON.stringify(userPayload));
+
+            navigate("/dashboard", { replace: true });
         } catch (err) {
-            setError(err.response?.data?.message || "Login gagal. Cek username/password!");
+            const msg =
+                err?.response?.data?.message || err?.response?.data?.error || "Login gagal. Cek username/password!";
+            setError(msg);
+        } finally {
+            setLoading(false);
         }
     };
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-base-300">
             <div className="card w-full max-w-md bg-base-100 shadow-xl rounded-2xl">
-                <div className="card-body">
-                    <h2 className="text-center text-2xl font-bold mb-2 text-primary">Mega Certification</h2>
-                    <form onSubmit={handleLogin} className="space-y-3">
-                        <div>
-                            <label className="label">
-                                <span className="label-text font-semibold pb-1">Username</span>
-                            </label>
+                <div className="card-body gap-4">
+                    <div className="text-center space-y-1">
+                        <h1 className="text-2xl font-bold text-accent">Mega Certification</h1>
+                    </div>
+
+                    <form onSubmit={handleSubmit} className="space-y-3">
+                        {/* USERNAME */}
+                        <label className="form-control">
+                            <span className="label-text font-semibold pb-1 text-base-content/70">Username</span>
                             <input
-                                className="input input-bordered w-full"
                                 type="text"
+                                className="input input-bordered w-full"
                                 placeholder="Username"
                                 autoFocus
                                 required
-                                value={username}
-                                onChange={(e) => setUsername(e.target.value)}
+                                value={form.username}
+                                onChange={handleChange("username")}
                             />
-                        </div>
-                        <div>
-                            <label className="label">
-                                <span className="label-text font-semibold pb-1">Password</span>
-                            </label>
+                        </label>
+
+                        {/* SPACING ANTAR FIELD */}
+                        <div className="h-0.5"></div>
+
+                        {/* PASSWORD */}
+                        <label className="form-control">
+                            <span className="label-text font-semibold pb-1 text-base-content/70">Password</span>
                             <input
-                                className="input input-bordered w-full"
                                 type="password"
+                                className="input input-bordered w-full"
                                 placeholder="Password"
                                 required
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
+                                value={form.password}
+                                onChange={handleChange("password")}
                             />
+                        </label>
+
+                        {/* FORGOT PASSWORD LINK */}
+                        <div className="flex items-center justify-between text-xs">
+                            <div />
+                            <Link to="/forgot-password" className="link link-primary">
+                                Lupa password?
+                            </Link>
                         </div>
-                        <a href="/forgot-password" className="link link-primary text-sm flex justify-end mb-2">
-                            Lupa password?
-                        </a>
-                        <button className="btn btn-primary btn-block rounded-xl font-bold text-lg">Login</button>
-                        {error && <div className="text-error text-center text-xs mt-2">{error}</div>}
+
+                        {/* LOGIN BUTTON */}
+                        <button
+                            type="submit"
+                            className="btn btn-primary btn-block rounded-xl font-bold"
+                            disabled={loading}
+                        >
+                            {loading ? "Logging in..." : "Login"}
+                        </button>
+
+                        {/* ERROR MESSAGE */}
+                        {error && <p className="text-error text-center text-xs mt-1">{error}</p>}
                     </form>
-                    <span className="text-xs text-base-content/60 mt-6 block text-center">
-                        © {new Date().getFullYear()} Bank Mega. All rights reserved.
-                    </span>
+
+                    <p className="text-xs text-base-content/60 mt-4 text-center">
+                        © {currentYear} Bank Mega. All rights reserved.
+                    </p>
                 </div>
             </div>
         </div>

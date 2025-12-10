@@ -5,6 +5,9 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 // Auth
 import Login from "./pages/auth/Login";
 import ForgotPassword from "./pages/auth/ForgotPassword";
+import ResetPassword from "./pages/auth/ResetPassword";
+import ResetPasswordInvalid from "./pages/auth/ResetPasswordInvalid";
+import FirstLoginChangePassword from "./pages/auth/FirstLoginChangePassword";
 
 // Layouts & Guards
 import ProtectedRoute from "./routes/ProtectedRoute";
@@ -24,7 +27,7 @@ import EmployeeExceptionPage from "./pages/employees/EmployeeExceptionPage";
 import EmployeeCertificationPage from "./pages/employees/EmployeeCertificationPage";
 import EmployeeCertificationHistoryPage from "./pages/employees/EmployeeCertificationHistoryPage";
 import EmployeeHistoryPage from "./pages/employees/EmployeeHistoryPage";
-import EmployeeResignedPage from "./pages/employees/EmployeeResignedPage"; // 🔹 NEW
+import EmployeeResignedPage from "./pages/employees/EmployeeResignedPage";
 
 // ================= ORGANIZATION =================
 import RegionalPage from "./pages/organizations/RegionalPage";
@@ -52,7 +55,7 @@ import DetailBatchPage from "./pages/batch/DetailBatchPage";
 // ================= USERS =================
 import UserPage from "./pages/users/UserPage";
 
-// ================= SETTINGS / NOTIFICATIONS =================
+// ================= SETTINGS / NOTIFIKASI =================
 import EmailConfigPage from "./pages/notifications/EmailConfigPage";
 import EmailTestPage from "./pages/notifications/EmailTestPage";
 import NotificationSettingsPage from "./pages/notifications/NotificationSettingsPage";
@@ -65,10 +68,12 @@ export default function App() {
                 {/* ===== AUTH ===== */}
                 <Route path="/login" element={<Login />} />
                 <Route path="/forgot-password" element={<ForgotPassword />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
+                <Route path="/reset-password/invalid" element={<ResetPasswordInvalid />} />
+                <Route path="/first-login/change-password" element={<FirstLoginChangePassword />} />
 
                 {/* ===== ROOT REDIRECT ===== */}
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />
-
                 {/* ===== DASHBOARD ===== */}
                 <Route
                     path="/dashboard"
@@ -80,7 +85,6 @@ export default function App() {
                         </ProtectedRoute>
                     }
                 />
-
                 {/* ===== PROFILE ===== */}
                 <Route
                     path="/profile"
@@ -92,7 +96,6 @@ export default function App() {
                         </ProtectedRoute>
                     }
                 />
-
                 {/* ===== EMPLOYEE ===== */}
                 <Route
                     path="/employee/data"
@@ -104,7 +107,6 @@ export default function App() {
                         </ProtectedRoute>
                     }
                 />
-                {/* 🔹 Halaman pegawai resign */}
                 <Route
                     path="/employee/resigned"
                     element={
@@ -175,7 +177,6 @@ export default function App() {
                         </ProtectedRoute>
                     }
                 />
-
                 {/* ===== ORGANIZATION ===== */}
                 <Route
                     path="/organization/regional"
@@ -217,7 +218,6 @@ export default function App() {
                         </ProtectedRoute>
                     }
                 />
-
                 {/* ===== MAPPING ===== */}
                 <Route
                     path="/mapping/job-certification"
@@ -249,7 +249,6 @@ export default function App() {
                         </ProtectedRoute>
                     }
                 />
-
                 {/* ===== BATCH ===== */}
                 <Route
                     path="/batch"
@@ -271,8 +270,7 @@ export default function App() {
                         </ProtectedRoute>
                     }
                 />
-
-                {/* ===== SERTIFIKAT (MASTER) ===== */}
+                {/* ===== SERTIFIKAT ===== */}
                 <Route
                     path="/sertifikat/jenis"
                     element={
@@ -333,7 +331,6 @@ export default function App() {
                         </ProtectedRoute>
                     }
                 />
-
                 {/* ===== USERS ===== */}
                 <Route
                     path="/user"
@@ -345,7 +342,6 @@ export default function App() {
                         </ProtectedRoute>
                     }
                 />
-
                 {/* ===== SETTINGS / NOTIFIKASI ===== */}
                 <Route
                     path="/settings/email-config"
@@ -387,7 +383,6 @@ export default function App() {
                         </ProtectedRoute>
                     }
                 />
-
                 {/* ===== FALLBACK ===== */}
                 <Route path="*" element={<Navigate to="/login" replace />} />
             </Routes>

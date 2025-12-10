@@ -2,63 +2,77 @@ package com.bankmega.certification.controller;
 
 import com.bankmega.certification.dto.LoginRequest;
 import com.bankmega.certification.dto.LoginResponse;
-import com.bankmega.certification.entity.User;
-import com.bankmega.certification.entity.Role;
-import com.bankmega.certification.repository.UserRepository;
-import com.bankmega.certification.security.JwtUtil;
+import com.bankmega.certification.dto.FirstLoginChangePasswordRequest;
+import com.bankmega.certification.dto.ForgotPasswordRequest;
+import com.bankmega.certification.dto.ResetPasswordRequest;
+import com.bankmega.certification.service.AuthService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.crypto.bcrypt.BCrypt;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ResponseStatusException;
+
+import jakarta.validation.Valid;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
 public class AuthController {
 
-    private final UserRepository userRepository;
+    private final AuthService authService;
+
+    // ================= LOGIN ================= //
 
     @PostMapping("/login")
-    public ResponseEntity<LoginResponse> login(@RequestBody LoginRequest request) {
-
-        User user = userRepository.findByUsernameAndDeletedAtIsNull(request.getUsername())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Username not found"));
-
-        if (!Boolean.TRUE.equals(user.getIsActive())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "User tidak aktif");
-        }
-
-        if (!BCrypt.checkpw(request.getPassword(), user.getPassword())) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Password salah");
-        }
-
-        // --- ambil role dan employeeId
-        Role role = user.getRole();
-        String roleName = role != null ? role.getName() : null;
-
-        Long employeeId = user.getEmployee() != null ? user.getEmployee().getId() : null;
-
-        // --- generate JWT BARU (lengkap)
-        String token = JwtUtil.generateToken(
-                user.getUsername(),
-                roleName,
-                user.getId(),
-                employeeId);
-
-        // --- login response lengkap ke FE
-        LoginResponse resp = LoginResponse.builder()
-                .id(user.getId())
-                .username(user.getUsername())
-                .email(user.getEmail())
-                .role(roleName)
-                .employeeId(employeeId)
-                .isActive(user.getIsActive())
-                .isFirstLogin(user.getIsFirstLogin())
-                .token(token)
-                .build();
-
+    public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
+        LoginResponse resp = authService.login(request);
         return ResponseEntity.ok(resp);
+    }
+
+    // ================= FORGOT / RESET PASSWORD ================= //
+
+    @PostMapping("/forgot-password")
+    public ResponseEntity<?> forgotPassword(@Valid @RequestBody ForgotPasswordRequest req) {
+        boolean success = authService.forgotPassword(req);
+
+        if (success) {
+            return ResponseEntity.ok(
+                    Map.of(
+                            "success", true,
+                            "message", "Akun ditemukan, email telah dikirim"));
+        } else {
+            // TETAP 200, tapi success=false
+            return ResponseEntity.ok(
+                    Map.of(
+                            "success", false,
+                            "message", "Akun tidak ditemukan"));
+        }
+    }
+
+    @GetMapping("/reset-password/validate")
+    public ResponseEntity<Map<String, Object>> validateResetToken(@RequestParam("token") String token) {
+        boolean valid = authService.validateResetToken(token);
+        return ResponseEntity.ok(Map.of("valid", valid));
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<?> resetPassword(@Valid @RequestBody ResetPasswordRequest req) {
+        authService.resetPassword(req);
+        return ResponseEntity.ok(
+                Map.of("message", "Password berhasil diubah"));
+    }
+
+    // ================= FIRST LOGIN CHANGE PASSWORD ================= //
+
+    @PostMapping("/change-password-first-login")
+    public ResponseEntity<?> changePasswordFirstLogin(
+            @Valid @RequestBody FirstLoginChangePasswordRequest req) {
+
+        authService.changePasswordFirstLogin(req);
+
+        return ResponseEntity.ok(
+                Map.of(
+                        "message", "Password berhasil diubah",
+                        "isFirstLogin", false));
     }
 }

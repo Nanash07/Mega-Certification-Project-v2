@@ -6,6 +6,7 @@ import com.bankmega.certification.service.EmailConfigService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.JavaMailSenderImpl;
 
 import java.util.Properties;
@@ -17,7 +18,7 @@ public class MailSenderConfig {
     private final EmailConfigService emailConfigService;
 
     @Bean
-    public JavaMailSenderImpl reusableMailSender() {
+    public JavaMailSender reusableMailSender() {
         EmailConfig config = emailConfigService.getActiveConfigEntity();
         if (config == null) {
             throw new IllegalStateException("⚠️ Tidak ada konfigurasi email aktif di database!");
