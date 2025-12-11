@@ -32,7 +32,14 @@ import BatchListCard from "../../components/dashboards/BatchListCard";
 import EligibilityPriorityCard from "../../components/dashboards/EligibilityPriorityCard";
 
 /* ===== MONTHS (lokal, sama kayak PicDashboard) ===== */
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
+const MONTHS = ["Jan", "Feb", "Mar", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
+
+const makeEmptyMonthly = () =>
+    MONTHS.map((label, i) => ({
+        month: i + 1,
+        label,
+        count: 0,
+    }));
 
 /* ===== helpers ===== */
 
@@ -44,6 +51,9 @@ function buildQueryFromFilters(f) {
     if (f.certificationId) params.set("certificationId", f.certificationId);
     if (f.levelId) params.set("levelId", f.levelId);
     if (f.subFieldId) params.set("subFieldId", f.subFieldId);
+    if (f.batchType) params.set("batchType", f.batchType);
+    if (f.startDate) params.set("startDate", f.startDate);
+    if (f.endDate) params.set("endDate", f.endDate);
     return params.toString();
 }
 
@@ -107,30 +117,16 @@ export default function SuperadminDashboard() {
     const [kpi, setKpi] = useState(null);
     const [computedAt, setComputedAt] = useState(null);
 
-    // ===== batch ONGOING (legacy state, tapi nggak ganggu UI baru)
-    const [batches, setBatches] = useState([]);
-    const [batchPage, setBatchPage] = useState(1);
-    const [batchRows, setBatchRows] = useState(5);
-    const [batchTotalPages, setBatchTotalPages] = useState(1);
-    const [batchTotalElements, setBatchTotalElements] = useState(0);
-    const [loadingBatch, setLoadingBatch] = useState(false);
-
-    // ===== batch FINISHED (legacy state)
-    const [finishedBatches, setFinishedBatches] = useState([]);
-    const [finishedPage, setFinishedPage] = useState(1);
-    const [finishedRows, setFinishedRows] = useState(5);
-    const [finishedTotalPages, setFinishedTotalPages] = useState(1);
-    const [finishedTotalElements, setFinishedTotalElements] = useState(0);
-    const [loadingFinished, setLoadingFinished] = useState(false);
-
     // ===== bulanan
-    const [monthly, setMonthly] = useState(MONTHS.map((label, i) => ({ month: i + 1, label, count: 0 })));
+    const [monthly, setMonthly] = useState(makeEmptyMonthly());
 
     /* ===== masters ===== */
     useEffect(() => {
         (async () => {
             try {
-                const { data } = await api.get("/divisions", { params: { page: 0, size: 1000, sort: "name,asc" } });
+                const { data } = await api.get("/divisions", {
+                    params: { page: 0, size: 1000, sort: "name,asc" },
+                });
                 setDivisionOptions(toOptions(data, (d) => d?.name || d?.code || `Divisi #${d?.id}`));
             } catch {
                 setDivisionOptions([]);
@@ -189,10 +185,8 @@ export default function SuperadminDashboard() {
         };
     };
 
-    const params = currentFilters;
-
     async function loadSummaryAndKpi() {
-        const f = params();
+        const f = currentFilters();
 
         const baseEligFilters = {
             regionalId: f.regionalId,
@@ -283,56 +277,16 @@ export default function SuperadminDashboard() {
                 });
             }
 
-            setMonthly(MONTHS.map((label, i) => ({ month: i + 1, label, count: byIdx[i] })));
+            setMonthly(
+                MONTHS.map((label, i) => ({
+                    month: i + 1,
+                    label,
+                    count: byIdx[i],
+                }))
+            );
         } catch (e) {
             console.error("loadMonthly error", e);
-            setMonthly(MONTHS.map((label, i) => ({ month: i + 1, label, count: 0 })));
-        }
-    }
-
-    async function loadBatches(page = 1, rowsOverride) {
-        setLoadingBatch(true);
-        try {
-            const size = rowsOverride ?? batchRows;
-            const res = await fetchBatches({
-                ...params(),
-                status: "ONGOING",
-                page: page - 1,
-                size,
-                sortField: "startDate",
-                sortDirection: "desc",
-            });
-
-            const list = Array.isArray(res?.content) ? res.content : [];
-            setBatches(list);
-            setBatchTotalPages(res?.totalPages || 1);
-            setBatchTotalElements(res?.totalElements || list.length || 0);
-            setBatchPage(page);
-        } finally {
-            setLoadingBatch(false);
-        }
-    }
-
-    async function loadFinishedBatches(page = 1, rowsOverride) {
-        setLoadingFinished(true);
-        try {
-            const size = rowsOverride ?? finishedRows;
-            const res = await fetchBatches({
-                ...params(),
-                status: "FINISHED",
-                page: page - 1,
-                size,
-                sortField: "endDate",
-                sortDirection: "desc",
-            });
-
-            const content = Array.isArray(res?.content) ? res.content : [];
-            setFinishedBatches(content);
-            setFinishedTotalPages(res?.totalPages || 1);
-            setFinishedTotalElements(res?.totalElements || content.length || 0);
-            setFinishedPage(page);
-        } finally {
-            setLoadingFinished(false);
+            setMonthly(makeEmptyMonthly());
         }
     }
 
@@ -340,14 +294,6 @@ export default function SuperadminDashboard() {
         (async () => {
             await loadSummaryAndKpi();
             await loadMonthly();
-
-            setBatchPage(1);
-            setBatches([]);
-            await loadBatches(1);
-
-            setFinishedPage(1);
-            setFinishedBatches([]);
-            await loadFinishedBatches(1);
         })();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [divisionSel, regionalSel, unitSel, certSel, levelSel, subSel, startDate, endDate, batchType]);
@@ -384,14 +330,17 @@ export default function SuperadminDashboard() {
     }, [kpi]);
 
     const cardConfigs = useMemo(() => {
-        const q = buildQueryFromFilters(currentFilters());
+        const filters = currentFilters();
+        const q = buildQueryFromFilters(filters);
+        const qs = q ? `?${q}` : "";
+
         return [
             {
                 key: "employees",
                 label: "Total Kewajiban Sertifikasi",
                 value: summary?.employees?.active,
                 tip: "Total kewajiban sertifikasi",
-                href: `/employee/data${q ? `?${q}` : ""}`,
+                href: `/employee/data${qs}`,
             },
             {
                 key: "tersretifikasi",
@@ -402,38 +351,51 @@ export default function SuperadminDashboard() {
                         ? `${((Number(summary?.certifications?.active ?? 0) / eligibleTotal) * 100).toFixed(1)}%`
                         : undefined,
                 tip: "Kewajiban sertifikasi yang sudah dipenuhi",
-                href: `/employee/eligibility${q ? `?${q}` : ""}`,
+                href: `/employee/eligibility${qs}`,
             },
             {
                 key: "due",
                 label: "Jatuh Tempo",
                 value: summary?.certifications?.due,
                 tip: "Sertifikasi yang akan jatuh tempo",
-                href: `/employee/certification${q ? `?${q}&status=DUE` : "?status=DUE"}`,
+                href: `/employee/certification${qs ? `${qs}&status=DUE` : "?status=DUE"}`,
             },
             {
                 key: "expired",
                 label: "Kadaluarsa",
                 value: summary?.certifications?.expired,
                 tip: "Sertifikasi yang sudah kadaluarsa",
-                href: `/employee/certification${q ? `?${q}&status=EXPIRED` : "?status=EXPIRED"}`,
+                href: `/employee/certification${qs ? `${qs}&status=EXPIRED` : "?status=EXPIRED"}`,
             },
             {
                 key: "notyet",
                 label: "Belum Bersertifikat",
                 value: kpi?.notYetCertified ?? 0,
                 tip: "Kewajiban sertifikasi yang belum dipenuhi",
-                href: `/employee/certification${q ? `?${q}&status=NOT_YET_CERTIFIED` : "?status=NOT_YET_CERTIFIED"}`,
+                href: `/employee/certification${qs ? `${qs}&status=NOT_YET_CERTIFIED` : "?status=NOT_YET_CERTIFIED"}`,
             },
             {
                 key: "batches",
                 label: "Batch Berjalan",
                 value: summary?.batches?.ongoing ?? summary?.batchesOngoing ?? summary?.batchesCount ?? 0,
                 tip: "Batch yang sedang berjalan",
-                href: `/batch${q ? `?${q}&status=ONGOING` : "?status=ONGOING"}`,
+                href: `/batch${qs ? `${qs}&status=ONGOING` : "?status=ONGOING"}`,
             },
         ];
-    }, [summary, kpi, divisionSel, regionalSel, unitSel, certSel, levelSel, subSel, eligibleTotal]);
+    }, [
+        summary,
+        kpi,
+        divisionSel,
+        regionalSel,
+        unitSel,
+        certSel,
+        levelSel,
+        subSel,
+        startDate,
+        endDate,
+        batchType,
+        eligibleTotal,
+    ]);
 
     /* ===== UI ===== */
     return (

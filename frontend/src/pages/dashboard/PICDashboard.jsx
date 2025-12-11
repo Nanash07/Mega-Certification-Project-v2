@@ -30,8 +30,15 @@ import {
 import BatchListCard from "../../components/dashboards/BatchListCard";
 import EligibilityPriorityCard from "../../components/dashboards/EligibilityPriorityCard";
 
-/* ===== MONTHS (lokal, sama kayak SuperadminDashboard) ===== */
+/* ===== MONTHS ===== */
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
+
+const makeEmptyMonthly = () =>
+    MONTHS.map((label, i) => ({
+        month: i + 1,
+        label,
+        count: 0,
+    }));
 
 /* ===== utils ===== */
 
@@ -81,11 +88,12 @@ export default function PicDashboard() {
     const [summary, setSummary] = useState(null);
     const [kpi, setKpi] = useState(null);
     const [computedAt, setComputedAt] = useState(null);
-    const [monthly, setMonthly] = useState(MONTHS.map((label, i) => ({ month: i + 1, label, count: 0 })));
+    const [monthly, setMonthly] = useState(makeEmptyMonthly());
 
     /* ===== master + scope PIC ===== */
     useEffect(() => {
         (async () => {
+            // Regional
             try {
                 const regRaw = await fetchRegionals({ page: 0, size: 1000, sort: "name,asc" });
                 setRegionalOptions(toOptions(regRaw, (r) => r?.name || r?.code || `Regional #${r?.id}`));
@@ -93,6 +101,7 @@ export default function PicDashboard() {
                 setRegionalOptions([]);
             }
 
+            // Divisi
             try {
                 const { data } = await api.get("/divisions", {
                     params: { page: 0, size: 1000, sort: "name,asc" },
@@ -102,6 +111,7 @@ export default function PicDashboard() {
                 setDivisionOptions([]);
             }
 
+            // Unit
             try {
                 const unitRaw = await fetchUnits({ page: 0, size: 1000, sort: "name,asc" });
                 setUnitOptions(toOptions(unitRaw, (u) => u?.name || u?.code || `Unit #${u?.id}`));
@@ -109,7 +119,7 @@ export default function PicDashboard() {
                 setUnitOptions([]);
             }
 
-            // ---- scope PIC: hanya sertifikat yang di-scope ----
+            // Scope PIC → sertifikasi
             try {
                 const scope = await fetchMyPicScope();
                 const opts = (scope?.certifications || []).map((s) => ({
@@ -132,7 +142,7 @@ export default function PicDashboard() {
                 setScopeReady(true);
             }
 
-            // level & sub-bidang (global)
+            // Jenjang
             fetchCertificationLevels()
                 .then((arr) =>
                     setLevelOptions(
@@ -144,6 +154,7 @@ export default function PicDashboard() {
                 )
                 .catch(() => {});
 
+            // Sub-Bidang
             fetchSubFields()
                 .then((arr) =>
                     setSubFieldOptions((arr || []).map((s) => ({ value: s.id, label: `${s.code || s.name}` })))
@@ -160,7 +171,7 @@ export default function PicDashboard() {
             regionalId: regionalSel?.value,
             divisionId: divisionSel?.value,
             unitId: unitSel?.value,
-            certificationId: certSel?.value, // <- TIDAK ada fallback ke opsi pertama
+            certificationId: certSel?.value,
             levelId: levelSel?.value,
             subFieldId: subSel?.value,
             batchType: batchType?.value || undefined,
@@ -169,7 +180,7 @@ export default function PicDashboard() {
         };
     };
 
-    /* ===== loader summary + KPI: pakai count API (eligibility & batch) ===== */
+    /* ===== loader summary + KPI ===== */
     async function loadSummaryAndKpi() {
         const f = currentFilters();
 
@@ -203,13 +214,11 @@ export default function PicDashboard() {
             const expiredNum = Number(expired ?? 0);
             const notYetNum = Number(notYet ?? 0);
 
-            // TOTAL KEWAJIBAN = semua status eligibility (sama dengan superadmin)
             const eligibleTotal = activeNum + dueNum + expiredNum + notYetNum;
             const certifiedIncDue = activeNum + dueNum;
             const ongoingCount = Number(ongoingPage?.totalElements ?? 0);
 
             const mappedSummary = {
-                // employees.active = Total Kewajiban Sertifikasi
                 employees: { active: eligibleTotal },
                 certifications: {
                     active: certifiedIncDue, // ACTIVE + DUE
@@ -238,7 +247,7 @@ export default function PicDashboard() {
         }
     }
 
-    /* ===== loader monthly (sama Superadmin) ===== */
+    /* ===== loader monthly ===== */
     async function loadMonthly() {
         try {
             const f = currentFilters();
@@ -265,10 +274,16 @@ export default function PicDashboard() {
                 });
             }
 
-            setMonthly(MONTHS.map((label, i) => ({ month: i + 1, label, count: byIdx[i] })));
+            setMonthly(
+                MONTHS.map((label, i) => ({
+                    month: i + 1,
+                    label,
+                    count: byIdx[i],
+                }))
+            );
         } catch (e) {
             console.error("PicDashboard loadMonthly error", e);
-            setMonthly(MONTHS.map((label, i) => ({ month: i + 1, label, count: 0 })));
+            setMonthly(makeEmptyMonthly());
         }
     }
 
@@ -316,12 +331,15 @@ export default function PicDashboard() {
 
     // kartu kecil summary (sama seperti Superadmin, tapi scope PIC)
     const cardConfigs = useMemo(() => {
+        const filters = currentFilters();
         const q = new URLSearchParams(
-            Object.entries(currentFilters()).reduce((acc, [k, v]) => {
+            Object.entries(filters).reduce((acc, [k, v]) => {
                 if (v !== undefined && v !== null && v !== "") acc[k] = v;
                 return acc;
             }, {})
         ).toString();
+
+        const qs = q ? `?${q}` : "";
 
         return [
             {
@@ -329,7 +347,7 @@ export default function PicDashboard() {
                 label: "Total Kewajiban Sertifikasi",
                 value: summary?.employees?.active,
                 tip: "Total kewajiban sertifikasi",
-                href: `/employee/data${q ? `?${q}` : ""}`,
+                href: `/employee/data${qs}`,
             },
             {
                 key: "tersretifikasi",
@@ -340,38 +358,51 @@ export default function PicDashboard() {
                         ? `${((Number(summary?.certifications?.active ?? 0) / eligibleTotal) * 100).toFixed(1)}%`
                         : undefined,
                 tip: "Kewajiban sertifikasi yang sudah dipenuhi",
-                href: `/employee/eligibility${q ? `?${q}` : ""}`,
+                href: `/employee/eligibility${qs}`,
             },
             {
                 key: "due",
                 label: "Jatuh Tempo",
                 value: summary?.certifications?.due,
                 tip: "Sertifikasi yang akan jatuh tempo",
-                href: `/employee/certification${q ? `?${q}&status=DUE` : "?status=DUE"}`,
+                href: `/employee/certification${qs ? `${qs}&status=DUE` : "?status=DUE"}`,
             },
             {
                 key: "expired",
                 label: "Kadaluarsa",
                 value: summary?.certifications?.expired,
                 tip: "Sertifikasi yang sudah kadaluarsa",
-                href: `/employee/certification${q ? `?${q}&status=EXPIRED` : "?status=EXPIRED"}`,
+                href: `/employee/certification${qs ? `${qs}&status=EXPIRED` : "?status=EXPIRED"}`,
             },
             {
                 key: "notyet",
                 label: "Belum Bersertifikat",
                 value: kpi?.notYetCertified ?? 0,
                 tip: "Kewajiban sertifikasi yang belum dipenuhi",
-                href: `/employee/certification${q ? `?${q}&status=NOT_YET_CERTIFIED` : "?status=NOT_YET_CERTIFIED"}`,
+                href: `/employee/certification${qs ? `${qs}&status=NOT_YET_CERTIFIED` : "?status=NOT_YET_CERTIFIED"}`,
             },
             {
                 key: "batches",
                 label: "Batch Berjalan",
                 value: summary?.batches?.ongoing ?? summary?.batchesOngoing ?? summary?.batchesCount ?? 0,
                 tip: "Batch yang sedang berjalan",
-                href: `/batch${q ? `?${q}&status=ONGOING` : "?status=ONGOING"}`,
+                href: `/batch${qs ? `${qs}&status=ONGOING` : "?status=ONGOING"}`,
             },
         ];
-    }, [summary, kpi, regionalSel, divisionSel, unitSel, certSel, levelSel, subSel, eligibleTotal]);
+    }, [
+        summary,
+        kpi,
+        regionalSel,
+        divisionSel,
+        unitSel,
+        certSel,
+        levelSel,
+        subSel,
+        startDate,
+        endDate,
+        batchType,
+        eligibleTotal,
+    ]);
 
     /* ===== UI ===== */
     return (

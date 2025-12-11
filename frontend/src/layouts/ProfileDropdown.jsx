@@ -4,17 +4,40 @@ import { useState, useRef, useEffect } from "react";
 import { User, LogOut, ChevronDown, Bell } from "lucide-react";
 import { handleLogout } from "../utils/logout";
 
+const getStoredUser = () => {
+    try {
+        return JSON.parse(localStorage.getItem("user") || "{}");
+    } catch {
+        return {};
+    }
+};
+
+const getCurrentRole = () => {
+    const storedUser = getStoredUser();
+
+    return (
+        storedUser.role ||
+        localStorage.getItem("role") || // fallback lama
+        ""
+    )
+        .toString()
+        .toUpperCase();
+};
+
 export default function ProfileDropdown() {
     const [open, setOpen] = useState(false);
     const ref = useRef(null);
     const navigate = useNavigate();
 
-    const username = localStorage.getItem("username") || "User";
-    const email = localStorage.getItem("email") || "-";
-    const employeeId = localStorage.getItem("employeeId");
-    const role = localStorage.getItem("role");
+    const storedUser = getStoredUser();
+    const role = getCurrentRole();
 
-    // Backend lo pake role PEGAWAI → jadi ini yang kita cek
+    const username = storedUser.username || storedUser.name || localStorage.getItem("username") || "User";
+    const email = storedUser.email || localStorage.getItem("email") || "-";
+
+    const employeeId = storedUser.employeeId ?? storedUser.employee_id ?? localStorage.getItem("employeeId") ?? null;
+
+    // Pegawai fix: role === "PEGAWAI"
     const isEmployee = role === "PEGAWAI";
 
     useEffect(() => {
@@ -31,12 +54,12 @@ export default function ProfileDropdown() {
         setOpen(false);
 
         // Pegawai boleh buka halaman dirinya sendiri
-        if (role === "PEGAWAI") {
+        if (isEmployee) {
             if (!employeeId) {
                 console.error("⚠ Employee login tapi employeeId NULL. Cek backend login response!");
                 return;
             }
-            navigate(`/employee/${employeeId}`); // ⬅ arahkan langsung ke pegawai yg login
+            navigate(`/employee/${employeeId}`);
         }
     };
 
@@ -63,6 +86,7 @@ export default function ProfileDropdown() {
                     <div className="px-6 pt-6 pb-4">
                         <div className="font-bold text-lg text-gray-800 truncate">{username}</div>
                         <div className="text-gray-400 text-sm truncate">{email}</div>
+                        <div className="text-gray-400 text-xs uppercase mt-1">{role || "-"}</div>
                     </div>
 
                     <div className="divide-y divide-gray-100">

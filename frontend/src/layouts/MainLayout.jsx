@@ -1,24 +1,51 @@
+// src/layouts/MainLayout.jsx
 import { useState } from "react";
 import { Toaster } from "react-hot-toast";
 import Sidebar from "./Sidebar";
 import Navbar from "./Navbar";
 
+function getStoredUser() {
+    try {
+        return JSON.parse(localStorage.getItem("user") || "{}");
+    } catch {
+        return {};
+    }
+}
+
+function getCurrentRole() {
+    const storedUser = getStoredUser();
+
+    return (
+        storedUser.role ||
+        localStorage.getItem("role") || // fallback lama kalau masih kepake
+        ""
+    )
+        .toString()
+        .toUpperCase();
+}
+
 export default function MainLayout({ children }) {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+    const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  return (
-    <div className="h-screen w-full flex bg-slate-50">
-      {/* sidebar kiri */}
-      <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} />
+    const role = getCurrentRole();
+    const isEmployee = role === "PEGAWAI";
 
-      {/* area kanan */}
-      <div className="flex-1 min-w-0 flex flex-col">
-        <Navbar onMenuClick={() => setSidebarOpen(v => !v)} />
-        <main className="flex-1 overflow-auto p-6">{children}</main>
-      </div>
+    return (
+        <div className="h-screen w-full flex bg-slate-50">
+            {/* Sidebar kiri: cuma NON-PEGAWAI yang punya */}
+            {!isEmployee && <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} />}
 
-      {/* toaster: cukup sekali di layout */}
-      <Toaster position="top-right" toastOptions={{ duration: 2500 }} />
-    </div>
-  );
+            {/* area kanan */}
+            <div className="flex-1 min-w-0 flex flex-col">
+                <Navbar
+                    onMenuClick={() => setSidebarOpen((v) => !v)}
+                    hideMenuButton={isEmployee} // Pegawai gak liat hamburger
+                />
+                <main className="flex-1 overflow-auto p-6">{children}</main>
+            </div>
+
+            {/* toaster: cukup sekali di layout */}
+            <Toaster position="top-right" toastOptions={{ duration: 2500 }} />
+        </div>
+    );
 }

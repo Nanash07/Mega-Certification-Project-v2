@@ -4,12 +4,29 @@ import { Menu, Bell } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import ProfileDropdown from "./ProfileDropdown";
-import {
-    fetchUnreadCount,
-    fetchLatestNotifications,
-    markNotificationAsRead, // ⬅️ tambahan
-} from "../services/notificationService";
+import { fetchUnreadCount, fetchLatestNotifications, markNotificationAsRead } from "../services/notificationService";
 import { MENU, filterMenuByRole } from "./Sidebar";
+
+// ====== HELPERS ======
+const getStoredUser = () => {
+    try {
+        return JSON.parse(localStorage.getItem("user") || "{}");
+    } catch {
+        return {};
+    }
+};
+
+const getCurrentRole = () => {
+    const storedUser = getStoredUser();
+
+    return (
+        storedUser.role ||
+        localStorage.getItem("role") || // fallback lama
+        ""
+    )
+        .toString()
+        .toUpperCase();
+};
 
 // Ambil title dari menu yang sudah difilter by role
 const getMenuTitle = (pathname, menu) => {
@@ -18,7 +35,6 @@ const getMenuTitle = (pathname, menu) => {
         item.subMenu
             ? item.subMenu.map((sub) => ({
                   ...sub,
-                  // kalau perlu tau parent, bisa simpan: parentKey: item.key
               }))
             : [item]
     );
@@ -28,17 +44,19 @@ const getMenuTitle = (pathname, menu) => {
     return match?.label || "Dashboard";
 };
 
-export default function Navbar({ onMenuClick }) {
+export default function Navbar({ onMenuClick, hideMenuButton = false }) {
     const navigate = useNavigate();
     const location = useLocation();
 
-    // 🔐 Ambil role dengan cara yang sama kayak Sidebar
-    const rawRole = (JSON.parse(localStorage.getItem("user") || "{}").role || localStorage.getItem("role") || "")
-        .toString()
-        .toUpperCase();
+    const rawRole = getCurrentRole();
+    const isEmployee = rawRole === "PEGAWAI";
 
     const visibleMenu = filterMenuByRole(MENU, rawRole);
-    const title = getMenuTitle(location.pathname, visibleMenu);
+
+    // 🔑 Di sini kuncinya:
+    // Pegawai: title fix "Mega Certification"
+    // Lainnya: ikut title dari menu
+    const title = isEmployee ? "Mega Certification" : getMenuTitle(location.pathname, visibleMenu);
 
     const [notifOpen, setNotifOpen] = useState(false);
     const notifRef = useRef(null);
@@ -46,10 +64,8 @@ export default function Navbar({ onMenuClick }) {
     const [unreadCount, setUnreadCount] = useState(0);
     const [latest, setLatest] = useState([]);
 
-    // support EMPLOYEE/PEGAWAI (jaga-jaga backend campur bahasa)
-    const isEmployee = rawRole === "EMPLOYEE" || rawRole === "PEGAWAI";
-
-    // ==== NOTIFICATION LOGIC ====
+    // Pegawai aja yang punya notifikasi
+    // (role lain notifnya di menu sidebar/settings)
     useEffect(() => {
         if (!isEmployee) return;
 
@@ -62,7 +78,6 @@ export default function Navbar({ onMenuClick }) {
 
     const loadNotif = async () => {
         try {
-            // fire dua-duanya paralel
             const [count, latestList] = await Promise.all([fetchUnreadCount(), fetchLatestNotifications(5)]);
 
             setUnreadCount(count || 0);
@@ -85,15 +100,12 @@ export default function Navbar({ onMenuClick }) {
 
     const openFullNotification = async (notifId) => {
         try {
-            // tandai sebagai read di backend
             await markNotificationAsRead(notifId);
 
-            // update state lokal biar badge & list langsung reflect
             setLatest((prev) => prev.map((n) => (n.id === notifId ? { ...n, read: true } : n)));
             setUnreadCount((prev) => (prev > 0 ? prev - 1 : 0));
         } catch (err) {
             console.warn("Gagal menandai notifikasi sebagai terbaca", err);
-            // kalau gagal, tetap lanjut navigate aja
         }
 
         navigate(`/notifications?open=${notifId}`);
@@ -102,10 +114,12 @@ export default function Navbar({ onMenuClick }) {
 
     return (
         <header className="flex items-center h-20 px-4 lg:px-8 bg-white border-b border-gray-200 relative z-40">
-            {/* Hamburger */}
-            <button className="btn btn-ghost btn-square border border-gray-200 lg:hidden" onClick={onMenuClick}>
-                <Menu size={24} className="text-gray-400" />
-            </button>
+            {/* Hamburger: cuma non-pegawai yang punya */}
+            {!hideMenuButton && (
+                <button className="btn btn-ghost btn-square border border-gray-200 lg:hidden" onClick={onMenuClick}>
+                    <Menu size={24} className="text-gray-400" />
+                </button>
+            )}
 
             {/* Page Title */}
             <h1 className="ml-4 font-bold text-base sm:text-lg md:text-xl lg:text-2xl truncate max-w-[70%]">{title}</h1>
@@ -124,7 +138,6 @@ export default function Navbar({ onMenuClick }) {
                             )}
                         </button>
 
-                        {/* 🔽 PREVIEW DROPDOWN */}
                         {notifOpen && (
                             <div className="absolute right-0 mt-3 w-80 bg-white rounded-2xl shadow-xl border border-gray-100 z-50 overflow-hidden">
                                 <div className="px-6 pt-4 pb-2 font-bold text-lg">Notifikasi</div>

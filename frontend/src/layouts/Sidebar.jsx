@@ -1,6 +1,6 @@
+// src/components/Sidebar.jsx
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-
 import {
     LayoutDashboard,
     User,
@@ -87,14 +87,31 @@ export const MENU = [
     },
 ];
 
+// ============ HELPERS ============
+
+const getStoredUser = () => {
+    try {
+        return JSON.parse(localStorage.getItem("user") || "{}");
+    } catch {
+        return {};
+    }
+};
+
+export const getCurrentRole = () => {
+    const user = getStoredUser();
+    return (user.role || localStorage.getItem("role") || "").toString().toUpperCase();
+};
+
 // =========================================
 //   ROLE-BASED FILTERING (EXPORTED)
 // =========================================
 export const filterMenuByRole = (menu, roleRaw) => {
     const role = (roleRaw || "").toUpperCase();
 
+    // SUPERADMIN: full access
     if (role === "SUPERADMIN") return menu;
 
+    // PIC: beberapa menu di-hide / trim
     if (role === "PIC") {
         return menu
             .filter((item) => item.key !== "organization")
@@ -119,7 +136,10 @@ export const filterMenuByRole = (menu, roleRaw) => {
             });
     }
 
-    if (role === "EMPLOYEE" || role === "PEGAWAI") {
+    // PEGAWAI:
+    // Sidebar sebenernya gak dirender (di MainLayout),
+    // tapi filter ini tetap dipakai Navbar buat title.
+    if (role === "PEGAWAI") {
         const employeeMenu = menu.filter((item) => item.key === "dashboard" || item.key === "employee");
         return [
             ...employeeMenu,
@@ -132,6 +152,7 @@ export const filterMenuByRole = (menu, roleRaw) => {
         ];
     }
 
+    // default: role lain cuma boleh Dashboard + Pegawai
     return menu.filter((item) => item.key === "dashboard" || item.key === "employee");
 };
 
@@ -142,14 +163,13 @@ export default function Sidebar({ open, setOpen }) {
     const location = useLocation();
     const [openMenu, setOpenMenu] = useState("");
 
-    const role = (JSON.parse(localStorage.getItem("user") || "{}").role || localStorage.getItem("role") || "")
-        .toString()
-        .toUpperCase();
-
+    const role = getCurrentRole();
     const visibleMenu = filterMenuByRole(MENU, role);
 
     const isActive = (href) => location.pathname === href || location.pathname.startsWith(href + "/");
+
     const isParentActive = (submenu) => submenu.some((sub) => isActive(sub.href));
+
     const isMenuActive = (item) => (item.subMenu ? isParentActive(item.subMenu) : isActive(item.href));
 
     useEffect(() => {
@@ -178,12 +198,12 @@ export default function Sidebar({ open, setOpen }) {
 
             <aside
                 className={`
-                    fixed z-40 top-0 left-0 h-full w-56 bg-white shadow-sm
-                    flex flex-col transition-transform duration-300
-                    ${open ? "translate-x-0" : "-translate-x-full"}
-                    border-r border-gray-200
-                    lg:translate-x-0 lg:static
-                `}
+          fixed z-40 top-0 left-0 h-full w-56 bg-white shadow-sm
+          flex flex-col transition-transform duration-300
+          ${open ? "translate-x-0" : "-translate-x-full"}
+          border-r border-gray-200
+          lg:translate-x-0 lg:static
+        `}
             >
                 <div className="flex items-center h-20 px-6 border-b border-gray-200">
                     <Link to="/dashboard" className="font-bold text-2xl" onClick={handleLinkClick}>

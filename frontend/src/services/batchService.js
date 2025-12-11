@@ -1,3 +1,4 @@
+// src/services/batchService.js
 import api from "./api";
 
 const BASE = "/batches";
@@ -16,10 +17,10 @@ function buildParams(params = {}) {
     set("size", params.size);
 
     // filter umum
-    set("batchIds", params.batchIds); // BE sekarang nggak pakai, tapi gak masalah kalau kepasang
+    set("batchIds", params.batchIds);
     set("status", params.status);
 
-    // 🔹 support param `type` dan juga alias `batchType` dari dashboard
+    // support param `type` dan juga alias `batchType` dari dashboard
     const resolvedType = params.type ?? params.batchType;
     set("type", resolvedType);
 
@@ -34,6 +35,9 @@ function buildParams(params = {}) {
     set("certificationId", params.certificationId);
     set("levelId", params.levelId);
     set("subFieldId", params.subFieldId);
+
+    // 🔹 NEW: scope per-pegawai (dipakai EmployeeDashboard & bisa dipakai endpoint lain juga)
+    set("employeeId", params.employeeId);
 
     // date range
     set("startDate", params.startDate);
@@ -151,7 +155,7 @@ export async function fetchEmployeeOngoingBatchesPaged({ page = 0, size = 10 } =
     }
 }
 
-// tetap boleh dipakai di tempat lain
+// tetap boleh dipakai di tempat lain (bulanannya masih global di BE, FE siapin param employeeId)
 export async function fetchMonthlyBatches(params = {}) {
     try {
         const { data } = await api.get(`${BASE}/monthly`, {
@@ -163,6 +167,7 @@ export async function fetchMonthlyBatches(params = {}) {
         return [];
     }
 }
+
 // ================== BATCH COUNT (DASHBOARD) ==================
 export async function fetchBatchCount(params = {}) {
     try {
@@ -176,6 +181,7 @@ export async function fetchBatchCount(params = {}) {
                 certificationId: params.certificationId,
                 levelId: params.levelId,
                 subFieldId: params.subFieldId,
+                employeeId: params.employeeId, // 🔹 NEW (optional; BE siapin byEmployee di service)
             },
         });
         return Number(data?.count ?? 0);
