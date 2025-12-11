@@ -113,6 +113,7 @@ public class EmployeeBatchService {
             String division,
             String unit,
             String job,
+            Long employeeId, // 🔹 NEW: filter personal
             Pageable pageable) {
 
         Specification<EmployeeBatch> spec = EmployeeBatchSpecification.notDeleted()
@@ -124,6 +125,11 @@ public class EmployeeBatchService {
                 .and(EmployeeBatchSpecification.byUnitName(unit))
                 .and(EmployeeBatchSpecification.byJobName(job))
                 .and(EmployeeBatchSpecification.withOrgFetch());
+
+        // 🔹 Filter per-pegawai (personal) kalau employeeId tidak null
+        if (employeeId != null) {
+            spec = spec.and((root, query, cb) -> cb.equal(root.get("employee").get("id"), employeeId));
+        }
 
         if (pageable.getSort().isUnsorted()) {
             pageable = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(),

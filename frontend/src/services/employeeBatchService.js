@@ -13,7 +13,7 @@ export async function fetchEmployeeBatches(batchId) {
     }
 }
 
-// dengan paging + filter org
+// dengan paging + filter org (+ optional filter personal by employeeId)
 export async function fetchEmployeeBatchesPaged({
     batchId,
     page = 0,
@@ -24,6 +24,7 @@ export async function fetchEmployeeBatchesPaged({
     division,
     unit,
     job,
+    employeeId, // 🔹 NEW: biar bisa personal sesuai user login
 }) {
     try {
         const params = { page, size };
@@ -33,6 +34,7 @@ export async function fetchEmployeeBatchesPaged({
         if (division) params.division = division;
         if (unit) params.unit = unit;
         if (job) params.job = job;
+        if (employeeId) params.employeeId = employeeId; // 🔹 kirim ke BE
 
         const { data } = await api.get(`${BASE}/batch/${batchId}/paged`, { params });
         return data || { content: [], totalPages: 0, totalElements: 0 };

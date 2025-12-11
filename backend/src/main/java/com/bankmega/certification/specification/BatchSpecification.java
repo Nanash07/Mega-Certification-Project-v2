@@ -133,14 +133,22 @@ public class BatchSpecification {
         };
     }
 
-    // khusus employee: hanya batch yang diikuti employee tertentu
+    // khusus employee: hanya batch yang diikuti employee tertentu (peserta tidak
+    // soft-deleted)
     public static Specification<Batch> byEmployee(Long employeeId) {
         return (root, query, cb) -> {
             if (employeeId == null)
                 return cb.conjunction();
+
+            // supaya 1 batch nggak duplikat kalau ada join lain
+            query.distinct(true);
+
             Join<Object, Object> eb = root.join("participants", JoinType.INNER);
             Join<Object, Object> e = eb.join("employee", JoinType.INNER);
-            return cb.equal(e.get("id"), employeeId);
+
+            return cb.and(
+                    cb.equal(e.get("id"), employeeId),
+                    cb.isNull(eb.get("deletedAt")));
         };
     }
 

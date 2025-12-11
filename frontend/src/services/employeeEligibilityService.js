@@ -6,6 +6,7 @@ const BASE = "/employee-eligibility";
 /* ===== util: current employeeId (sinkron sama ProtectedRoute) ===== */
 function getCurrentEmployeeId() {
     if (typeof window === "undefined") return null;
+
     try {
         const rawUser = window.localStorage.getItem("user");
         if (rawUser) {
@@ -13,17 +14,23 @@ function getCurrentEmployeeId() {
             const cand = user?.employeeId ?? user?.employee?.id ?? null;
             if (cand != null && !Number.isNaN(Number(cand))) {
                 const num = Number(cand);
-                window.localStorage.setItem("employeeId", String(num)); // cache
+                // cache biar next time gak perlu parse user lagi
+                window.localStorage.setItem("employeeId", String(num));
                 return num;
             }
         }
-    } catch {}
-    const raw = window.localStorage.getItem("employeeId");
+    } catch {
+        // ignore parsing error, fallback ke key employeeId
+    }
+
+    const raw = typeof window !== "undefined" ? window.localStorage.getItem("employeeId") : null;
+
     if (raw == null || raw === "") return null;
     const num = Number(raw);
     return Number.isNaN(num) ? null : num;
 }
 
+/* ===== helper build query params (paged) ===== */
 function buildParams(params = {}) {
     const q = {};
     const set = (k, v) => {
@@ -60,7 +67,7 @@ function buildParams(params = {}) {
     return q;
 }
 
-/* ===== paged ===== */
+/* ===== paged generic (bisa PIC / admin / personal tergantung params) ===== */
 export async function fetchEmployeeEligibilityPaged(params = {}) {
     try {
         const { data } = await api.get(`${BASE}/paged`, {
@@ -73,12 +80,15 @@ export async function fetchEmployeeEligibilityPaged(params = {}) {
     }
 }
 
-/* ===== by employee (helper siap pakai di FE) ===== */
+/* ===== paged khusus pegawai login ===== */
 export async function fetchMyEligibilityPaged({ page = 0, size = 10, statuses, sortField, sortDirection } = {}) {
     const employeeId = getCurrentEmployeeId();
-    if (!employeeId) return { content: [], totalPages: 0, totalElements: 0 };
+    if (!employeeId) {
+        return { content: [], totalPages: 0, totalElements: 0 };
+    }
+
     return fetchEmployeeEligibilityPaged({
-        employeeIds: [employeeId],
+        employeeIds: [employeeId], // 🔹 scope ke pegawai login
         statuses,
         page,
         size,
@@ -109,10 +119,11 @@ export async function refreshEmployeeEligibility() {
     }
 }
 
-/* ===== counts untuk dashboard (fix: bawa employeeIds juga) ===== */
+/* ===== counts untuk dashboard (sudah dukung scope pegawai) ===== */
 export async function fetchEligibilityCount(params = {}) {
     try {
         const q = {
+            // BE: status single string → nanti di-controller di-wrap ke List<String>
             status: params.status, // ACTIVE, DUE, EXPIRED, NOT_YET_CERTIFIED
             regionalId: params.regionalId,
             divisionId: params.divisionId,
@@ -122,9 +133,12 @@ export async function fetchEligibilityCount(params = {}) {
             subFieldId: params.subFieldId,
         };
 
-        // 🔹 PERBAIKAN: dukung scope pegawai
-        if (params.employeeIds?.length) q.employeeIds = params.employeeIds.join(",");
-        if (params.employeeId) q.employeeIds = String(params.employeeId); // single
+        // 🔹 scope ke pegawai (bisa list, bisa single)
+        if (params.employeeIds?.length) {
+            q.employeeIds = params.employeeIds.join(",");
+        } else if (params.employeeId) {
+            q.employeeIds = String(params.employeeId);
+        }
 
         const { data } = await api.get(`${BASE}/count`, { params: q });
         return Number(data?.count ?? 0);
@@ -140,3 +154,6 @@ export async function fetchMyEligibilityCount(status) {
     if (!employeeId) return 0;
     return fetchEligibilityCount({ employeeId, status });
 }
+
+/* (opsional) export util kalau mau dipakai di tempat lain */
+export { getCurrentEmployeeId };

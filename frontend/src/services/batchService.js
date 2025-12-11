@@ -36,8 +36,13 @@ function buildParams(params = {}) {
     set("levelId", params.levelId);
     set("subFieldId", params.subFieldId);
 
-    // 🔹 NEW: scope per-pegawai (dipakai EmployeeDashboard & bisa dipakai endpoint lain juga)
-    set("employeeId", params.employeeId);
+    // NOTE:
+    // BE /batches/paged sekarang BELUM baca employeeId dari query param,
+    // scope pegawai dipakai di endpoint khusus:
+    // - /batches/employee/ongoing-paged (pakai AuthenticationPrincipal.employeeId)
+    // - /batches/monthly (juga pakai AuthenticationPrincipal.employeeId)
+    // jadi di sini nggak perlu kirim employeeId, tapi kalaupun ada akan diabaikan.
+    // set("employeeId", params.employeeId);
 
     // date range
     set("startDate", params.startDate);
@@ -155,11 +160,35 @@ export async function fetchEmployeeOngoingBatchesPaged({ page = 0, size = 10 } =
     }
 }
 
-// tetap boleh dipakai di tempat lain (bulanannya masih global di BE, FE siapin param employeeId)
+// MONTHLY batch untuk dashboard:
+// - Superadmin / PIC: hasil global (plus scope PIC)
+// - Pegawai: otomatis ke-filter batch yang dia ikuti (BE pakai AuthenticationPrincipal.employeeId)
 export async function fetchMonthlyBatches(params = {}) {
     try {
+        const q = {};
+        const set = (k, v) => {
+            if (v === undefined || v === null || v === "") return;
+            q[k] = v;
+        };
+
+        // filter yang memang didukung endpoint /monthly
+        set("regionalId", params.regionalId);
+        set("divisionId", params.divisionId);
+        set("unitId", params.unitId);
+        set("certificationId", params.certificationId);
+        set("levelId", params.levelId);
+        set("subFieldId", params.subFieldId);
+        set("startDate", params.startDate);
+        set("endDate", params.endDate);
+
+        // support type / batchType
+        const resolvedType = params.type ?? params.batchType;
+        set("type", resolvedType);
+
+        // employeeId TIDAK perlu dikirim, BE baca dari principal
+
         const { data } = await api.get(`${BASE}/monthly`, {
-            params,
+            params: q,
         });
         return Array.isArray(data) ? data : [];
     } catch (err) {
@@ -171,17 +200,20 @@ export async function fetchMonthlyBatches(params = {}) {
 // ================== BATCH COUNT (DASHBOARD) ==================
 export async function fetchBatchCount(params = {}) {
     try {
-        const { data } = await api.get(`${BASE}/count`, {
+        const { data } = await api.get(`${BASE}/dashboard-count`, {
             params: {
-                status: params.status,
-                type: params.type,
+                status: params.status, // single status
+                statuses: params.statuses, // atau list status
+                type: params.type ?? params.batchType,
                 regionalId: params.regionalId,
                 divisionId: params.divisionId,
                 unitId: params.unitId,
                 certificationId: params.certificationId,
                 levelId: params.levelId,
                 subFieldId: params.subFieldId,
-                employeeId: params.employeeId, // 🔹 NEW (optional; BE siapin byEmployee di service)
+                startDate: params.startDate,
+                endDate: params.endDate,
+                // employeeId: nggak dipakai di endpoint ini (BE selalu null di service)
             },
         });
         return Number(data?.count ?? 0);

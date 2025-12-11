@@ -213,7 +213,8 @@ public class BatchService {
             LocalDate startDate,
             LocalDate endDate,
             Batch.BatchType type,
-            List<Long> allowedCertificationIds) {
+            List<Long> allowedCertificationIds,
+            Long employeeId) { // 🔹 DITAMBAH employeeId
         // status default: ONGOING + FINISHED (sama kayak query JDBC sebelumnya)
         List<Batch.Status> statuses = List.of(Batch.Status.ONGOING, Batch.Status.FINISHED);
 
@@ -225,6 +226,7 @@ public class BatchService {
                 .and(BatchSpecification.byCertificationLevel(levelId))
                 .and(BatchSpecification.bySubField(subFieldId))
                 .and(BatchSpecification.byAllowedCertifications(allowedCertificationIds))
+                .and(BatchSpecification.byEmployee(employeeId)) // 🔹 filter batch yang diikuti pegawai (kalau ada)
                 .and(BatchSpecification.byDateRange(startDate, endDate));
 
         List<Batch> batches = batchRepository.findAll(spec);

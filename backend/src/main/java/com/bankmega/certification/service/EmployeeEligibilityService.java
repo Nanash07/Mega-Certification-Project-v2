@@ -1,4 +1,3 @@
-// src/main/java/com/bankmega/certification/service/EmployeeEligibilityService.java
 package com.bankmega.certification.service;
 
 import com.bankmega.certification.dto.EmployeeEligibilityResponse;
@@ -164,6 +163,7 @@ public class EmployeeEligibilityService {
      * - filter org (regional/division/unit)
      * - filter cert (cert/level/subField)
      * - PIC scope
+     * - filter per-pegawai (opsional)
      * - exclude pegawai RESIGN / deleted
      */
     private Specification<EmployeeEligibility> buildDashboardBaseSpec(
@@ -173,7 +173,8 @@ public class EmployeeEligibilityService {
             Long certificationId,
             Long levelId,
             Long subFieldId,
-            List<Long> allowedCertificationIds) {
+            List<Long> allowedCertificationIds,
+            List<Long> employeeIds) {
 
         return EmployeeEligibilitySpecification.notDeleted()
                 // org
@@ -186,6 +187,8 @@ public class EmployeeEligibilityService {
                 .and(EmployeeEligibilitySpecification.bySubFieldId(subFieldId))
                 // PIC scope
                 .and(EmployeeEligibilitySpecification.byAllowedCertificationIds(allowedCertificationIds))
+                // per-pegawai (personal dashboard, fetchMyEligibilityCount, dll)
+                .and(EmployeeEligibilitySpecification.byEmployeeIds(employeeIds))
                 // exclude RESIGN
                 .and(excludeResignedEmployee());
     }
@@ -211,7 +214,8 @@ public class EmployeeEligibilityService {
             Long certificationId,
             Long levelId,
             Long subFieldId,
-            List<Long> allowedCertificationIds) {
+            List<Long> allowedCertificationIds,
+            List<Long> employeeIds) {
 
         Specification<EmployeeEligibility> spec = buildDashboardBaseSpec(
                 regionalId,
@@ -220,7 +224,8 @@ public class EmployeeEligibilityService {
                 certificationId,
                 levelId,
                 subFieldId,
-                allowedCertificationIds);
+                allowedCertificationIds,
+                employeeIds);
 
         // kalau statuses null/empty => semua status
         if (statuses != null && !statuses.isEmpty()) {
@@ -516,15 +521,11 @@ public class EmployeeEligibilityService {
             boolean fromName = manualRuleIds.contains(ruleId);
 
             // ==== DI SINI KUNCI-NYA BRO ====
-            // Selalu hitung ulang source, status ACTIVE/DUE/EXPIRED gak ngaruh.
             if (fromJob) {
-                // Kalau rule ada di mapping job → SELALU BY_JOB (prioritas utama)
                 eligibility.setSource(EmployeeEligibility.EligibilitySource.BY_JOB);
             } else if (fromName) {
-                // Hanya kalau TIDAK dari job tapi ada di exception by-name
                 eligibility.setSource(EmployeeEligibility.EligibilitySource.BY_NAME);
             } else {
-                // Fallback: kalau entah gimana ruleId gak ada di dua-duanya
                 eligibility.setSource(null);
             }
 

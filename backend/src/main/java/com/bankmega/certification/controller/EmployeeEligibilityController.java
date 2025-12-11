@@ -1,4 +1,3 @@
-// src/main/java/com/bankmega/certification/controller/EmployeeEligibilityController.java
 package com.bankmega.certification.controller;
 
 import com.bankmega.certification.dto.EmployeeEligibilityResponse;
@@ -146,6 +145,10 @@ public class EmployeeEligibilityController {
             @RequestParam(required = false) Long levelId,
             @RequestParam(required = false) Long subFieldId,
 
+            // 🔹 NEW: scope per-pegawai (dipakai EmployeeDashboard,
+            // fetchMyEligibilityCount, dll)
+            @RequestParam(required = false) List<Long> employeeIds,
+
             Authentication authentication,
             @AuthenticationPrincipal(expression = "id") Long userIdFromPrincipal) {
 
@@ -172,7 +175,8 @@ public class EmployeeEligibilityController {
                 certificationId,
                 levelId,
                 subFieldId,
-                allowedCertIds);
+                allowedCertIds,
+                employeeIds);
 
         return ResponseEntity.ok(new EligibilityCountResponse(count));
     }

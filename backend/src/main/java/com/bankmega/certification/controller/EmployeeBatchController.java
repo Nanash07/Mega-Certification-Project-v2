@@ -28,7 +28,9 @@ public class EmployeeBatchController {
         return ResponseEntity.ok(service.getByBatch(batchId));
     }
 
-    /** Get peserta batch dengan paging + filter organisasi */
+    /**
+     * Get peserta batch dengan paging + filter organisasi + optional filter pegawai
+     */
     @GetMapping("/batch/{batchId}/paged")
     public ResponseEntity<Page<EmployeeBatchResponse>> getPagedByBatch(
             @PathVariable Long batchId,
@@ -38,13 +40,17 @@ public class EmployeeBatchController {
             @RequestParam(required = false) String division,
             @RequestParam(required = false) String unit,
             @RequestParam(required = false, name = "job") String job,
+            @RequestParam(required = false) Long employeeId, // 🔹 NEW: filter personal
             Pageable pageable) {
 
         return ResponseEntity.ok(
-                service.search(batchId, search, status, regional, division, unit, job, pageable));
+                service.search(batchId, search, status, regional, division, unit, job, employeeId, pageable));
     }
 
-    /** Search global peserta batch */
+    /**
+     * Search global peserta batch (bisa pakai batchId atau tidak) + optional filter
+     * pegawai
+     */
     @GetMapping
     public ResponseEntity<Page<EmployeeBatchResponse>> search(
             @RequestParam(required = false) Long batchId,
@@ -54,10 +60,11 @@ public class EmployeeBatchController {
             @RequestParam(required = false) String division,
             @RequestParam(required = false) String unit,
             @RequestParam(required = false, name = "job") String job,
+            @RequestParam(required = false) Long employeeId, // 🔹 NEW: filter personal
             Pageable pageable) {
 
         return ResponseEntity.ok(
-                service.search(batchId, search, status, regional, division, unit, job, pageable));
+                service.search(batchId, search, status, regional, division, unit, job, employeeId, pageable));
     }
 
     /** Daftar pegawai yang eligible untuk batch (exclude yg sudah jadi peserta) */

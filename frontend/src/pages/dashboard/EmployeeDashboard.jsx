@@ -2,10 +2,17 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Select from "react-select";
-import api from "../../services/api";
 
-import { fetchEmployeeEligibilityPaged, fetchEligibilityCount } from "../../services/employeeEligibilityService";
-import { fetchEmployeeOngoingBatchesPaged, fetchMonthlyBatches } from "../../services/batchService";
+import {
+    fetchEmployeeEligibilityPaged,
+    fetchEligibilityCount,
+    getCurrentEmployeeId, // 🔹 util shared dari service
+} from "../../services/employeeEligibilityService";
+import {
+    fetchEmployeeOngoingBatchesPaged,
+    fetchMonthlyBatches,
+    fetchBatches, // 🔹 pakai service untuk batch selesai juga
+} from "../../services/batchService";
 
 import { formatShortIdDateTime } from "../../utils/date";
 
@@ -28,15 +35,6 @@ const MONTHS = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "
 
 /* ========= utils ========= */
 const toNum = (v) => Number(v ?? 0) || 0;
-
-/** Ambil employeeId dari localStorage (sesuai login) */
-function getCurrentEmployeeId() {
-    if (typeof window === "undefined") return null;
-    const raw = window.localStorage.getItem("employeeId");
-    if (raw == null || raw === "") return null;
-    const num = Number(raw);
-    return Number.isNaN(num) ? null : num;
-}
 
 /* ========= small components ========= */
 function MiniCard({ label, value, sub, tip }) {
@@ -496,7 +494,8 @@ function FinishedBatchSection({
     return (
         <div className="card bg-base-100 border rounded-2xl shadow-sm">
             <div className="card-body p-4 md:p-5">
-                <div className="flex items-center justify_between">
+                {/* 🔹 fix typo: justify_between -> justify-between */}
+                <div className="flex items-center justify-between">
                     <h2 className="card-title text-base md:text-lg">Batch Selesai</h2>
                 </div>
 
@@ -634,7 +633,6 @@ export default function EmployeeDashboard() {
     // ===== summary & KPI (pakai count eligibility + batch employee) =====
     async function loadSummaryAndKpi() {
         try {
-            const filters = currentFilters();
             const employeeId = getCurrentEmployeeId();
             if (!employeeId) {
                 setSummary(null);
@@ -643,9 +641,9 @@ export default function EmployeeDashboard() {
                 return;
             }
 
+            // batchType belum kepakai di count eligibility BE, jadi nggak perlu dikirim
             const baseEligFilters = {
                 employeeIds: [employeeId],
-                batchType: filters.batchType,
             };
 
             const [active, due, expired, notYet, ongoingRes] = await Promise.all([
@@ -718,25 +716,24 @@ export default function EmployeeDashboard() {
     async function loadFinishedBatches(page = 1) {
         setLoadingFinished(true);
         try {
-            const { data } = await api.get("/batches/paged", {
-                params: {
-                    status: "FINISHED",
-                    page: page - 1,
-                    size: finishedRows,
-                    sort: "endDate,desc",
-                },
+            const res = await fetchBatches({
+                status: "FINISHED",
+                page: page - 1,
+                size: finishedRows,
+                sortField: "endDate",
+                sortDirection: "desc",
             });
-            const content = Array.isArray(data?.content) ? data.content : [];
+            const content = Array.isArray(res?.content) ? res.content : [];
             setFinishedBatches(content);
-            setFinishedTotalPages(data?.totalPages || 1);
-            setFinishedTotalElements(data?.totalElements || content.length || 0);
+            setFinishedTotalPages(res?.totalPages || 1);
+            setFinishedTotalElements(res?.totalElements || content.length || 0);
             setFinishedPage(page);
         } finally {
             setLoadingFinished(false);
         }
     }
 
-    // ===== pakai fetchMonthlyBatches (sama konsep dengan SuperadminDashboard) =====
+    // ===== pakai fetchMonthlyBatches (BE sudah filter berdasarkan employee via principal) =====
     async function loadMonthly() {
         try {
             const typeVal = batchType?.value || undefined;

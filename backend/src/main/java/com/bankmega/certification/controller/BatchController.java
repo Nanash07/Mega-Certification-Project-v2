@@ -181,7 +181,7 @@ public class BatchController {
         return new BatchCountResponse(count);
     }
 
-    // 🔹 Monthly batch chart untuk dashboard (Superadmin / PIC)
+    // 🔹 Monthly batch chart untuk dashboard (Superadmin / PIC / Employee)
     @GetMapping("/monthly")
     public List<MonthlyPoint> monthly(
             @RequestParam(required = false) Long regionalId,
@@ -194,7 +194,10 @@ public class BatchController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
             @RequestParam(required = false) Batch.BatchType type,
             Authentication auth,
-            @AuthenticationPrincipal(expression = "id") Long userId) {
+            @AuthenticationPrincipal(expression = "id") Long userId,
+            @AuthenticationPrincipal(expression = "employeeId") Long employeeId // 🔹 ambil employeeId untuk dashboard
+                                                                                // pegawai
+    ) {
 
         List<Long> allowedCertIds = resolveAllowedCertIds(auth, userId);
 
@@ -208,7 +211,9 @@ public class BatchController {
                 startDate,
                 endDate,
                 type,
-                allowedCertIds);
+                allowedCertIds,
+                employeeId // 🔹 kalau employeeId ada, chart hanya batch yg dia ikuti
+        );
     }
 
     // 🔹 Batch berjalan khusus Pegawai (self)
