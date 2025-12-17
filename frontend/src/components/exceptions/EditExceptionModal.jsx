@@ -72,7 +72,7 @@ export default function EditExceptionModal({ open, onClose, onSaved, initial, pi
         }
         try {
             await updateException(initial.id, { notes: form.notes });
-            toast.success("✅ Exception diupdate");
+            toast.success("Exception diupdate");
             onSaved?.();
             onClose();
         } catch (err) {

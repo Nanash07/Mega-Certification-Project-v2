@@ -10,8 +10,8 @@ import java.time.Instant;
 
 @Entity
 @Table(name = "certifications", uniqueConstraints = {
-        @UniqueConstraint(columnNames = {"code"}),
-        @UniqueConstraint(columnNames = {"name"})
+        @UniqueConstraint(columnNames = { "code" }),
+        @UniqueConstraint(columnNames = { "name" })
 })
 @Getter
 @Setter
@@ -40,5 +40,5 @@ public class Certification {
     private Instant updatedAt;
 
     @Column(name = "deleted_at")
-    private Instant deletedAt; // ✅ soft delete
+    private Instant deletedAt;
 }

@@ -11,7 +11,7 @@ export async function fetchPicScopesByUser(userId) {
     return data;
 }
 
-// ✅ BARU — scope milik PIC yang login
+// BARU — scope milik PIC yang login
 export async function fetchMyPicScope() {
     const { data } = await api.get("/pic-scope/me");
     return data; // { userId, certifications: [{ certificationId, certificationCode }, ...] }

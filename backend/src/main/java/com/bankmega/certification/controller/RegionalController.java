@@ -17,35 +17,29 @@ public class RegionalController {
 
     private final RegionalService service;
 
-    // ✅ Ambil semua (dropdown)
     @GetMapping("/all")
     public ResponseEntity<List<RegionalResponse>> getAll() {
         return ResponseEntity.ok(service.getAll());
     }
 
-    // ✅ Search + Pagination
     @GetMapping
     public ResponseEntity<Page<RegionalResponse>> search(
             @RequestParam(required = false) String q,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size
-    ) {
+            @RequestParam(defaultValue = "10") int size) {
         return ResponseEntity.ok(service.search(q, page, size));
     }
 
-    // ✅ Get detail by ID
     @GetMapping("/{id}")
     public ResponseEntity<RegionalResponse> getById(@PathVariable Long id) {
         return ResponseEntity.ok(service.getById(id));
     }
 
-    // ✅ Create baru
     @PostMapping
     public ResponseEntity<RegionalResponse> create(@RequestBody RegionalRequest req) {
         return ResponseEntity.ok(service.createOrGet(req));
     }
 
-    // ✅ Toggle aktif/nonaktif
     @PutMapping("/{id}/toggle")
     public ResponseEntity<RegionalResponse> toggle(@PathVariable Long id) {
         return ResponseEntity.ok(service.toggle(id));

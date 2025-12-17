@@ -8,13 +8,47 @@ import java.util.List;
 
 public class EmployeeSpecification {
 
+    // ===== Base filters =====
+
+    /** Data yang "masih ada di sistem" (belum dihapus/soft delete) */
     public static Specification<Employee> notDeleted() {
         return (root, query, cb) -> cb.isNull(root.get("deletedAt"));
     }
 
+    /** Data yang sudah dihapus/soft delete dari sistem */
     public static Specification<Employee> deleted() {
         return (root, query, cb) -> cb.isNotNull(root.get("deletedAt"));
     }
+
+    // ===== Status filters =====
+
+    public static Specification<Employee> statusIs(String status) {
+        return (root, query, cb) -> {
+            if (status == null || status.isBlank())
+                return cb.conjunction();
+            return cb.equal(cb.upper(root.get("status")), status.toUpperCase());
+        };
+    }
+
+    public static Specification<Employee> statusNot(String status) {
+        return (root, query, cb) -> {
+            if (status == null || status.isBlank())
+                return cb.conjunction();
+            return cb.notEqual(cb.upper(root.get("status")), status.toUpperCase());
+        };
+    }
+
+    /** Active page: belum dihapus dari sistem DAN bukan resign */
+    public static Specification<Employee> activePageOnly() {
+        return Specification.where(notDeleted()).and(statusNot("RESIGN"));
+    }
+
+    /** Resigned page: belum dihapus dari sistem DAN status resign */
+    public static Specification<Employee> resignedPageOnly() {
+        return Specification.where(notDeleted()).and(statusIs("RESIGN"));
+    }
+
+    // ===== Search + multi filters =====
 
     public static Specification<Employee> bySearch(String search) {
         return (root, query, cb) -> {

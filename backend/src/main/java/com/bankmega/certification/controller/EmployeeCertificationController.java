@@ -115,7 +115,7 @@ public class EmployeeCertificationController {
     // ================== Delete File ==================
     @DeleteMapping("/{id}/certificate")
     public ResponseEntity<Void> deleteCertificate(@PathVariable Long id) {
-        service.deleteCertificate(id); // ✅ lewat service biar status/history ke-record
+        service.deleteCertificate(id);
         return ResponseEntity.noContent().build();
     }
 

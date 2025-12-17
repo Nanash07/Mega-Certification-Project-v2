@@ -35,7 +35,7 @@ public class EmployeeController {
                 service.search(employeeIds, regionalIds, divisionIds, unitIds, jobPositionIds, search, pageable));
     }
 
-    // Resigned - Paging + Filter (same shape as active)
+    // Resigned - Paging + Filter
     @GetMapping("/resigned/paged")
     public ResponseEntity<Page<EmployeeResponse>> getResignedPaged(
             @RequestParam(required = false) List<Long> employeeIds,
@@ -51,7 +51,7 @@ public class EmployeeController {
                         pageable));
     }
 
-    // ======= DASHBOARD COUNT (ACTIVE ONLY) =======
+    // ======= DASHBOARD COUNT (ACTIVE ONLY, exclude RESIGN) =======
     @GetMapping("/count")
     public ResponseEntity<EmployeeCountResponse> countActive(
             @RequestParam(required = false) Long regionalId,
@@ -80,13 +80,19 @@ public class EmployeeController {
         return ResponseEntity.ok(service.create(req));
     }
 
-    // Update (active only)
+    // Update
     @PutMapping("/{id}")
     public ResponseEntity<EmployeeResponse> update(@PathVariable Long id, @RequestBody EmployeeRequest req) {
         return ResponseEntity.ok(service.update(id, req));
     }
 
-    // Soft delete (to resigned)
+    // Resign (status change only)
+    @PatchMapping("/{id}/resign")
+    public ResponseEntity<EmployeeResponse> resign(@PathVariable Long id) {
+        return ResponseEntity.ok(service.resign(id));
+    }
+
+    // Soft delete (hapus dari sistem)
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> softDelete(@PathVariable Long id) {
         service.softDelete(id);

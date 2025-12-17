@@ -15,6 +15,7 @@ public class EmployeeImportResponse {
     private int updated;
     private int mutated;
     private int resigned;
+    private int rehired;
     private int errors;
     private List<String> errorDetails;
     private String message;

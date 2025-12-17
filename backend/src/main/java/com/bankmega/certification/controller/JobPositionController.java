@@ -17,35 +17,29 @@ public class JobPositionController {
 
     private final JobPositionService service;
 
-    // ✅ Ambil semua (dropdown)
     @GetMapping("/all")
     public ResponseEntity<List<JobPositionResponse>> getAll() {
         return ResponseEntity.ok(service.getAll());
     }
 
-    // ✅ Paged list + search
     @GetMapping
     public ResponseEntity<Page<JobPositionResponse>> search(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
-            @RequestParam(required = false) String q
-    ) {
+            @RequestParam(required = false) String q) {
         return ResponseEntity.ok(service.search(q, page, size));
     }
 
-    // ✅ Ambil detail by ID
     @GetMapping("/{id}")
     public ResponseEntity<JobPositionResponse> getById(@PathVariable Long id) {
         return ResponseEntity.ok(service.getById(id));
     }
 
-    // ✅ Create baru
     @PostMapping
     public ResponseEntity<JobPositionResponse> create(@RequestBody JobPositionRequest req) {
         return ResponseEntity.ok(service.createOrGet(req));
     }
 
-    // ✅ Toggle aktif/nonaktif
     @PutMapping("/{id}/toggle")
     public ResponseEntity<JobPositionResponse> toggle(@PathVariable Long id) {
         return ResponseEntity.ok(service.toggle(id));

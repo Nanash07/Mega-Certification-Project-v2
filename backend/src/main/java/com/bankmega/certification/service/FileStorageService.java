@@ -43,7 +43,6 @@ public class FileStorageService {
                     ? ec.getCertificationRule().getSubField().getCode()
                     : null;
 
-            // ✅ Validasi tipe file
             String originalName = file.getOriginalFilename();
             String contentType = file.getContentType();
             if (contentType == null ||
@@ -53,13 +52,11 @@ public class FileStorageService {
                 throw new IllegalArgumentException("Hanya file PNG, JPG, atau JPEG yang diperbolehkan");
             }
 
-            // ✅ Ambil extension
             String extension = "";
             if (originalName != null && originalName.contains(".")) {
                 extension = originalName.substring(originalName.lastIndexOf("."));
             }
 
-            // ✅ Nama unik
             String timestamp = LocalDateTime.now()
                     .format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
 
@@ -75,7 +72,6 @@ public class FileStorageService {
 
             newFileName.append("_").append(timestamp).append(extension);
 
-            // ✅ Simpan file ke storage
             Path storagePath = Paths.get(STORAGE_DIR);
             if (!Files.exists(storagePath)) {
                 Files.createDirectories(storagePath);
@@ -84,7 +80,6 @@ public class FileStorageService {
             Path filePath = storagePath.resolve(newFileName.toString());
             file.transferTo(filePath.toFile());
 
-            // ✅ Update info file ke entity
             ec.setFileUrl(newFileName.toString()); // simpan hanya nama file
             ec.setFileName(originalName);
             ec.setFileType(contentType != null ? contentType : "image/jpeg");

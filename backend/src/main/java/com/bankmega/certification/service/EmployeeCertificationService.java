@@ -286,7 +286,7 @@ public class EmployeeCertificationService {
                 .orElseThrow(() -> new RuntimeException("Certification not found"));
 
         if (!hasChanged(ec, req)) {
-            return toResponse(ec); // no-op
+            return toResponse(ec);
         }
 
         if (req.getCertificationRuleId() != null &&

@@ -38,7 +38,6 @@ public class EmployeeBatch {
     @Column(length = 20, nullable = false)
     private Status status;
 
-    // ✅ NEW: snapshot jenis proses saat enroll
     @Enumerated(EnumType.STRING)
     @Column(name = "process_type", length = 20, nullable = false)
     private ProcessType processType;

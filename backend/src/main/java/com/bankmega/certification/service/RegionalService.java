@@ -22,14 +22,14 @@ public class RegionalService {
     private final RegionalRepository repo;
     private final EmployeeRepository employeeRepo;
 
-    // ✅ Ambil semua (dropdown)
+    // Ambil semua (dropdown)
     public List<RegionalResponse> getAll() {
         return repo.findAllByOrderByIsActiveDescNameAsc().stream()
                 .map(this::mapToResponse)
                 .toList();
     }
 
-    // ✅ Search + Pagination
+    // Search + Pagination
     public Page<RegionalResponse> search(String q, int page, int size) {
         Pageable pageable = PageRequest.of(page, size,
                 Sort.by("isActive").descending().and(Sort.by("name").ascending()));
@@ -44,14 +44,14 @@ public class RegionalService {
         return result.map(this::mapToResponse);
     }
 
-    // ✅ Get by ID
+    // Get by ID
     public RegionalResponse getById(Long id) {
         Regional r = repo.findById(id)
                 .orElseThrow(() -> new NotFoundException("Regional not found: " + id));
         return mapToResponse(r);
     }
 
-    // ✅ Create baru atau ambil existing
+    // Create baru atau ambil existing
     @Transactional
     public RegionalResponse createOrGet(RegionalRequest req) {
         Regional r = repo.findByNameIgnoreCase(req.getName())
@@ -64,7 +64,7 @@ public class RegionalService {
         return mapToResponse(r);
     }
 
-    // ✅ Toggle aktif/nonaktif
+    // Toggle aktif/nonaktif
     @Transactional
     public RegionalResponse toggle(Long id) {
         Regional r = repo.findById(id)

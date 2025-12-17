@@ -87,7 +87,7 @@ export default function DivisionPage() {
         try {
             // toggleDivision diasumsikan flip status
             await toggleDivision(row.id);
-            toast.success(`✅ Division berhasil di${newIsActive ? "aktifkan" : "nonaktifkan"}`);
+            toast.success(`Division berhasil di${newIsActive ? "aktifkan" : "nonaktifkan"}`);
             load();
         } catch (err) {
             toast.error(err?.response?.data?.message || "❌ Gagal update status division");

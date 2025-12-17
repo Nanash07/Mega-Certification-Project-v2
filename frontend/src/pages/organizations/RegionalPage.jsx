@@ -88,7 +88,7 @@ export default function RegionalPage() {
         try {
             // toggleRegional diasumsikan flip status
             await toggleRegional(row.id);
-            toast.success(`✅ Regional berhasil di${newIsActive ? "aktifkan" : "nonaktifkan"}`);
+            toast.success(`Regional berhasil di${newIsActive ? "aktifkan" : "nonaktifkan"}`);
             load();
         } catch (err) {
             toast.error(err?.response?.data?.message || "❌ Gagal update status regional");

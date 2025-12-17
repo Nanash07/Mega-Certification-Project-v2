@@ -48,7 +48,7 @@ export default function UnitPage() {
     async function onToggle(id) {
         try {
             await toggleUnit(id);
-            toast.success("✅ Status unit berhasil diperbarui");
+            toast.success("Status unit berhasil diperbarui");
             load();
         } catch (err) {
             const msg = err?.response?.data?.message || "❌ Gagal update status unit";
@@ -102,7 +102,7 @@ export default function UnitPage() {
         try {
             // toggleUnit diasumsikan flip status
             await toggleUnit(row.id);
-            toast.success(`✅ Unit berhasil di${newIsActive ? "aktifkan" : "nonaktifkan"}`);
+            toast.success(`Unit berhasil di${newIsActive ? "aktifkan" : "nonaktifkan"}`);
             load();
         } catch (err) {
             const msg = err?.response?.data?.message || "❌ Gagal update status unit";

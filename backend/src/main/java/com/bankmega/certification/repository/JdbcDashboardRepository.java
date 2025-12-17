@@ -74,7 +74,6 @@ public class JdbcDashboardRepository implements DashboardRepository {
             cond.add(alias + ".sub_field_id = :subFieldId");
         }
 
-        // ✅ GUARD SCOPE PIC (WAJIB): batasi ke daftar yg diizinkan
         if (f.getAllowedCertificationIds() != null) {
             List<Long> allowed = f.getAllowedCertificationIds();
             if (allowed.isEmpty()) {

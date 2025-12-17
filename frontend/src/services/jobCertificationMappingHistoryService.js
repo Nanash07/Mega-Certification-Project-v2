@@ -2,7 +2,7 @@
 import api from "./api";
 
 const BASE_URL = "/job-certification-mapping-histories";
-// ✅ pastiin backend lo punya endpoint: GET /api/job-certification-mapping-histories
+// pastiin backend lo punya endpoint: GET /api/job-certification-mapping-histories
 
 // 🔹 Ambil histori Job Certification Mapping (paging + filter)
 export async function fetchJobCertMappingHistories(params = {}) {

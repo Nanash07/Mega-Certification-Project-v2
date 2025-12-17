@@ -65,16 +65,13 @@ public class JobCertificationMappingHistoryService {
                                         .build();
 
                         historyRepo.save(h);
-                        log.info("✅ History mapping tersimpan: [{} - {}] action={}",
+                        log.info("History mapping tersimpan: [{} - {}] action={}",
                                         h.getJobName(), h.getCertificationCode(), action);
                 } catch (Exception e) {
                         log.error("❌ Gagal menyimpan history mapping: {}", e.getMessage());
                 }
         }
 
-        // ============================================================
-        // 🔹 Ambil data history dengan filter (paging + spec + PIC scope)
-        // ============================================================
         @Transactional(readOnly = true)
         public Page<JobCertificationMappingHistoryResponse> getPagedHistory(
                         String jobName,

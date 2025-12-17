@@ -76,7 +76,7 @@ public class EmployeeImportProcessor {
         preloadMasters();
         ImportPlan plan = buildPlan(file, true, true); // strictGuard ON
         EmployeeImportResponse res = plan.toResponse(file.getOriginalFilename(), true);
-        res.setMessage("✅ Dry run selesai oleh " + user.getUsername());
+        res.setMessage("Dry run selesai oleh " + user.getUsername());
         return res;
     }
 
@@ -87,6 +87,7 @@ public class EmployeeImportProcessor {
 
         // 1) Persist employees (batch)
         batchSave(plan.newEmployees, empRepo::saveAll);
+        batchSave(plan.rehiredEmployees, empRepo::saveAll); // REHIRED saved
         batchSave(plan.updatedEmployees, empRepo::saveAll);
         batchSave(plan.mutatedEmployees, empRepo::saveAll);
         batchSave(plan.resignedEmployees, empRepo::saveAll);
@@ -104,6 +105,7 @@ public class EmployeeImportProcessor {
                         .toList();
                 safe(() -> userService.batchUpsertAccountsByNips(upsertNips, pegawaiRole));
             }
+
             // resign → deactivate accounts + invalidate certs
             if (!plan.resignedEmployees.isEmpty()) {
                 List<Long> resignedIds = plan.resignedEmployees.stream()
@@ -113,9 +115,8 @@ public class EmployeeImportProcessor {
                         .toList();
                 safe(() -> userService.batchDeactivateByEmployeeIds(resignedIds));
                 safe(() -> certificationService.bulkInvalidateByEmployeeIds(resignedIds));
-                // Optional: revoke tokens kalau ada modulnya
-                // safe(() -> authTokenService.revokeByEmployeeIds(resignedIds));
             }
+
             // rehire → re-enable cert flow
             if (!plan.rehiredEmployees.isEmpty()) {
                 List<Long> rehiredIds = plan.rehiredEmployees.stream()
@@ -132,7 +133,7 @@ public class EmployeeImportProcessor {
         saveImportLog(user, file, plan);
 
         EmployeeImportResponse res = plan.toResponse(file.getOriginalFilename(), false);
-        res.setMessage("✅ Import pegawai berhasil oleh " + user.getUsername());
+        res.setMessage("Import pegawai berhasil oleh " + user.getUsername());
         return res;
     }
 
@@ -159,7 +160,6 @@ public class EmployeeImportProcessor {
 
         // Guard: full snapshot detection (hindari mass-resign karena file parsial)
         if (strictGuard) {
-            // NOTE: pakai size() biar gak perlu nambah repository method
             int activeNow = empRepo.findByDeletedAtIsNull().size();
             if (!dryRun && rows.size() < Math.max(50, (int) (activeNow * 0.6))) {
                 throw new IllegalStateException("Import terdeteksi bukan full snapshot ("
@@ -215,7 +215,7 @@ public class EmployeeImportProcessor {
                             .division(division)
                             .unit(unit)
                             .jobPosition(job)
-                            .status("ACTIVE") // tetap pakai String biar backward-compatible
+                            .status("ACTIVE")
                             .effectiveDate(r.effectiveDate)
                             .createdAt(Instant.now())
                             .updatedAt(Instant.now())
@@ -226,9 +226,38 @@ public class EmployeeImportProcessor {
                     continue;
                 }
 
+                boolean wasResign = "RESIGN".equalsIgnoreCase(existing.getStatus());
+
+                // REHIRED: RESIGN -> ACTIVE, masuk counter rehired, BUKAN updated/mutated
+                if (wasResign) {
+                    if (!dryRun) {
+                        existing.setStatus("ACTIVE");
+
+                        // sinkronin data dari file
+                        existing.setName(r.name);
+                        existing.setEmail(r.email);
+                        existing.setGender(r.gender);
+                        existing.setRegional(regional);
+                        existing.setDivision(division);
+                        existing.setUnit(unit);
+                        existing.setJobPosition(job);
+                        if (r.effectiveDate != null)
+                            existing.setEffectiveDate(r.effectiveDate);
+
+                        existing.setUpdatedAt(Instant.now());
+
+                        // harus udah ada di enum + DB constraint
+                        historyService.snapshot(existing, EmployeeHistory.EmployeeActionType.REHIRED, r.effectiveDate);
+                    }
+
+                    plan.rehiredEmployees.add(existing);
+                    plan.createdOrRehiredForAccount.add(existing);
+                    plan.rehired++;
+                    continue; // 🔥 stop biar gak masuk updated/mutated
+                }
+
                 boolean mutasi = placementChanged(existing, regional, division, unit, job);
                 boolean changedProfile = profileChanged(existing, r.name, r.email, r.gender);
-                boolean wasResign = "RESIGN".equalsIgnoreCase(existing.getStatus());
 
                 if (mutasi) {
                     if (!dryRun) {
@@ -240,15 +269,10 @@ public class EmployeeImportProcessor {
                             existing.setEffectiveDate(r.effectiveDate);
                         existing.setUpdatedAt(Instant.now());
                         historyService.snapshot(existing, EmployeeHistory.EmployeeActionType.MUTASI);
-                        if (wasResign) {
-                            existing.setStatus("ACTIVE");
-                            plan.createdOrRehiredForAccount.add(existing);
-                            plan.rehiredEmployees.add(existing);
-                        }
                     }
                     plan.mutatedEmployees.add(existing);
                     plan.mutated++;
-                } else if (changedProfile || wasResign) {
+                } else if (changedProfile) {
                     if (!dryRun) {
                         if (!Objects.equals(existing.getName(), r.name))
                             existing.setName(r.name);
@@ -256,6 +280,7 @@ public class EmployeeImportProcessor {
                             existing.setEmail(r.email);
                         if (!Objects.equals(existing.getGender(), r.gender))
                             existing.setGender(r.gender);
+
                         if (regional != null)
                             existing.setRegional(regional);
                         if (division != null)
@@ -264,13 +289,10 @@ public class EmployeeImportProcessor {
                             existing.setUnit(unit);
                         if (job != null)
                             existing.setJobPosition(job);
+
                         if (r.effectiveDate != null)
                             existing.setEffectiveDate(r.effectiveDate);
-                        if (wasResign) {
-                            existing.setStatus("ACTIVE");
-                            plan.createdOrRehiredForAccount.add(existing);
-                            plan.rehiredEmployees.add(existing);
-                        }
+
                         existing.setUpdatedAt(Instant.now());
                         historyService.snapshot(existing, EmployeeHistory.EmployeeActionType.UPDATED, r.effectiveDate);
                     }
@@ -312,16 +334,14 @@ public class EmployeeImportProcessor {
             Sheet sheet = wb.getSheetAt(0);
             DataFormatter fmt = new DataFormatter();
 
-            // (opsional) validasi header di row 0
-
-            for (int i = 1; i <= sheet.getLastRowNum(); i++) { // mulai dari baris ke-1 (0 = header)
+            for (int i = 1; i <= sheet.getLastRowNum(); i++) {
                 Row row = sheet.getRow(i);
                 if (row == null)
                     continue;
 
                 String nip = safe(fmt.formatCellValue(row.getCell(4)));
                 if (nip.isEmpty())
-                    continue; // skip kosong
+                    continue;
 
                 String regionalName = safe(fmt.formatCellValue(row.getCell(0)));
                 String divisionName = safe(fmt.formatCellValue(row.getCell(1)));
@@ -334,7 +354,6 @@ public class EmployeeImportProcessor {
 
                 LocalDate effDate = parseDateSafe(row.getCell(8), effStr);
 
-                // simpan rowIndex = i+1 biar sesuai excel (1-based)
                 out.add(new ImportRow(i + 1, regionalName, divisionName, unitName, jobName,
                         nip, name, gender, email, effDate));
             }
@@ -483,12 +502,16 @@ public class EmployeeImportProcessor {
     }
 
     private static class ImportPlan {
-        int processed = 0, created = 0, updated = 0, mutated = 0, resigned = 0, errors = 0;
+        int processed = 0, created = 0, updated = 0, mutated = 0, resigned = 0, rehired = 0, errors = 0;
+
         List<String> errorDetails = new ArrayList<>();
+
         List<Employee> newEmployees = new ArrayList<>();
         List<Employee> updatedEmployees = new ArrayList<>();
         List<Employee> mutatedEmployees = new ArrayList<>();
         List<Employee> resignedEmployees = new ArrayList<>();
+
+        // NEW
         List<Employee> rehiredEmployees = new ArrayList<>();
         List<Employee> createdOrRehiredForAccount = new ArrayList<>();
 
@@ -501,6 +524,7 @@ public class EmployeeImportProcessor {
                     .updated(updated)
                     .mutated(mutated)
                     .resigned(resigned)
+                    .rehired(rehired)
                     .errors(errors)
                     .errorDetails(errorDetails)
                     .build();

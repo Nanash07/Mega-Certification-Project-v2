@@ -471,7 +471,7 @@ export default function JobCertificationMappingPage() {
                             onClick={() => {
                                 deleteJobCertificationMapping(confirm.id)
                                     .then(() => {
-                                        toast.success("✅ Mapping dihapus");
+                                        toast.success("Mapping dihapus");
                                         load();
                                     })
                                     .catch(() => toast.error("❌ Gagal menghapus mapping"))

@@ -37,7 +37,6 @@ public interface EmployeeEligibilityRepository
 
         List<EmployeeEligibility> findByEmployee_IdAndDeletedAtIsNull(Long employeeId);
 
-        // ✅ NEW: single row by employee & rule (not deleted)
         Optional<EmployeeEligibility> findByEmployee_IdAndCertificationRule_IdAndDeletedAtIsNull(Long employeeId,
                         Long ruleId);
 

@@ -75,12 +75,11 @@ public class NotificationTemplateService {
         template.setUpdatedAt(LocalDateTime.now());
         NotificationTemplate updated = repository.save(template);
 
-        log.info("✅ Template {} berhasil diupdate", template.getCode());
+        log.info("Template {} berhasil diupdate", template.getCode());
         return updated;
     }
 
     // ================== GENERATE (TITLE/BODY) ==================
-    /** Versi simpel: variabel standar. */
     @Transactional(readOnly = true)
     public String generateTitle(
             NotificationTemplate.Code code,
@@ -93,7 +92,6 @@ public class NotificationTemplateService {
         return replaceVariables(template.getTitle(), employee, namaSertifikasi, berlakuSampai, namaBatch, mulaiTanggal);
     }
 
-    /** Versi simpel: variabel standar. */
     @Transactional(readOnly = true)
     public String generateMessage(
             NotificationTemplate.Code code,

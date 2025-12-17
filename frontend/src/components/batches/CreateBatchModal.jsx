@@ -19,7 +19,7 @@ export default function CreateBatchModal({ open, onClose, onSaved }) {
             endDate: "",
             quota: "",
             status: "PLANNED",
-            type: "CERTIFICATION", // ✅ default
+            type: "CERTIFICATION", // default
         };
     }
 
@@ -55,7 +55,7 @@ export default function CreateBatchModal({ open, onClose, onSaved }) {
         try {
             const payload = { ...form };
 
-            // ✅ pastikan quota number atau null
+            // pastikan quota number atau null
             if (payload.quota === "") {
                 delete payload.quota;
             } else {

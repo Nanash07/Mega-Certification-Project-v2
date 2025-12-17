@@ -23,7 +23,7 @@ import java.util.List;
 public class RoleService {
 
     private final RoleRepository roleRepo;
-    private final UserRepository userRepo; // ✅ tambahin ini
+    private final UserRepository userRepo; // tambahin ini
 
     // 🔹 List semua role (buat dropdown, dsb)
     public List<RoleResponse> getAll() {
@@ -82,7 +82,7 @@ public class RoleService {
         Role r = roleRepo.findById(id)
                 .orElseThrow(() -> new NotFoundException("Role dengan id " + id + " tidak ditemukan"));
 
-        long used = userRepo.countByRole_Id(id); // ✅ ubah ke userRepo
+        long used = userRepo.countByRole_Id(id); // ubah ke userRepo
         if (used > 0) {
             throw new BadRequestException("Role sedang dipakai oleh " + used + " user");
         }

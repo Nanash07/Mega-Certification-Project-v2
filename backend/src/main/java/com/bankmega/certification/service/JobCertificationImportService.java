@@ -176,7 +176,7 @@ public class JobCertificationImportService {
             throw new IllegalArgumentException("Level harus berupa angka, tapi dapat: " + levelStr);
         }
 
-        final Integer level = tmpLevel; // ✅ bikin final variable
+        final Integer level = tmpLevel;
 
         String subCode = (subFieldCode == null || subFieldCode.isBlank()) ? null : subFieldCode.trim();
 

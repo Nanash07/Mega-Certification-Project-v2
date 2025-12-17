@@ -87,7 +87,7 @@ public class EmployeeCertificationHistoryService {
                                 .orElse(null);
 
                 if (last == null)
-                        return true; // belum ada history → pasti berubah
+                        return true;
 
                 return !Objects.equals(last.getCertNumber(), ec.getCertNumber()) ||
                                 !Objects.equals(last.getCertDate(), ec.getCertDate()) ||

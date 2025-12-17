@@ -30,17 +30,11 @@ export default function EmployeeResignedPage() {
     const [divisionIds, setDivisionIds] = useState([]);
     const [unitIds, setUnitIds] = useState([]);
     const [jobPositionIds, setJobPositionIds] = useState([]);
-    const [statuses, setStatuses] = useState([]);
 
     const [regionalOptions, setRegionalOptions] = useState([]);
     const [divisionOptions, setDivisionOptions] = useState([]);
     const [unitOptions, setUnitOptions] = useState([]);
     const [jobOptions, setJobOptions] = useState([]);
-    const statusOptions = [
-        { value: "ACTIVE", label: "Active" },
-        { value: "INACTIVE", label: "Inactive" },
-        { value: "RESIGN", label: "Resign" },
-    ];
 
     function formatStatusLabel(status) {
         if (!status) return "-";
@@ -61,11 +55,7 @@ export default function EmployeeResignedPage() {
 
     const loadEmployees = async (inputValue) => {
         try {
-            const res = await searchResignedEmployees({
-                search: inputValue,
-                page: 0,
-                size: 20,
-            });
+            const res = await searchResignedEmployees({ search: inputValue, page: 0, size: 20 });
             return res.content.map((e) => ({
                 value: e.id,
                 label: `${e.nip} - ${e.name}`,
@@ -86,7 +76,7 @@ export default function EmployeeResignedPage() {
                 divisionIds: divisionIds.map((i) => i.value),
                 unitIds: unitIds.map((i) => i.value),
                 jobPositionIds: jobPositionIds.map((i) => i.value),
-                statuses: statuses.map((i) => i.value),
+                // statuses removed: resigned endpoint already fixed
             };
 
             const res = await fetchResignedEmployees(params);
@@ -102,7 +92,8 @@ export default function EmployeeResignedPage() {
 
     useEffect(() => {
         load();
-    }, [page, rowsPerPage, filterEmployee, regionalIds, divisionIds, unitIds, jobPositionIds, statuses]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [page, rowsPerPage, filterEmployee, regionalIds, divisionIds, unitIds, jobPositionIds]);
 
     function resetFilter() {
         setFilterEmployee(null);
@@ -110,7 +101,6 @@ export default function EmployeeResignedPage() {
         setDivisionIds([]);
         setUnitIds([]);
         setJobPositionIds([]);
-        setStatuses([]);
         setPage(1);
         toast.success("Clear filter berhasil");
     }
@@ -119,10 +109,8 @@ export default function EmployeeResignedPage() {
 
     return (
         <div>
-            {/* Toolbar (resign: hanya clear filter) */}
             <div className="mb-4 space-y-3">
-                {/* Filters */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-3 text-xs items-center">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 text-xs items-center">
                     <AsyncSelect
                         cacheOptions
                         defaultOptions
@@ -160,14 +148,7 @@ export default function EmployeeResignedPage() {
                         onChange={setJobPositionIds}
                         placeholder="Filter Jabatan"
                     />
-                    <Select
-                        isMulti
-                        options={statusOptions}
-                        value={statuses}
-                        onChange={setStatuses}
-                        placeholder="Filter Status"
-                    />
-                    <div className="col-span-1">
+                    <div className="col-span-1 lg:col-span-1">
                         <button className="btn btn-accent btn-soft border-accent btn-sm w-full" onClick={resetFilter}>
                             <Eraser className="w-4 h-4" />
                             Clear Filter
@@ -176,7 +157,6 @@ export default function EmployeeResignedPage() {
                 </div>
             </div>
 
-            {/* Table */}
             <div className="overflow-x-auto rounded-xl border border-gray-200 shadow bg-base-100">
                 <table className="table table-zebra">
                     <thead className="bg-base-200 text-xs">
@@ -212,7 +192,6 @@ export default function EmployeeResignedPage() {
                             rows.map((e, idx) => (
                                 <tr key={e.id}>
                                     <td>{startIdx + idx}</td>
-
                                     <td>
                                         <div className="flex gap-2">
                                             <div className="tooltip" data-tip="Lihat detail pegawai">
@@ -230,20 +209,11 @@ export default function EmployeeResignedPage() {
                                     <td>{e.name}</td>
 
                                     <td>
-                                        <span
-                                            className={`badge badge-sm text-white ${
-                                                e.status === "ACTIVE"
-                                                    ? "badge-success"
-                                                    : e.status === "INACTIVE"
-                                                    ? "badge-neutral"
-                                                    : e.status === "RESIGN"
-                                                    ? "badge-error"
-                                                    : "badge-ghost"
-                                            }`}
-                                        >
+                                        <span className="badge badge-sm text-white badge-error">
                                             {formatStatusLabel(e.status)}
                                         </span>
                                     </td>
+
                                     <td>{e.email}</td>
                                     <td>{e.gender}</td>
                                     <td>{e.regionalName || "-"}</td>

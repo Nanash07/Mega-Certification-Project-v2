@@ -22,14 +22,12 @@ public class JobPositionService {
     private final JobPositionRepository repo;
     private final EmployeeRepository employeeRepo;
 
-    // ✅ Ambil semua tanpa paging (dropdown)
     public List<JobPositionResponse> getAll() {
         return repo.findAllByOrderByIsActiveDescNameAsc().stream()
                 .map(this::mapToResponse)
                 .toList();
     }
 
-    // ✅ Search + Pagination
     public Page<JobPositionResponse> search(String q, int page, int size) {
         Pageable pageable = PageRequest.of(page, size,
                 Sort.by("isActive").descending().and(Sort.by("name").ascending()));
@@ -44,14 +42,12 @@ public class JobPositionService {
         return result.map(this::mapToResponse);
     }
 
-    // ✅ Get by ID
     public JobPositionResponse getById(Long id) {
         JobPosition jp = repo.findById(id)
                 .orElseThrow(() -> new NotFoundException("Job Position not found: " + id));
         return mapToResponse(jp);
     }
 
-    // ✅ Create baru atau ambil existing
     @Transactional
     public JobPositionResponse createOrGet(JobPositionRequest req) {
         JobPosition jp = repo.findByNameIgnoreCase(req.getName())
@@ -64,7 +60,6 @@ public class JobPositionService {
         return mapToResponse(jp);
     }
 
-    // ✅ Toggle aktif/nonaktif
     @Transactional
     public JobPositionResponse toggle(Long id) {
         JobPosition jp = repo.findById(id)

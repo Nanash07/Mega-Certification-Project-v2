@@ -428,18 +428,14 @@ public class EmployeeEligibilityService {
         return existing;
     }
 
-    /**
-     * Sinkron eligibility dari mapping job & exception untuk 1 pegawai (assumed
-     * active),
-     * dengan existing yang sudah di-preload.
-     */
+    // Sinkron eligibility dari mapping job & exception untuk 1 pegawai dengan
+    // existing yang sudah di-preload.
     private List<EmployeeEligibility> syncEligibilitiesForEmployee(
             Employee employee,
             List<EmployeeEligibility> existingElig,
             Map<Long, List<CertificationRule>> jobRuleMap,
             Map<Long, List<CertificationRule>> exceptionRuleMap) {
 
-        // Safety: kalau ternyata RESIGN, langsung deactivate
         if (isResigned(employee)) {
             return deactivateEligibilitiesForEmployee(employee, existingElig);
         }
@@ -455,7 +451,6 @@ public class EmployeeEligibilityService {
 
         List<CertificationRule> manualRules = exceptionRuleMap.getOrDefault(employee.getId(), List.of());
 
-        // Precompute ID set supaya gampang dan gak stream2 mulu
         Set<Long> jobRuleIds = mappingRules.stream()
                 .map(CertificationRule::getId)
                 .collect(Collectors.toSet());

@@ -34,7 +34,7 @@ public class EmployeeBatchSpecification {
         };
     }
 
-    // ✅ Filter by regional/division/unit/job (based on NAME, case-insensitive)
+    // Filter by regional/division/unit/job (based on NAME, case-insensitive)
     public static Specification<EmployeeBatch> byRegionalName(String regional) {
         return (root, query, cb) -> {
             if (regional == null || regional.isBlank())
@@ -67,7 +67,7 @@ public class EmployeeBatchSpecification {
         };
     }
 
-    // ✅ Fetch join supaya gak N+1; skip untuk count query
+    // Fetch join supaya gak N+1; skip untuk count query
     public static Specification<EmployeeBatch> withOrgFetch() {
         return (root, query, cb) -> {
             if (query.getResultType() != Long.class && query.getResultType() != long.class) {

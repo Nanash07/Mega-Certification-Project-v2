@@ -1,71 +1,118 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import Select from "react-select";
-import AsyncSelect from "react-select/async";
 import Pagination from "../../components/common/Pagination";
 import { fetchEmployeeHistories } from "../../services/employeeHistoryService";
 import { ArrowLeft } from "lucide-react";
 
+const ACTION_OPTIONS = [
+    { value: "all", label: "Semua Aksi" },
+    { value: "CREATED", label: "CREATED" },
+    { value: "UPDATED", label: "UPDATED" },
+    { value: "MUTASI", label: "MUTASI" },
+    { value: "REHIRED", label: "REHIRED" },
+    { value: "RESIGN", label: "RESIGN" },
+    { value: "TERMINATED", label: "TERMINATED" },
+];
+
+const badgeClass = (actionType) => {
+    switch (actionType) {
+        case "CREATED":
+            return "badge-success";
+        case "UPDATED":
+            return "badge-info";
+        case "MUTASI":
+            return "badge-warning";
+        case "REHIRED":
+            return "badge-primary";
+        case "RESIGN":
+            return "badge-neutral";
+        case "TERMINATED":
+            return "badge-error";
+        default:
+            return "badge-ghost";
+    }
+};
+
 export default function EmployeeHistoryPage() {
     const navigate = useNavigate();
 
-    // State data
+    // data
     const [rows, setRows] = useState([]);
     const [loading, setLoading] = useState(false);
 
-    // Pagination
+    // pagination
     const [page, setPage] = useState(1);
     const [rowsPerPage, setRowsPerPage] = useState(10);
     const [totalPages, setTotalPages] = useState(0);
     const [totalElements, setTotalElements] = useState(0);
 
-    // Filters
-    const [filterEmployee, setFilterEmployee] = useState(null);
-    const [filterAction, setFilterAction] = useState({ value: "all", label: "Semua Aksi" });
+    // filters
+    const [filterEmployee, setFilterEmployee] = useState(null); // {value,label}
+    const [filterAction, setFilterAction] = useState(ACTION_OPTIONS[0]);
     const [startDate, setStartDate] = useState("");
     const [endDate, setEndDate] = useState("");
 
+    // options pegawai (react-select biasa)
     const [employeeOptions, setEmployeeOptions] = useState([]);
 
-    // ===================== INIT EMPLOYEE LIST =====================
+    const startIdx = useMemo(
+        () => (totalElements === 0 ? 0 : (page - 1) * rowsPerPage + 1),
+        [totalElements, page, rowsPerPage]
+    );
+
+    const formatDate = (val) => {
+        if (!val) return "-";
+        const d = new Date(val);
+        if (Number.isNaN(d.getTime())) return "-";
+        return d.toLocaleDateString("id-ID", {
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+        });
+    };
+
+    // ====== Load list pegawai (simple, seperti sebelumnya) ======
+    // NOTE: Ini masih fallback dari histories. Kalau mau lengkap, idealnya endpoint employees/options.
     const loadEmployeeList = useCallback(async () => {
         try {
-            const data = await fetchEmployeeHistories({ page: 0, size: 500 });
-            const uniqueEmps = new Map();
+            const data = await fetchEmployeeHistories({ page: 0, size: 2000 });
+
+            const unique = new Map();
             data.content.forEach((h) => {
-                if (h.employeeId && !uniqueEmps.has(h.employeeId)) {
-                    uniqueEmps.set(h.employeeId, {
+                if (h?.employeeId && !unique.has(h.employeeId)) {
+                    unique.set(h.employeeId, {
                         value: h.employeeId,
-                        label: `${h.employeeNip} - ${h.employeeName}`,
+                        label: `${h.employeeNip || "-"} - ${h.employeeName || "-"}`,
                     });
                 }
             });
-            setEmployeeOptions(Array.from(uniqueEmps.values()));
+
+            // sort biar enak dicari di dropdown
+            const opts = Array.from(unique.values()).sort((a, b) => a.label.localeCompare(b.label));
+
+            setEmployeeOptions(opts);
         } catch (err) {
             console.error("❌ Gagal load list pegawai:", err);
         }
     }, []);
 
-    // Filter function for react-select
-    const loadEmployeeOptions = (inputValue) =>
-        new Promise((resolve) => {
-            if (!inputValue) resolve(employeeOptions.slice(0, 20));
-            else {
-                const filtered = employeeOptions.filter((e) =>
-                    e.label.toLowerCase().includes(inputValue.toLowerCase())
-                );
-                resolve(filtered.slice(0, 20));
-            }
-        });
+    useEffect(() => {
+        loadEmployeeList();
+    }, [loadEmployeeList]);
 
-    // ===================== LOAD HISTORIES =====================
+    // ====== Reset page kalau filter berubah (biar filter gak “kayak ga jalan”) ======
+    useEffect(() => {
+        setPage(1);
+    }, [filterEmployee, filterAction, startDate, endDate]);
+
+    // ====== Load histories ======
     const load = useCallback(async () => {
         setLoading(true);
         try {
             if (startDate && endDate && startDate > endDate) {
                 toast.error("Tanggal awal tidak boleh melebihi tanggal akhir");
-                setLoading(false);
                 return;
             }
 
@@ -73,14 +120,14 @@ export default function EmployeeHistoryPage() {
                 page: page - 1,
                 size: rowsPerPage,
                 actionType: filterAction?.value || "all",
-                employeeId: filterEmployee?.value || null,
+                employeeId: filterEmployee?.value ?? null,
                 startDate,
                 endDate,
             };
 
             const data = await fetchEmployeeHistories(params);
             setRows(data.content || []);
-            setTotalPages(data.totalPages || 1);
+            setTotalPages(data.totalPages || 0);
             setTotalElements(data.totalElements || 0);
         } catch (err) {
             toast.error("Gagal memuat histori pegawai");
@@ -89,37 +136,19 @@ export default function EmployeeHistoryPage() {
         }
     }, [page, rowsPerPage, filterEmployee, filterAction, startDate, endDate]);
 
-    // Initial load
-    useEffect(() => {
-        loadEmployeeList();
-    }, [loadEmployeeList]);
-
     useEffect(() => {
         load();
     }, [load]);
 
-    // Reset filter
     const resetFilter = () => {
         setFilterEmployee(null);
-        setFilterAction({ value: "all", label: "Semua Aksi" });
+        setFilterAction(ACTION_OPTIONS[0]);
         setStartDate("");
         setEndDate("");
+        setPage(1);
         toast.success("Filter berhasil direset");
     };
 
-    // Utils
-    const formatDate = (val) => {
-        if (!val) return "-";
-        return new Date(val).toLocaleDateString("id-ID", {
-            day: "2-digit",
-            month: "short",
-            year: "numeric",
-        });
-    };
-
-    const startIdx = totalElements === 0 ? 0 : (page - 1) * rowsPerPage + 1;
-
-    // ===================== UI =====================
     return (
         <div className="p-4 space-y-5">
             {/* Back button */}
@@ -131,48 +160,48 @@ export default function EmployeeHistoryPage() {
 
             {/* Filters */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 text-xs items-end">
-                {/* Pegawai */}
-                <AsyncSelect
-                    cacheOptions
-                    defaultOptions={employeeOptions}
-                    loadOptions={loadEmployeeOptions}
+                {/* Pegawai (react-select biasa) */}
+                <Select
+                    options={employeeOptions}
                     value={filterEmployee}
                     onChange={setFilterEmployee}
                     placeholder="Filter Pegawai"
                     isClearable
+                    isSearchable
+                    className="text-sm"
                 />
 
                 {/* Aksi */}
                 <Select
-                    options={[
-                        { value: "all", label: "Semua Aksi" },
-                        { value: "CREATED", label: "CREATED" },
-                        { value: "UPDATED", label: "UPDATED" },
-                        { value: "MUTASI", label: "MUTASI" },
-                        { value: "RESIGN", label: "RESIGN" },
-                        { value: "TERMINATED", label: "TERMINATED" },
-                    ]}
+                    options={ACTION_OPTIONS}
                     value={filterAction}
                     onChange={setFilterAction}
                     placeholder="Filter Aksi"
+                    className="text-sm"
                 />
 
                 {/* Start Date */}
-                <input
-                    type="date"
-                    className="input input-bordered input-sm w-full"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                />
+                <div className="flex flex-col gap-1">
+                    <label className="text-xs font-medium text-gray-600">Tanggal Mulai</label>
+                    <input
+                        type="date"
+                        className="input input-bordered input-sm w-full"
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                    />
+                </div>
 
                 {/* End Date */}
-                <input
-                    type="date"
-                    className="input input-bordered input-sm w-full"
-                    value={endDate}
-                    min={startDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                />
+                <div className="flex flex-col gap-1">
+                    <label className="text-xs font-medium text-gray-600">Tanggal Akhir</label>
+                    <input
+                        type="date"
+                        className="input input-bordered input-sm w-full"
+                        value={endDate}
+                        min={startDate || undefined}
+                        onChange={(e) => setEndDate(e.target.value)}
+                    />
+                </div>
 
                 {/* Export */}
                 <button className="btn btn-warning btn-sm w-full" onClick={() => toast("📥 Coming Soon: Export Excel")}>
@@ -203,6 +232,7 @@ export default function EmployeeHistoryPage() {
                             <th>Tanggal Efektif</th>
                         </tr>
                     </thead>
+
                     <tbody>
                         {loading ? (
                             <tr>
@@ -218,23 +248,11 @@ export default function EmployeeHistoryPage() {
                             </tr>
                         ) : (
                             rows.map((h, idx) => (
-                                <tr key={h.id || idx}>
+                                <tr key={h.id ?? `${h.employeeId}-${idx}`}>
                                     <td>{startIdx + idx}</td>
                                     <td>
-                                        <span
-                                            className={`badge badge-sm text-white ${
-                                                h.actionType === "CREATED"
-                                                    ? "badge-success"
-                                                    : h.actionType === "UPDATED"
-                                                    ? "badge-info"
-                                                    : h.actionType === "MUTASI"
-                                                    ? "badge-warning"
-                                                    : h.actionType === "RESIGN"
-                                                    ? "badge-neutral"
-                                                    : "badge-error"
-                                            }`}
-                                        >
-                                            {h.actionType}
+                                        <span className={`badge badge-sm text-white ${badgeClass(h.actionType)}`}>
+                                            {h.actionType || "-"}
                                         </span>
                                     </td>
                                     <td>{formatDate(h.actionAt)}</td>

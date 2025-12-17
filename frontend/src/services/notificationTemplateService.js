@@ -1,8 +1,8 @@
 // src/services/notificationTemplateService.js
-import api from "./api"; // ✅ axios instance yang udah handle baseURL & JWT token
+import api from "./api"; // axios instance yang udah handle baseURL & JWT token
 
 const BASE_URL = "/notification-templates";
-// ✅ Controller @RequestMapping("/api/notification-templates")
+// Controller @RequestMapping("/api/notification-templates")
 
 /**
  * 🔹 Ambil semua template notifikasi

@@ -281,10 +281,10 @@ public class EmployeeEligibilityExceptionImportService {
                 .errorDetails(errorDetails)
                 .message(dryRun
                         ? String.format(
-                                "Dry run selesai ✅. Baru: %d, reactivate: %d, update: %d, nonaktif: %d, skip: %d",
+                                "Dry run selesai. Baru: %d, reactivate: %d, update: %d, nonaktif: %d, skip: %d",
                                 created, reactivated, updated, deactivated,
                                 Math.max(0, processed - (created + reactivated + updated + deactivated + errors)))
-                        : "Import selesai ✅ oleh " + (user != null ? user.getUsername() : "-"))
+                        : "Import selesai oleh " + (user != null ? user.getUsername() : "-"))
                 .build();
     }
 

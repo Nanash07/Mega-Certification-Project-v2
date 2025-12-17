@@ -43,7 +43,6 @@ public class RoleController {
     @PostMapping
     public ResponseEntity<RoleResponse> create(@RequestBody RoleRequest req) {
         RoleResponse created = service.create(req);
-        // ✅ Gunakan 201 CREATED untuk resource baru
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
@@ -59,6 +58,6 @@ public class RoleController {
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         service.delete(id);
-        return ResponseEntity.noContent().build(); // ✅ 204 No Content — standar REST
+        return ResponseEntity.noContent().build();
     }
 }

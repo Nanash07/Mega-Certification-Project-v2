@@ -1,10 +1,7 @@
+// src/main/java/com/bankmega/certification/repository/EmployeeRepository.java
 package com.bankmega.certification.repository;
 
-import com.bankmega.certification.entity.Division;
-import com.bankmega.certification.entity.Employee;
-import com.bankmega.certification.entity.JobPosition;
-import com.bankmega.certification.entity.Regional;
-import com.bankmega.certification.entity.Unit;
+import com.bankmega.certification.entity.*;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -23,7 +20,7 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long>, JpaSp
 
     List<NipOnly> findAllBy();
 
-    // active only
+    // ========= soft delete "hapus dari sistem" =========
     List<Employee> findByDeletedAtIsNull();
 
     Optional<Employee> findByIdAndDeletedAtIsNull(Long id);
@@ -38,19 +35,25 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long>, JpaSp
 
     List<Employee> findByIdInAndDeletedAtIsNull(List<Long> ids);
 
-    // all (active + resigned)
+    // ========= all (active + resigned + etc) =========
     Optional<Employee> findByNip(String nip);
 
     List<Employee> findByNipIn(Set<String> nips);
 
     List<Employee> findByNipIn(Collection<String> nips);
 
-    // resigned only
+    // ========= deleted only =========
     List<Employee> findByDeletedAtIsNotNull();
 
     Page<Employee> findByDeletedAtIsNotNull(Pageable pageable);
 
     List<Employee> findByIdInAndDeletedAtIsNotNull(List<Long> ids);
+
+    // ========= status helpers (buat dropdown & uniqueness yang lebih proper)
+    // =========
+    List<Employee> findByStatusIgnoreCaseNotAndDeletedAtIsNull(String status);
+
+    boolean existsByNipIgnoreCaseAndDeletedAtIsNull(String nip);
 
     // constraints
     boolean existsByRegional(Regional regional);

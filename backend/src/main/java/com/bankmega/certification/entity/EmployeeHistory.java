@@ -63,6 +63,7 @@ public class EmployeeHistory {
         UPDATED,
         MUTASI,
         RESIGN,
-        TERMINATED
+        TERMINATED,
+        REHIRED
     }
 }

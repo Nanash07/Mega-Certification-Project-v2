@@ -31,8 +31,7 @@ import {
 import BatchListCard from "../../components/dashboards/BatchListCard";
 import EligibilityPriorityCard from "../../components/dashboards/EligibilityPriorityCard";
 
-/* ===== MONTHS (lokal, sama kayak PicDashboard) ===== */
-const MONTHS = ["Jan", "Feb", "Mar", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
 
 const makeEmptyMonthly = () =>
     MONTHS.map((label, i) => ({

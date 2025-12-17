@@ -64,7 +64,6 @@ public class EmployeeEligibility {
     @Column(name = "is_active")
     private Boolean isActive = true;
 
-    // ✅ NEW: counters per-siklus (reset saat lulus CERTIFICATION)
     @Builder.Default
     @Column(name = "training_count", nullable = false)
     private Integer trainingCount = 0;

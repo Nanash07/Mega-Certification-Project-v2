@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { Download, Upload, History, Eraser } from "lucide-react";
 import toast from "react-hot-toast";
@@ -7,7 +7,8 @@ import AsyncSelect from "react-select/async";
 import Pagination from "../../components/common/Pagination";
 import {
     fetchEmployees,
-    deleteEmployee,
+    softDeleteEmployee,
+    resignEmployee,
     downloadEmployeeTemplate,
     fetchRegionals,
     fetchDivisions,
@@ -16,7 +17,7 @@ import {
     searchEmployees,
 } from "../../services/employeeService";
 import ImportEmployeeModal from "../../components/employees/ImportEmployeeModal";
-import { Eye, Pencil, Trash2 } from "lucide-react";
+import { Eye, Trash2, UserX } from "lucide-react";
 
 export default function EmployeePage() {
     const navigate = useNavigate();
@@ -44,17 +45,22 @@ export default function EmployeePage() {
     const [divisionOptions, setDivisionOptions] = useState([]);
     const [unitOptions, setUnitOptions] = useState([]);
     const [jobOptions, setJobOptions] = useState([]);
-    const statusOptions = [
-        { value: "ACTIVE", label: "Active" },
-        { value: "INACTIVE", label: "Inactive" },
-        { value: "RESIGN", label: "Resign" },
-    ];
+
+    // Active page: jangan tampilkan RESIGN
+    const statusOptions = useMemo(
+        () => [
+            { value: "ACTIVE", label: "Active" },
+            { value: "INACTIVE", label: "Inactive" },
+            // no RESIGN here
+        ],
+        []
+    );
 
     // Modals
     const [openImport, setOpenImport] = useState(false);
-    const [confirm, setConfirm] = useState({ open: false, id: null });
+    const [confirmDelete, setConfirmDelete] = useState({ open: false, id: null });
+    const [confirmResign, setConfirmResign] = useState({ open: false, id: null });
 
-    // Helper: format status -> kapital depan doang
     function formatStatusLabel(status) {
         if (!status) return "-";
         const s = status.toString().toLowerCase();
@@ -73,24 +79,19 @@ export default function EmployeePage() {
             .catch(() => toast.error("Gagal memuat filter master data"));
     }, []);
 
-    // Async search employees (tanpa toggle resign lagi)
+    // Async search employees (active endpoint already excludes resign)
     const loadEmployees = async (inputValue) => {
         try {
-            const res = await searchEmployees({
-                search: inputValue,
-                page: 0,
-                size: 20,
-            });
+            const res = await searchEmployees({ search: inputValue, page: 0, size: 20 });
             return res.content.map((e) => ({
                 value: e.id,
-                label: `${e.nip} - ${e.name}${e.status === "RESIGN" ? " (Resign)" : ""}`,
+                label: `${e.nip} - ${e.name}`,
             }));
         } catch {
             return [];
         }
     };
 
-    // Load employees
     async function load() {
         setLoading(true);
         try {
@@ -118,9 +119,9 @@ export default function EmployeePage() {
 
     useEffect(() => {
         load();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [page, rowsPerPage, filterEmployee, regionalIds, divisionIds, unitIds, jobPositionIds, statuses]);
 
-    // Reset filter
     function resetFilter() {
         setFilterEmployee(null);
         setRegionalIds([]);
@@ -132,20 +133,30 @@ export default function EmployeePage() {
         toast.success("Clear filter berhasil");
     }
 
-    // Confirm delete
-    async function handleDelete(id) {
+    async function handleSoftDelete(id) {
         try {
-            await deleteEmployee(id);
-            toast.success("Pegawai berhasil dihapus");
+            await softDeleteEmployee(id);
+            toast.success("Pegawai berhasil dihapus dari sistem");
             load();
         } catch (err) {
             toast.error(err?.response?.data?.message || "Gagal menghapus pegawai");
         } finally {
-            setConfirm({ open: false, id: null });
+            setConfirmDelete({ open: false, id: null });
         }
     }
 
-    // Download template
+    async function handleResign(id) {
+        try {
+            await resignEmployee(id);
+            toast.success("Pegawai berhasil di-resign");
+            load(); // akan otomatis hilang dari active page
+        } catch (err) {
+            toast.error(err?.response?.data?.message || "Gagal resign pegawai");
+        } finally {
+            setConfirmResign({ open: false, id: null });
+        }
+    }
+
     async function handleDownloadTemplate() {
         try {
             const blob = await downloadEmployeeTemplate();
@@ -286,7 +297,6 @@ export default function EmployeePage() {
                                 <tr key={e.id}>
                                     <td>{startIdx + idx}</td>
 
-                                    {/* Aksi: detail, hapus pakai icon + tooltip */}
                                     <td>
                                         <div className="flex gap-2">
                                             {/* Detail */}
@@ -299,12 +309,23 @@ export default function EmployeePage() {
                                                 </Link>
                                             </div>
 
-                                            {/* Hapus */}
+                                            {/* Resign (optional, biar pindah ke halaman resign) */}
+                                            <div className="tooltip" data-tip="Tandai pegawai resign">
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-xs btn-warning btn-soft border-warning"
+                                                    onClick={() => setConfirmResign({ open: true, id: e.id })}
+                                                >
+                                                    <UserX className="w-3 h-3" />
+                                                </button>
+                                            </div>
+
+                                            {/* Hapus dari sistem */}
                                             <div className="tooltip" data-tip="Hapus pegawai dari sistem">
                                                 <button
                                                     type="button"
                                                     className="btn btn-xs btn-error btn-soft border-error"
-                                                    onClick={() => setConfirm({ open: true, id: e.id })}
+                                                    onClick={() => setConfirmDelete({ open: true, id: e.id })}
                                                 >
                                                     <Trash2 className="w-3 h-3" />
                                                 </button>
@@ -313,7 +334,6 @@ export default function EmployeePage() {
                                     </td>
 
                                     <td>{e.nip}</td>
-                                    {/* Nama: teks biasa */}
                                     <td>{e.name}</td>
 
                                     <td>
@@ -372,22 +392,41 @@ export default function EmployeePage() {
             {/* Modals */}
             <ImportEmployeeModal open={openImport} onClose={() => setOpenImport(false)} onImported={load} />
 
-            {/* Confirm Delete Modal */}
-            <dialog className="modal" open={confirm.open}>
+            {/* Confirm Resign Modal */}
+            <dialog className="modal" open={confirmResign.open}>
                 <div className="modal-box">
-                    <h3 className="font-bold text-lg">Hapus Pegawai?</h3>
-                    <p className="py-2">Pegawai ini akan dihapus dari sistem.</p>
+                    <h3 className="font-bold text-lg">Resign Pegawai?</h3>
+                    <p className="py-2">Pegawai ini akan dipindahkan ke daftar resign.</p>
                     <div className="modal-action">
-                        <button className="btn" onClick={() => setConfirm({ open: false, id: null })}>
+                        <button className="btn" onClick={() => setConfirmResign({ open: false, id: null })}>
                             Batal
                         </button>
-                        <button className="btn btn-error" onClick={() => handleDelete(confirm.id)}>
+                        <button className="btn btn-warning" onClick={() => handleResign(confirmResign.id)}>
+                            Resign
+                        </button>
+                    </div>
+                </div>
+                <form method="dialog" className="modal-backdrop">
+                    <button onClick={() => setConfirmResign({ open: false, id: null })}>close</button>
+                </form>
+            </dialog>
+
+            {/* Confirm Delete Modal */}
+            <dialog className="modal" open={confirmDelete.open}>
+                <div className="modal-box">
+                    <h3 className="font-bold text-lg">Hapus Pegawai?</h3>
+                    <p className="py-2">Pegawai ini akan dihapus dari sistem (soft delete).</p>
+                    <div className="modal-action">
+                        <button className="btn" onClick={() => setConfirmDelete({ open: false, id: null })}>
+                            Batal
+                        </button>
+                        <button className="btn btn-error" onClick={() => handleSoftDelete(confirmDelete.id)}>
                             Hapus
                         </button>
                     </div>
                 </div>
                 <form method="dialog" className="modal-backdrop">
-                    <button onClick={() => setConfirm({ open: false, id: null })}>close</button>
+                    <button onClick={() => setConfirmDelete({ open: false, id: null })}>close</button>
                 </form>
             </dialog>
         </div>

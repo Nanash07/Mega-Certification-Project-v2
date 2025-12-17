@@ -87,7 +87,7 @@ export default function JobPositionPage() {
         try {
             // toggleJobPosition diasumsikan flip status
             await toggleJobPosition(row.id);
-            toast.success(`✅ Job position berhasil di${newIsActive ? "aktifkan" : "nonaktifkan"}`);
+            toast.success(`Job position berhasil di${newIsActive ? "aktifkan" : "nonaktifkan"}`);
             load();
         } catch (err) {
             toast.error(err?.response?.data?.message || "❌ Gagal update status job position");

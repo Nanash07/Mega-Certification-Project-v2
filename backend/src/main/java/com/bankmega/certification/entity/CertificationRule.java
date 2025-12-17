@@ -36,11 +36,9 @@ public class CertificationRule {
     @JoinColumn(name = "sub_field_id")
     private SubField subField;
 
-    // ✅ Masa berlaku (bulan)
     @Column(name = "validity_months")
     private Integer validityMonths;
 
-    // ✅ Reminder sebelum expired (bulan)
     @Column(name = "reminder_months")
     private Integer reminderMonths;
 

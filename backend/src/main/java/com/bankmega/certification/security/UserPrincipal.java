@@ -17,7 +17,7 @@ public class UserPrincipal implements UserDetails {
     private final User user;
 
     private final Long id;
-    private final Long employeeId; // ✅ DITAMBAHKAN
+    private final Long employeeId;
 
     private final String username;
     private final String password;

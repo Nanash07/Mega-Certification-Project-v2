@@ -21,10 +21,7 @@ public class NotificationSchedulerService {
 
     private static final DateTimeFormatter HHMM = DateTimeFormatter.ofPattern("HH:mm");
 
-    /**
-     * Cek tiap menit; jalankan job yang jam-nya match.
-     */
-    @Scheduled(cron = "0 * * * * *") // detik=0, setiap menit
+    @Scheduled(cron = "0 * * * * *")
     public void tick() {
         LocalDate today = LocalDate.now();
         LocalTime now = LocalTime.now().withSecond(0).withNano(0);
@@ -72,7 +69,6 @@ public class NotificationSchedulerService {
      */
     public void runManual(NotificationTemplate.Code type) {
         log.info("[Manual Trigger] Menjalankan jadwal {}", type);
-        // optional: validasi/ambil jadwal by type untuk logging konsisten
         try {
             scheduleService.getByType(type);
         } catch (Exception ignored) {
@@ -96,12 +92,10 @@ public class NotificationSchedulerService {
                 log.info("Handler CERT_REMINDER executed.");
             }
             case EXPIRED_NOTICE -> {
-                // Handler expired - PENTING
                 notificationService.processCertExpired();
                 log.info("Handler EXPIRED_NOTICE executed.");
             }
             case BATCH_NOTIFICATION -> {
-                // Biasanya trigger per-batch; skip eksekusi global
                 log.info("BATCH_NOTIFICATION is not executed globally via scheduler.");
             }
             default -> log.warn("Unsupported schedule type: {}", type);

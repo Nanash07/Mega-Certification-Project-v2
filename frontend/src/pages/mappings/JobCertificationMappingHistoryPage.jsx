@@ -149,7 +149,7 @@ export default function JobCertificationMappingHistoryPage() {
         setStartDate(null);
         setEndDate(null);
         setPage(1);
-        toast.success("✅ Filter direset");
+        toast.success("Filter direset");
     };
 
     const formatDate = (val, withTime = true) => {
