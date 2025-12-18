@@ -1,4 +1,3 @@
-// src/main/java/com/bankmega/certification/repository/EmployeeEligibilityRepository.java
 package com.bankmega.certification.repository;
 
 import com.bankmega.certification.entity.EmployeeEligibility;
@@ -42,4 +41,8 @@ public interface EmployeeEligibilityRepository
 
         List<EmployeeEligibility> findByEmployee_IdInAndCertificationRule_IdAndDeletedAtIsNull(List<Long> employeeIds,
                         Long ruleId);
+
+        List<EmployeeEligibility> findByEmployeeIdIn(Set<Long> employeeIds);
+
+        List<EmployeeEligibility> findByEmployeeId(Long employeeId);
 }

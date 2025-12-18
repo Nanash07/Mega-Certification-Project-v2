@@ -28,8 +28,8 @@ public class EmployeeEligibilityExceptionImportService {
     private final CertificationRuleRepository ruleRepo;
     private final EmployeeEligibilityExceptionRepository exceptionRepo;
     private final EligibilityExceptionImportLogRepository logRepo;
+    private final EmployeeEligibilityService eligibilityService;
 
-    // ===================== DRYRUN & CONFIRM =====================
     public EmployeeEligibilityExceptionImportResponse dryRun(MultipartFile file, User user) throws Exception {
         return process(file, true, user);
     }
@@ -41,17 +41,12 @@ public class EmployeeEligibilityExceptionImportService {
         return response;
     }
 
-    // ===================== GET LOGS =====================
     public List<EmployeeEligibilityExceptionImportLogResponse> getAllLogsDto() {
-        return logRepo.findAll().stream()
-                .map(this::toResponse)
-                .toList();
+        return logRepo.findAll().stream().map(this::toResponse).toList();
     }
 
     public List<EmployeeEligibilityExceptionImportLogResponse> getLogsByUserDto(Long userId) {
-        return logRepo.findByUserIdOrderByCreatedAtDesc(userId).stream()
-                .map(this::toResponse)
-                .toList();
+        return logRepo.findByUserIdOrderByCreatedAtDesc(userId).stream().map(this::toResponse).toList();
     }
 
     private EmployeeEligibilityExceptionImportLogResponse toResponse(EmployeeEligibilityExceptionImportLog log) {
@@ -69,14 +64,12 @@ public class EmployeeEligibilityExceptionImportService {
                 .build();
     }
 
-    // ===================== CORE PROCESS =====================
     private EmployeeEligibilityExceptionImportResponse process(MultipartFile file, boolean dryRun, User user)
             throws Exception {
         if (file == null || file.isEmpty()) {
             throw new IllegalArgumentException("File tidak boleh kosong");
         }
 
-        // 1) Parse ke rows ringan + kumpulkan key untuk prefetch
         List<RowDto> rows = new ArrayList<>();
         Set<String> nips = new LinkedHashSet<>();
         Set<RuleKey> ruleKeys = new LinkedHashSet<>();
@@ -87,7 +80,8 @@ public class EmployeeEligibilityExceptionImportService {
 
             for (Row row : sheet) {
                 if (row.getRowNum() == 0)
-                    continue; // skip header
+                    continue;
+
                 String nip = getCellValue(row.getCell(0), fmt);
                 String name = getCellValue(row.getCell(1), fmt);
                 String certCode = getCellValue(row.getCell(2), fmt);
@@ -111,6 +105,7 @@ public class EmployeeEligibilityExceptionImportService {
 
         int processed = 0, created = 0, reactivated = 0, updated = 0, deactivated = 0, skipped = 0, errors = 0;
         List<String> errorDetails = new ArrayList<>();
+        Set<Long> affectedEmployeeIds = new LinkedHashSet<>();
 
         if (rows.isEmpty()) {
             return EmployeeEligibilityExceptionImportResponse.builder()
@@ -126,20 +121,16 @@ public class EmployeeEligibilityExceptionImportService {
                     .build();
         }
 
-        // 2) Prefetch & cache
         Map<String, Employee> empByNip = employeeRepo.findByNipIn(new ArrayList<>(nips)).stream()
                 .collect(Collectors.toMap(Employee::getNip, e -> e, (a, b) -> a, LinkedHashMap::new));
 
-        // Ambil seluruh rule berdasarkan certCode dulu (minim query)
         Map<String, List<CertificationRule>> rulesByCode = new LinkedHashMap<>();
         for (String code : ruleKeys.stream().map(RuleKey::code).collect(Collectors.toCollection(LinkedHashSet::new))) {
             rulesByCode.put(code, ruleRepo.findByCertification_CodeIgnoreCaseAndDeletedAtIsNull(code));
         }
 
-        // cache untuk kombinasi spesifik (code, level, sub)
         Map<RuleKey, CertificationRule> ruleCache = new HashMap<>();
 
-        // 3) Proses baris
         for (RowDto r : rows) {
             processed++;
             try {
@@ -152,13 +143,10 @@ public class EmployeeEligibilityExceptionImportService {
                     throw new IllegalArgumentException("Employee tidak ditemukan atau non-aktif: " + r.nip());
                 }
                 if ("RESIGN".equalsIgnoreCase(safe(emp.getStatus()))) {
-                    // policy: jangan buat/aktifkan exception utk pegawai resign
                     throw new IllegalArgumentException("Pegawai RESIGN: " + r.nip());
                 }
 
-                // optional validate name
-                if (!r.name().isBlank() && emp.getName() != null
-                        && !emp.getName().equalsIgnoreCase(r.name().trim())) {
+                if (!r.name().isBlank() && emp.getName() != null && !emp.getName().equalsIgnoreCase(r.name().trim())) {
                     throw new IllegalArgumentException("Nama tidak sesuai untuk NIP " + r.nip());
                 }
 
@@ -166,16 +154,17 @@ public class EmployeeEligibilityExceptionImportService {
                 RuleKey key = new RuleKey(r.certCode().trim(), level, emptyToNull(r.subCode()));
                 CertificationRule rule = resolveRule(key, rulesByCode, ruleCache);
 
-                boolean shouldActive = parseActiveFlag(r.activeFlag()); // default true
+                boolean shouldActive = parseActiveFlag(r.activeFlag());
                 Instant now = Instant.now();
 
-                // ambil exception existing (aktif / soft-deleted)
+                if (!dryRun)
+                    affectedEmployeeIds.add(emp.getId()); // employee ini eligibility-nya perlu di-sync
+
                 EmployeeEligibilityException ex = exceptionRepo
                         .findFirstByEmployeeIdAndCertificationRuleId(emp.getId(), rule.getId())
                         .orElse(null);
 
                 if (ex == null) {
-                    // CREATE baru
                     created++;
                     if (!dryRun) {
                         EmployeeEligibilityException nu = EmployeeEligibilityException.builder()
@@ -192,7 +181,6 @@ public class EmployeeEligibilityExceptionImportService {
                 }
 
                 if (ex.getDeletedAt() != null) {
-                    // REACTIVATE (un-delete)
                     reactivated++;
                     if (!dryRun) {
                         ex.setDeletedAt(null);
@@ -204,9 +192,7 @@ public class EmployeeEligibilityExceptionImportService {
                     continue;
                 }
 
-                // existing & not deleted
                 if (!shouldActive && Boolean.TRUE.equals(ex.getIsActive())) {
-                    // DEACTIVATE
                     deactivated++;
                     if (!dryRun) {
                         ex.setIsActive(false);
@@ -217,7 +203,6 @@ public class EmployeeEligibilityExceptionImportService {
                     continue;
                 }
 
-                // UPDATE fields (notes / isActive)
                 boolean needUpdate = false;
                 String newNotes = nullIfBlank(r.notes());
                 if (!Objects.equals(ex.getNotes(), newNotes)) {
@@ -225,7 +210,6 @@ public class EmployeeEligibilityExceptionImportService {
                     needUpdate = true;
                 }
                 if (!Objects.equals(ex.getIsActive(), shouldActive)) {
-                    // Jika mau aktifkan kembali, pastikan emp masih aktif
                     if (shouldActive
                             && ("RESIGN".equalsIgnoreCase(safe(emp.getStatus())) || emp.getDeletedAt() != null)) {
                         throw new IllegalArgumentException(
@@ -251,23 +235,28 @@ public class EmployeeEligibilityExceptionImportService {
             }
         }
 
-        // 4) Save log (confirm only)
         if (!dryRun) {
             if (user == null || user.getId() == null) {
                 throw new IllegalArgumentException("User tidak boleh null saat simpan import log");
             }
+
             EmployeeEligibilityExceptionImportLog log = EmployeeEligibilityExceptionImportLog.builder()
                     .user(user)
                     .fileName(file.getOriginalFilename())
                     .totalProcessed(processed)
                     .totalCreated(created)
-                    .totalUpdated(updated + reactivated) // updated = update + reactivate (sesuai versi lo)
+                    .totalUpdated(updated + reactivated)
                     .totalDeactivated(deactivated)
                     .totalErrors(errors)
                     .dryRun(false)
                     .createdAt(Instant.now())
                     .build();
             logRepo.save(log);
+
+            // auto refresh eligibility setelah import confirm
+            for (Long empId : affectedEmployeeIds) {
+                eligibilityService.refreshEligibilityForEmployee(empId);
+            }
         }
 
         return EmployeeEligibilityExceptionImportResponse.builder()
@@ -280,15 +269,13 @@ public class EmployeeEligibilityExceptionImportService {
                 .errors(errors)
                 .errorDetails(errorDetails)
                 .message(dryRun
-                        ? String.format(
-                                "Dry run selesai. Baru: %d, reactivate: %d, update: %d, nonaktif: %d, skip: %d",
+                        ? String.format("Dry run selesai. Baru: %d, reactivate: %d, update: %d, nonaktif: %d, skip: %d",
                                 created, reactivated, updated, deactivated,
                                 Math.max(0, processed - (created + reactivated + updated + deactivated + errors)))
                         : "Import selesai oleh " + (user != null ? user.getUsername() : "-"))
                 .build();
     }
 
-    // ===================== HELPER =====================
     private static String safe(String s) {
         return s == null ? "" : s;
     }
@@ -319,7 +306,7 @@ public class EmployeeEligibilityExceptionImportService {
 
     private boolean parseActiveFlag(String flag) {
         if (flag == null || flag.isBlank())
-            return true; // default aktif
+            return true;
         String f = flag.trim().toLowerCase();
         return f.equals("y") || f.equals("yes") || f.equals("1") || f.equals("true");
     }
@@ -327,17 +314,17 @@ public class EmployeeEligibilityExceptionImportService {
     private CertificationRule resolveRule(RuleKey key,
             Map<String, List<CertificationRule>> rulesByCode,
             Map<RuleKey, CertificationRule> cache) {
+
         CertificationRule cached = cache.get(key);
         if (cached != null)
             return cached;
 
         List<CertificationRule> candidates = rulesByCode.getOrDefault(key.code(), List.of());
         List<CertificationRule> filtered = candidates.stream()
-                .filter(rule -> (key.level() == null || (rule.getCertificationLevel() != null &&
-                        Objects.equals(rule.getCertificationLevel().getLevel(), key.level())))
-                        &&
-                        (key.subCode() == null || (rule.getSubField() != null &&
-                                key.subCode().equalsIgnoreCase(rule.getSubField().getCode()))))
+                .filter(rule -> (key.level() == null || (rule.getCertificationLevel() != null
+                        && Objects.equals(rule.getCertificationLevel().getLevel(), key.level())))
+                        && (key.subCode() == null || (rule.getSubField() != null
+                                && key.subCode().equalsIgnoreCase(rule.getSubField().getCode()))))
                 .toList();
 
         if (filtered.isEmpty()) {
@@ -358,7 +345,6 @@ public class EmployeeEligibilityExceptionImportService {
         return cell == null ? "" : formatter.formatCellValue(cell).trim();
     }
 
-    // ===================== TEMPLATE =====================
     @Transactional(readOnly = true)
     public ResponseEntity<ByteArrayResource> downloadTemplate() {
         try (Workbook workbook = new XSSFWorkbook()) {
@@ -378,7 +364,6 @@ public class EmployeeEligibilityExceptionImportService {
                 sheet.autoSizeColumn(i);
             }
 
-            // contoh row
             Row example = sheet.createRow(1);
             example.createCell(0).setCellValue("23101918");
             example.createCell(1).setCellValue("SITI RAHAYU");
@@ -408,16 +393,8 @@ public class EmployeeEligibilityExceptionImportService {
         }
     }
 
-    // ===================== DTOs & Keys =====================
-    private record RowDto(
-            int row,
-            String nip,
-            String name,
-            String certCode,
-            String levelStr,
-            String subCode,
-            String notes,
-            String activeFlag) {
+    private record RowDto(int row, String nip, String name, String certCode, String levelStr, String subCode,
+            String notes, String activeFlag) {
     }
 
     private record RuleKey(String code, Integer level, String subCode) {
