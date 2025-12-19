@@ -2,11 +2,15 @@ import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import Select from "react-select";
 import AsyncSelect from "react-select/async";
-import { Plus, History as HistoryIcon, Eraser, Pencil, Trash2, Upload, Eye } from "lucide-react";
+import { Plus, History as HistoryIcon, Eraser, Pencil, Trash2, Upload, Eye, Download } from "lucide-react";
 
 import Pagination from "../../components/common/Pagination";
 
-import { fetchCertifications, deleteCertification } from "../../services/employeeCertificationService";
+import {
+    fetchCertifications,
+    deleteCertification,
+    exportCertifications,
+} from "../../services/employeeCertificationService";
 import { searchEmployees } from "../../services/employeeService";
 import { fetchCertificationRules } from "../../services/certificationRuleService";
 import { fetchInstitutions } from "../../services/institutionService";
@@ -16,25 +20,22 @@ import EditEmployeeCertificationModal from "../../components/employee-certificat
 import UploadEmployeeCertificationModal from "../../components/employee-certifications/UploadEmployeeCertificationModal";
 import ViewEmployeeCertificationModal from "../../components/employee-certifications/ViewEmployeeCertificationModal";
 
-const TABLE_COLS = 15; // No + Aksi + 13 kolom lain
+const TABLE_COLS = 15;
 
 export default function EmployeeCertificationPage() {
     const [rows, setRows] = useState([]);
     const [loading, setLoading] = useState(false);
 
-    // Pagination
     const [page, setPage] = useState(1);
     const [rowsPerPage, setRowsPerPage] = useState(10);
     const [totalPages, setTotalPages] = useState(0);
     const [totalElements, setTotalElements] = useState(0);
 
-    // Filter options
     const [institutionOptions, setInstitutionOptions] = useState([]);
     const [certCodeOptions, setCertCodeOptions] = useState([]);
     const [levelOptions, setLevelOptions] = useState([]);
     const [subFieldOptions, setSubFieldOptions] = useState([]);
 
-    // Filters
     const [filterEmployee, setFilterEmployee] = useState(null);
     const [filterCertCode, setFilterCertCode] = useState([]);
     const [filterLevel, setFilterLevel] = useState([]);
@@ -42,7 +43,6 @@ export default function EmployeeCertificationPage() {
     const [filterInstitution, setFilterInstitution] = useState([]);
     const [filterStatus, setFilterStatus] = useState([]);
 
-    // Modals
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [editData, setEditData] = useState(null);
     const [uploadData, setUploadData] = useState(null);
@@ -87,11 +87,7 @@ export default function EmployeeCertificationPage() {
         if (!value) return "-";
         const d = new Date(value);
         if (isNaN(d.getTime())) return "-";
-        return d.toLocaleDateString("id-ID", {
-            day: "2-digit",
-            month: "short",
-            year: "numeric",
-        });
+        return d.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
     }
 
     function formatDateTime(value) {
@@ -107,21 +103,23 @@ export default function EmployeeCertificationPage() {
         });
     }
 
+    function buildParams() {
+        return {
+            page: page - 1,
+            size: rowsPerPage,
+            employeeIds: filterEmployee ? [filterEmployee.value] : [],
+            certCodes: filterCertCode.map((f) => f.value),
+            levels: filterLevel.map((f) => f.value),
+            subCodes: filterSubField.map((f) => f.value),
+            institutionIds: filterInstitution.map((f) => f.value),
+            statuses: filterStatus.map((f) => f.value),
+        };
+    }
+
     async function load() {
         setLoading(true);
         try {
-            const params = {
-                page: page - 1,
-                size: rowsPerPage,
-                employeeIds: filterEmployee ? [filterEmployee.value] : [],
-                certCodes: filterCertCode.map((f) => f.value),
-                levels: filterLevel.map((f) => f.value),
-                subCodes: filterSubField.map((f) => f.value),
-                institutionIds: filterInstitution.map((f) => f.value),
-                statuses: filterStatus.map((f) => f.value),
-            };
-
-            const res = await fetchCertifications(params);
+            const res = await fetchCertifications(buildParams());
             setRows(res.content || []);
             setTotalPages(res.totalPages || 1);
             setTotalElements(res.totalElements || 0);
@@ -137,22 +135,26 @@ export default function EmployeeCertificationPage() {
         try {
             const [rules, insts] = await Promise.all([fetchCertificationRules(), fetchInstitutions()]);
 
-            const certCodeOpts = [...new Set(rules.map((r) => r.certificationCode).filter(Boolean))]
+            const certCodeOpts = [...new Set((rules || []).map((r) => r.certificationCode).filter(Boolean))]
                 .sort()
                 .map((code) => ({ value: code, label: code }));
 
-            const levelOpts = [...new Set(rules.map((r) => r.certificationLevelLevel).filter(Boolean))]
+            const levelOpts = [
+                ...new Set(
+                    (rules || []).map((r) => r.certificationLevelLevel).filter((v) => v !== null && v !== undefined)
+                ),
+            ]
                 .sort((a, b) => a - b)
                 .map((lvl) => ({ value: lvl, label: String(lvl) }));
 
-            const subFieldOpts = [...new Set(rules.map((r) => r.subFieldCode).filter(Boolean))]
+            const subFieldOpts = [...new Set((rules || []).map((r) => r.subFieldCode).filter(Boolean))]
                 .sort()
                 .map((sf) => ({ value: sf, label: sf }));
 
             setCertCodeOptions(certCodeOpts);
             setLevelOptions(levelOpts);
             setSubFieldOptions(subFieldOpts);
-            setInstitutionOptions(insts.map((i) => ({ value: i.id, label: i.name })));
+            setInstitutionOptions((insts || []).map((i) => ({ value: i.id, label: i.name })));
         } catch (err) {
             console.error("loadFilters error:", err);
             toast.error("Gagal memuat filter");
@@ -162,10 +164,7 @@ export default function EmployeeCertificationPage() {
     const loadEmployees = async (inputValue) => {
         try {
             const res = await searchEmployees({ search: inputValue, page: 0, size: 20 });
-            return (res.content || []).map((e) => ({
-                value: e.id,
-                label: `${e.nip} - ${e.name}`,
-            }));
+            return (res.content || []).map((e) => ({ value: e.id, label: `${e.nip} - ${e.name}` }));
         } catch {
             return [];
         }
@@ -179,6 +178,31 @@ export default function EmployeeCertificationPage() {
             await load();
         } catch {
             toast.error("Gagal hapus sertifikasi");
+        }
+    }
+
+    async function handleExport() {
+        try {
+            const params = {
+                employeeIds: filterEmployee ? [filterEmployee.value] : [],
+                certCodes: filterCertCode.map((f) => f.value),
+                levels: filterLevel.map((f) => f.value),
+                subCodes: filterSubField.map((f) => f.value),
+                institutionIds: filterInstitution.map((f) => f.value),
+                statuses: filterStatus.map((f) => f.value),
+            };
+
+            const blob = await exportCertifications(params);
+            const url = window.URL.createObjectURL(new Blob([blob]));
+            const link = document.createElement("a");
+            link.href = url;
+            link.setAttribute("download", `employee-certifications-${new Date().toISOString().slice(0, 10)}.xlsx`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+        } catch (err) {
+            console.error("export error:", err);
+            toast.error("Gagal export excel");
         }
     }
 
@@ -208,9 +232,7 @@ export default function EmployeeCertificationPage() {
 
     return (
         <div>
-            {/* Toolbar */}
             <div className="mb-4 space-y-3">
-                {/* Row tombol (bukan filter) */}
                 <div className="grid grid-cols-1 lg:grid-cols-6 gap-3">
                     <div className="col-span-1">
                         <button
@@ -222,7 +244,15 @@ export default function EmployeeCertificationPage() {
                             <span>Tambah Sertifikat</span>
                         </button>
                     </div>
-                    <div className="col-span-3" />
+
+                    <div className="col-span-1">
+                        <button type="button" className="btn btn-sm btn-neutral w-full" onClick={handleExport}>
+                            <Download className="w-4 h-4" />
+                            <span>Export Excel</span>
+                        </button>
+                    </div>
+
+                    <div className="col-span-2" />
 
                     <div className="col-span-1">
                         <button
@@ -256,9 +286,7 @@ export default function EmployeeCertificationPage() {
                     </div>
                 </div>
 
-                {/* Row filter: 1 baris semua filter */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 text-xs">
-                    {/* 1. Pegawai */}
                     <AsyncSelect
                         cacheOptions
                         defaultOptions
@@ -269,7 +297,6 @@ export default function EmployeeCertificationPage() {
                         isClearable
                     />
 
-                    {/* 2. Cert Code */}
                     <Select
                         isMulti
                         options={certCodeOptions}
@@ -278,7 +305,6 @@ export default function EmployeeCertificationPage() {
                         placeholder="Filter Cert Code"
                     />
 
-                    {/* 3. Jenjang */}
                     <Select
                         isMulti
                         options={levelOptions}
@@ -287,7 +313,6 @@ export default function EmployeeCertificationPage() {
                         placeholder="Filter Jenjang"
                     />
 
-                    {/* 4. Sub Field */}
                     <Select
                         isMulti
                         options={subFieldOptions}
@@ -296,7 +321,6 @@ export default function EmployeeCertificationPage() {
                         placeholder="Filter Sub Field"
                     />
 
-                    {/* 5. Lembaga */}
                     <Select
                         isMulti
                         options={institutionOptions}
@@ -305,7 +329,6 @@ export default function EmployeeCertificationPage() {
                         placeholder="Filter Lembaga"
                     />
 
-                    {/* 6. Status */}
                     <Select
                         isMulti
                         options={[
@@ -323,7 +346,6 @@ export default function EmployeeCertificationPage() {
                 </div>
             </div>
 
-            {/* Table */}
             <div className="overflow-x-auto rounded-xl border border-gray-200 shadow bg-base-100">
                 <table className="table table-zebra">
                     <thead className="bg-base-200 text-xs">
@@ -362,8 +384,6 @@ export default function EmployeeCertificationPage() {
                             rows.map((r, idx) => (
                                 <tr key={r.id}>
                                     <td>{startIdx + idx}</td>
-
-                                    {/* Aksi */}
                                     <td>
                                         <div className="flex gap-2">
                                             <div className="tooltip" data-tip="Lihat detail sertifikat">
@@ -418,7 +438,6 @@ export default function EmployeeCertificationPage() {
                                     <td>{r.employeeName}</td>
                                     <td>{r.jobPositionTitle || "-"}</td>
 
-                                    {/* Status */}
                                     <td>
                                         <div className="tooltip" data-tip={formatStatusLabel(r.status)}>
                                             <span
@@ -447,7 +466,6 @@ export default function EmployeeCertificationPage() {
                 </table>
             </div>
 
-            {/* Pagination */}
             <Pagination
                 page={page}
                 totalPages={totalPages}
@@ -460,7 +478,6 @@ export default function EmployeeCertificationPage() {
                 }}
             />
 
-            {/* Modal Create */}
             {showCreateModal && (
                 <CreateEmployeeCertificationModal
                     open={showCreateModal}
@@ -472,7 +489,6 @@ export default function EmployeeCertificationPage() {
                 />
             )}
 
-            {/* Modal Edit */}
             {editData && (
                 <EditEmployeeCertificationModal
                     open={!!editData}
@@ -485,7 +501,6 @@ export default function EmployeeCertificationPage() {
                 />
             )}
 
-            {/* Modal Upload */}
             {uploadData && (
                 <UploadEmployeeCertificationModal
                     open={!!uploadData}
@@ -498,7 +513,6 @@ export default function EmployeeCertificationPage() {
                 />
             )}
 
-            {/* Modal View */}
             {viewData && (
                 <ViewEmployeeCertificationModal
                     open={!!viewData}
@@ -507,7 +521,6 @@ export default function EmployeeCertificationPage() {
                 />
             )}
 
-            {/* Modal Delete */}
             {confirm.open && (
                 <dialog className="modal" open={confirm.open}>
                     <div className="modal-box">

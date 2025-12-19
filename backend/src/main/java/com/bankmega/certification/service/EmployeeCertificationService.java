@@ -17,15 +17,19 @@ import com.bankmega.certification.specification.EmployeeCertificationSpecificati
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.ByteArrayOutputStream;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -43,16 +47,14 @@ public class EmployeeCertificationService {
     private final EmployeeEligibilityRepository eligibilityRepo;
     private final FileStorageService fileStorageService;
     private final EmployeeCertificationHistoryService historyService;
-    private final ApplicationEventPublisher eventPublisher; // 🔹 NEW
+    private final ApplicationEventPublisher eventPublisher;
 
     @PersistenceContext
     private EntityManager em;
 
-    // batching
-    private static final int BATCH_SIZE = 500; // saveAll chunk size
-    private static final int IN_CHUNK = 800; // query IN(...) chunk size
+    private static final int BATCH_SIZE = 500;
+    private static final int IN_CHUNK = 800;
 
-    // ================== Mapper ==================
     private EmployeeCertificationResponse toResponse(EmployeeCertification ec) {
         return EmployeeCertificationResponse.builder()
                 .id(ec.getId())
@@ -93,17 +95,13 @@ public class EmployeeCertificationService {
                 .build();
     }
 
-    // ================== Helpers ==================
-    /**
-     * Hitung validFrom/validUntil/reminderDate. Fallback ke rule kalau snapshot
-     * null.
-     */
     private void updateValidity(EmployeeCertification ec) {
         Integer validityMonths = ec.getRuleValidityMonths();
         if (validityMonths == null && ec.getCertificationRule() != null) {
             validityMonths = ec.getCertificationRule().getValidityMonths();
             ec.setRuleValidityMonths(validityMonths);
         }
+
         Integer reminderMonths = ec.getRuleReminderMonths();
         if (reminderMonths == null && ec.getCertificationRule() != null) {
             reminderMonths = ec.getCertificationRule().getReminderMonths();
@@ -131,7 +129,6 @@ public class EmployeeCertificationService {
         }
     }
 
-    /** Tentukan status berdasarkan kelengkapan dokumen dan validity. */
     private void updateStatus(EmployeeCertification ec) {
         if (ec.getStatus() == EmployeeCertification.Status.INVALID) {
             return;
@@ -187,9 +184,6 @@ public class EmployeeCertificationService {
         }
     }
 
-    /**
-     * Reset counter training & refreshment di eligibility untuk (employee, rule).
-     */
     private void resetCountersFor(Long employeeId, Long ruleId) {
         if (employeeId == null || ruleId == null)
             return;
@@ -206,7 +200,6 @@ public class EmployeeCertificationService {
                 });
     }
 
-    /** Reset counter jika sertifikat SERTIFIKASI valid (punya certDate). */
     private void maybeResetCounters(EmployeeCertification ec) {
         if (ec != null
                 && ec.getProcessType() == EmployeeCertification.ProcessType.SERTIFIKASI
@@ -215,7 +208,6 @@ public class EmployeeCertificationService {
         }
     }
 
-    // ================== EVENT HELPERS ==================
     private void publishChangedEvent(EmployeeCertification ec) {
         if (ec == null || ec.getEmployee() == null || ec.getEmployee().getId() == null)
             return;
@@ -231,7 +223,6 @@ public class EmployeeCertificationService {
                 .forEach(id -> eventPublisher.publishEvent(new EmployeeCertificationChangedEvent(id)));
     }
 
-    // ================== Create ==================
     @Transactional
     public EmployeeCertificationResponse create(EmployeeCertificationRequest req) {
         Employee employee = employeeRepo.findById(req.getEmployeeId())
@@ -255,9 +246,9 @@ public class EmployeeCertificationService {
                 .institution(institution)
                 .certNumber(req.getCertNumber())
                 .certDate(req.getCertDate())
-                .processType(
-                        req.getProcessType() != null ? req.getProcessType()
-                                : EmployeeCertification.ProcessType.SERTIFIKASI)
+                .processType(req.getProcessType() != null
+                        ? req.getProcessType()
+                        : EmployeeCertification.ProcessType.SERTIFIKASI)
                 .jobPositionTitle(employee.getJobPosition() != null
                         ? employee.getJobPosition().getName()
                         : null)
@@ -274,12 +265,11 @@ public class EmployeeCertificationService {
         historyService.snapshot(saved, ActionType.CREATED);
 
         maybeResetCounters(saved);
-        publishChangedEvent(saved); // 🔹 trigger refresh eligibility
+        publishChangedEvent(saved);
 
         return toResponse(saved);
     }
 
-    // ================== Update ==================
     @Transactional
     public EmployeeCertificationResponse update(Long id, EmployeeCertificationRequest req) {
         EmployeeCertification ec = repo.findByIdAndDeletedAtIsNull(id)
@@ -308,10 +298,12 @@ public class EmployeeCertificationService {
         if (req.getProcessType() != null) {
             ec.setProcessType(req.getProcessType());
         }
+
         if (ec.getJobPositionTitle() == null || ec.getJobPositionTitle().isBlank()) {
             var jp = ec.getEmployee().getJobPosition();
             ec.setJobPositionTitle(jp != null ? jp.getName() : null);
         }
+
         ec.setUpdatedAt(Instant.now());
 
         updateValidity(ec);
@@ -321,12 +313,11 @@ public class EmployeeCertificationService {
         historyService.snapshot(saved, ActionType.UPDATED);
 
         maybeResetCounters(saved);
-        publishChangedEvent(saved); // 🔹 trigger refresh eligibility
+        publishChangedEvent(saved);
 
         return toResponse(saved);
     }
 
-    // ================== Soft Delete (record) ==================
     @Transactional
     public void softDelete(Long id) {
         EmployeeCertification ec = repo.findByIdAndDeletedAtIsNull(id)
@@ -339,15 +330,15 @@ public class EmployeeCertificationService {
         EmployeeCertification saved = repo.save(ec);
         historyService.snapshot(saved, ActionType.DELETED);
 
-        publishChangedEvent(saved); // 🔹 trigger refresh eligibility
+        publishChangedEvent(saved);
     }
 
-    // ================== Handle File Update ==================
     private EmployeeCertification handleFileUpdate(EmployeeCertification ec,
             MultipartFile file,
             boolean isReupload,
             boolean isDelete,
             ActionType actionType) {
+
         if (isDelete) {
             fileStorageService.deleteCertificate(ec.getId());
             ec.setFileUrl(null);
@@ -370,12 +361,11 @@ public class EmployeeCertificationService {
         EmployeeCertification saved = repo.save(ec);
         historyService.snapshot(saved, actionType);
 
-        publishChangedEvent(saved); // 🔹 trigger refresh eligibility
+        publishChangedEvent(saved);
 
         return saved;
     }
 
-    // ================== Upload Certificate ==================
     @Transactional
     public EmployeeCertificationResponse uploadCertificate(Long id, MultipartFile file) {
         EmployeeCertification ec = repo.findByIdAndDeletedAtIsNull(id)
@@ -384,7 +374,6 @@ public class EmployeeCertificationService {
         return toResponse(handleFileUpdate(ec, file, false, false, ActionType.UPLOAD_CERTIFICATE));
     }
 
-    // ================== Reupload Certificate ==================
     @Transactional
     public EmployeeCertificationResponse reuploadCertificate(Long id, MultipartFile file) {
         EmployeeCertification ec = repo.findByIdAndDeletedAtIsNull(id)
@@ -393,7 +382,6 @@ public class EmployeeCertificationService {
         return toResponse(handleFileUpdate(ec, file, true, false, ActionType.REUPLOAD_CERTIFICATE));
     }
 
-    // ================== Delete Certificate (file only) ==================
     @Transactional
     public void deleteCertificate(Long id) {
         EmployeeCertification ec = repo.findByIdAndDeletedAtIsNull(id)
@@ -402,7 +390,6 @@ public class EmployeeCertificationService {
         handleFileUpdate(ec, null, false, true, ActionType.DELETE_CERTIFICATE);
     }
 
-    // ================== Detail ==================
     @Transactional(readOnly = true)
     public EmployeeCertificationResponse getDetail(Long id) {
         EmployeeCertification ec = repo.findByIdAndDeletedAtIsNull(id)
@@ -410,7 +397,6 @@ public class EmployeeCertificationService {
         return toResponse(ec);
     }
 
-    // ================== Paging + Filter ==================
     @Transactional(readOnly = true)
     public Page<EmployeeCertificationResponse> getPagedFiltered(
             List<Long> employeeIds,
@@ -425,7 +411,53 @@ public class EmployeeCertificationService {
             LocalDate validUntilStart,
             LocalDate validUntilEnd,
             Pageable pageable) {
-        Specification<EmployeeCertification> spec = EmployeeCertificationSpecification.notDeleted()
+
+        Specification<EmployeeCertification> spec = buildFilteredSpec(
+                employeeIds, certCodes, levels, subCodes, institutionIds, statuses, search,
+                certDateStart, certDateEnd, validUntilStart, validUntilEnd);
+
+        return repo.findAll(spec, pageable).map(this::toResponse);
+    }
+
+    @Transactional(readOnly = true)
+    public byte[] exportExcel(
+            List<Long> employeeIds,
+            List<String> certCodes,
+            List<Integer> levels,
+            List<String> subCodes,
+            List<Long> institutionIds,
+            List<String> statuses,
+            String search,
+            LocalDate certDateStart,
+            LocalDate certDateEnd,
+            LocalDate validUntilStart,
+            LocalDate validUntilEnd) {
+
+        Specification<EmployeeCertification> spec = buildFilteredSpec(
+                employeeIds, certCodes, levels, subCodes, institutionIds, statuses, search,
+                certDateStart, certDateEnd, validUntilStart, validUntilEnd);
+
+        Sort sort = Sort.by(Sort.Order.desc("createdAt"));
+        List<EmployeeCertification> rows = repo.findAll(spec, sort);
+        List<EmployeeCertificationResponse> data = rows.stream().map(this::toResponse).toList();
+
+        return buildCertificationExcel(data);
+    }
+
+    private Specification<EmployeeCertification> buildFilteredSpec(
+            List<Long> employeeIds,
+            List<String> certCodes,
+            List<Integer> levels,
+            List<String> subCodes,
+            List<Long> institutionIds,
+            List<String> statuses,
+            String search,
+            LocalDate certDateStart,
+            LocalDate certDateEnd,
+            LocalDate validUntilStart,
+            LocalDate validUntilEnd) {
+
+        return EmployeeCertificationSpecification.notDeleted()
                 .and(EmployeeCertificationSpecification.byEmployeeIds(employeeIds))
                 .and(EmployeeCertificationSpecification.byCertCodes(certCodes))
                 .and(EmployeeCertificationSpecification.byLevels(levels))
@@ -435,15 +467,89 @@ public class EmployeeCertificationService {
                 .and(EmployeeCertificationSpecification.bySearch(search))
                 .and(EmployeeCertificationSpecification.byCertDateRange(certDateStart, certDateEnd))
                 .and(EmployeeCertificationSpecification.byValidUntilRange(validUntilStart, validUntilEnd));
-
-        return repo.findAll(spec, pageable).map(this::toResponse);
     }
 
-    // =========================================================
-    // 🔥 Bulk ops optimized (chunked + only-changed writes)
-    // =========================================================
+    private byte[] buildCertificationExcel(List<EmployeeCertificationResponse> data) {
+        try (Workbook wb = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            Sheet sh = wb.createSheet("Employee Certifications");
 
-    /** INVALID semua sertifikat milik pegawai-pegawai (mis. resign). */
+            CellStyle headerStyle = wb.createCellStyle();
+            Font headerFont = wb.createFont();
+            headerFont.setBold(true);
+            headerStyle.setFont(headerFont);
+
+            CellStyle dateStyle = wb.createCellStyle();
+            CreationHelper ch = wb.getCreationHelper();
+            dateStyle.setDataFormat(ch.createDataFormat().getFormat("dd-mmm-yyyy"));
+
+            String[] headers = new String[] {
+                    "NIP", "Nama Pegawai", "Jabatan",
+                    "Status",
+                    "Cert Code", "Jenjang", "Sub Bidang",
+                    "No Sertifikat", "Tanggal Sertifikat",
+                    "Valid From", "Tanggal Kadaluarsa", "Reminder",
+                    "Lembaga",
+                    "File Name", "File Type"
+            };
+
+            Row hr = sh.createRow(0);
+            for (int i = 0; i < headers.length; i++) {
+                Cell c = hr.createCell(i);
+                c.setCellValue(headers[i]);
+                c.setCellStyle(headerStyle);
+            }
+
+            int r = 1;
+            for (EmployeeCertificationResponse e : data) {
+                Row row = sh.createRow(r++);
+                int col = 0;
+
+                row.createCell(col++).setCellValue(nz(e.getNip()));
+                row.createCell(col++).setCellValue(nz(e.getEmployeeName()));
+                row.createCell(col++).setCellValue(nz(e.getJobPositionTitle()));
+
+                row.createCell(col++).setCellValue(nz(e.getStatus() != null ? e.getStatus().name() : null));
+
+                row.createCell(col++).setCellValue(nz(e.getCertificationCode()));
+                row.createCell(col++)
+                        .setCellValue(e.getCertificationLevelLevel() != null ? e.getCertificationLevelLevel() : 0);
+                row.createCell(col++).setCellValue(nz(e.getSubFieldCode()));
+
+                row.createCell(col++).setCellValue(nz(e.getCertNumber()));
+                setDateCell(row, col++, e.getCertDate(), dateStyle);
+
+                setDateCell(row, col++, e.getValidFrom(), dateStyle);
+                setDateCell(row, col++, e.getValidUntil(), dateStyle);
+                setDateCell(row, col++, e.getReminderDate(), dateStyle);
+
+                row.createCell(col++).setCellValue(nz(e.getInstitutionName()));
+                row.createCell(col++).setCellValue(nz(e.getFileName()));
+                row.createCell(col++).setCellValue(nz(e.getFileType()));
+            }
+
+            for (int i = 0; i < headers.length; i++) {
+                sh.autoSizeColumn(i);
+            }
+
+            wb.write(out);
+            return out.toByteArray();
+        } catch (Exception ex) {
+            throw new RuntimeException("Failed to export excel", ex);
+        }
+    }
+
+    private static String nz(String s) {
+        return s == null ? "" : s;
+    }
+
+    private static void setDateCell(Row row, int col, LocalDate date, CellStyle dateStyle) {
+        Cell c = row.createCell(col);
+        if (date == null)
+            return;
+        c.setCellValue(java.sql.Date.valueOf(date));
+        c.setCellStyle(dateStyle);
+    }
+
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public int bulkInvalidateByEmployeeIds(List<Long> employeeIds) {
         if (employeeIds == null || employeeIds.isEmpty())
@@ -474,7 +580,6 @@ public class EmployeeCertificationService {
             batchSave(changed);
             total += changed.size();
 
-            // 🔹 publish event utk employee2 terkait
             publishChangedEventsForEmployeeIds(
                     changed.stream()
                             .map(c -> c.getEmployee().getId())
@@ -483,7 +588,6 @@ public class EmployeeCertificationService {
         return total;
     }
 
-    /** Opsi rehire: INVALID -> PENDING. */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public int markInvalidToPendingForEmployeeIds(List<Long> employeeIds) {
         if (employeeIds == null || employeeIds.isEmpty())
@@ -524,7 +628,6 @@ public class EmployeeCertificationService {
         return total;
     }
 
-    /** Recompute status utk pegawai-pegawai tertentu. */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public int recomputeStatusesForEmployeeIds(List<Long> employeeIds) {
         if (employeeIds == null || employeeIds.isEmpty())
@@ -565,7 +668,6 @@ public class EmployeeCertificationService {
         return total;
     }
 
-    // ================== Util single-employee ==================
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public int invalidateByEmployeeId(Long employeeId) {
         if (employeeId == null)
@@ -589,13 +691,12 @@ public class EmployeeCertificationService {
         batchSave(changed);
 
         if (!changed.isEmpty()) {
-            publishChangedEvent(changed.get(0)); // satu employeeId saja
+            publishChangedEvent(changed.get(0));
         }
 
         return changed.size();
     }
 
-    // ================== internal helpers ==================
     private static <T> List<List<T>> partition(Collection<T> src, int size) {
         List<T> list = (src instanceof List<T> l) ? l : new ArrayList<>(src);
         int n = list.size();

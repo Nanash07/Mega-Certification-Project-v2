@@ -2,18 +2,22 @@ package com.bankmega.certification.controller;
 
 import com.bankmega.certification.dto.EmployeeCertificationRequest;
 import com.bankmega.certification.dto.EmployeeCertificationResponse;
+import com.bankmega.certification.service.EmployeeCertificationHistoryService;
 import com.bankmega.certification.service.EmployeeCertificationService;
 import com.bankmega.certification.service.FileStorageService;
-import com.bankmega.certification.service.EmployeeCertificationHistoryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.Resource;
 import org.springframework.data.domain.*;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 @RestController
@@ -25,7 +29,6 @@ public class EmployeeCertificationController {
     private final FileStorageService fileStorageService;
     private final EmployeeCertificationHistoryService historyService;
 
-    // ================== Paging + Filter ==================
     @GetMapping
     public Page<EmployeeCertificationResponse> getPagedFiltered(
             @RequestParam(required = false) List<Long> employeeIds,
@@ -42,10 +45,12 @@ public class EmployeeCertificationController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "createdAt,desc") String sort) {
+
         String[] sortParams = sort.split(",");
         Sort.Direction direction = sortParams.length > 1 && sortParams[1].equalsIgnoreCase("asc")
                 ? Sort.Direction.ASC
                 : Sort.Direction.DESC;
+
         Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortParams[0]));
 
         return service.getPagedFiltered(
@@ -63,19 +68,55 @@ public class EmployeeCertificationController {
                 pageable);
     }
 
-    // ================== Detail ==================
+    @GetMapping("/export")
+    public ResponseEntity<byte[]> exportExcel(
+            @RequestParam(required = false) List<Long> employeeIds,
+            @RequestParam(required = false) List<String> certCodes,
+            @RequestParam(required = false) List<Integer> levels,
+            @RequestParam(required = false) List<String> subCodes,
+            @RequestParam(required = false) List<Long> institutionIds,
+            @RequestParam(required = false) List<String> statuses,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate certDateStart,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate certDateEnd,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate validUntilStart,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate validUntilEnd) {
+
+        byte[] bytes = service.exportExcel(
+                employeeIds,
+                certCodes,
+                levels,
+                subCodes,
+                institutionIds,
+                statuses,
+                search,
+                certDateStart,
+                certDateEnd,
+                validUntilStart,
+                validUntilEnd);
+
+        String today = LocalDate.now().format(DateTimeFormatter.ISO_DATE);
+        String filename = "employee-certifications-" + today + ".xlsx";
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
+                        .filename(filename)
+                        .build().toString())
+                .contentType(MediaType.parseMediaType(
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(bytes);
+    }
+
     @GetMapping("/{id}")
     public EmployeeCertificationResponse getDetail(@PathVariable Long id) {
         return service.getDetail(id);
     }
 
-    // ================== Create ==================
     @PostMapping
     public EmployeeCertificationResponse create(@RequestBody EmployeeCertificationRequest req) {
         return service.create(req);
     }
 
-    // ================== Update ==================
     @PutMapping("/{id}")
     public EmployeeCertificationResponse update(
             @PathVariable Long id,
@@ -83,14 +124,12 @@ public class EmployeeCertificationController {
         return service.update(id, req);
     }
 
-    // ================== Soft Delete ==================
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> softDelete(@PathVariable Long id) {
         service.softDelete(id);
         return ResponseEntity.noContent().build();
     }
 
-    // ================== Upload File ==================
     @PostMapping("/{id}/upload")
     public EmployeeCertificationResponse uploadCertificate(
             @PathVariable Long id,
@@ -101,7 +140,6 @@ public class EmployeeCertificationController {
         return service.uploadCertificate(id, file);
     }
 
-    // ================== Reupload File ==================
     @PostMapping("/{id}/reupload")
     public EmployeeCertificationResponse reuploadCertificate(
             @PathVariable Long id,
@@ -112,14 +150,12 @@ public class EmployeeCertificationController {
         return service.reuploadCertificate(id, file);
     }
 
-    // ================== Delete File ==================
     @DeleteMapping("/{id}/certificate")
     public ResponseEntity<Void> deleteCertificate(@PathVariable Long id) {
         service.deleteCertificate(id);
         return ResponseEntity.noContent().build();
     }
 
-    // ================== Preview / Download File ==================
     @GetMapping("/{id}/file")
     public ResponseEntity<Resource> getCertificateFile(
             @PathVariable Long id,
