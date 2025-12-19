@@ -6,7 +6,11 @@ import Select from "react-select";
 import AsyncSelect from "react-select/async";
 
 import Pagination from "../../components/common/Pagination";
-import { fetchEmployeeEligibilityPaged, refreshEmployeeEligibility } from "../../services/employeeEligibilityService";
+import {
+    fetchEmployeeEligibilityPaged,
+    refreshEmployeeEligibility,
+    getCurrentEmployeeId,
+} from "../../services/employeeEligibilityService";
 import { fetchAllJobPositions } from "../../services/jobPositionService";
 import { fetchCertifications } from "../../services/certificationService";
 import { fetchCertificationLevels } from "../../services/certificationLevelService";
@@ -16,16 +20,7 @@ import { fetchMyPicScope } from "../../services/picScopeService";
 
 import { Eye, RotateCw, Eraser } from "lucide-react";
 
-const TABLE_COLS = 15;
-
-// ==================== Role / Employee Helper ====================
-function getCurrentEmployeeId() {
-    if (typeof window === "undefined") return null;
-    const raw = window.localStorage.getItem("employeeId");
-    if (!raw) return null;
-    const num = Number(raw);
-    return Number.isNaN(num) ? null : num;
-}
+const TABLE_COLS = 17;
 
 function getCurrentRole() {
     if (typeof window === "undefined") return "";
@@ -38,8 +33,14 @@ function getCurrentRole() {
     return (localStorage.getItem("role") || "").toString().toUpperCase();
 }
 
+function formatDate(v) {
+    if (!v) return "-";
+    const d = new Date(v);
+    if (Number.isNaN(d.getTime())) return "-";
+    return d.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
+}
+
 export default function EmployeeEligibilityPage() {
-    // Role flags
     const [role] = useState(() => getCurrentRole());
     const isSuperadmin = role === "SUPERADMIN";
     const isPic = role === "PIC";
@@ -53,13 +54,11 @@ export default function EmployeeEligibilityPage() {
     const [loading, setLoading] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
 
-    // Pagination
     const [page, setPage] = useState(1);
     const [rowsPerPage, setRowsPerPage] = useState(10);
     const [totalPages, setTotalPages] = useState(0);
     const [totalElements, setTotalElements] = useState(0);
 
-    // Filters
     const [filterEmployee, setFilterEmployee] = useState(null);
     const [filterJob, setFilterJob] = useState(null);
     const [filterCert, setFilterCert] = useState(null);
@@ -68,13 +67,11 @@ export default function EmployeeEligibilityPage() {
     const [filterStatus, setFilterStatus] = useState(null);
     const [filterSource, setFilterSource] = useState(null);
 
-    // Master filter options
     const [jobOptions, setJobOptions] = useState([]);
     const [certOptions, setCertOptions] = useState([]);
     const [levelOptions, setLevelOptions] = useState([]);
     const [subOptions, setSubOptions] = useState([]);
 
-    // ==================== Status Badge Style ====================
     const statusBadgeClass = useMemo(
         () => ({
             ACTIVE: "badge-success",
@@ -104,7 +101,6 @@ export default function EmployeeEligibilityPage() {
         return s ?? "-";
     }
 
-    // ==================== LOAD TABLE ====================
     async function load() {
         setLoading(true);
         try {
@@ -132,26 +128,23 @@ export default function EmployeeEligibilityPage() {
 
             const res = await fetchEmployeeEligibilityPaged(params);
 
-            // PEGAWAI → cert options berdasarkan list eligibility
             if (isSelfMode) {
                 const uniqueCodes = Array.from(
                     new Set((res?.content || []).map((r) => r.certificationCode).filter(Boolean))
                 );
-
                 setCertOptions(uniqueCodes.map((code) => ({ value: code, label: code })));
             }
 
             setRows(res?.content || []);
             setTotalPages(res?.totalPages || 1);
             setTotalElements(res?.totalElements || 0);
-        } catch (e) {
+        } catch {
             toast.error("Gagal memuat eligibility");
         } finally {
             setLoading(false);
         }
     }
 
-    // ==================== REFRESH ELIGIBILITY ====================
     async function onRefresh() {
         if (!canRefresh || isSelfMode) return;
 
@@ -167,7 +160,6 @@ export default function EmployeeEligibilityPage() {
         }
     }
 
-    // ==================== LOAD FILTER MASTER ====================
     async function loadFilters() {
         try {
             const [jobs, levels, subs] = await Promise.all([
@@ -197,7 +189,6 @@ export default function EmployeeEligibilityPage() {
         }
     }
 
-    // Employees search
     const loadEmployees = async (input) => {
         try {
             const res = await searchEmployees({ search: input, page: 0, size: 20 });
@@ -210,7 +201,6 @@ export default function EmployeeEligibilityPage() {
         }
     };
 
-    // ==================== EFFECTS ====================
     useEffect(() => {
         load();
     }, [
@@ -238,9 +228,7 @@ export default function EmployeeEligibilityPage() {
 
     return (
         <div>
-            {/* Toolbar */}
             <div className="mb-4 space-y-3">
-                {/* Row 1 */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 text-xs">
                     <div className="col-span-1">
                         {!isSelfMode && (
@@ -303,7 +291,6 @@ export default function EmployeeEligibilityPage() {
                     </div>
                 </div>
 
-                {/* Row 2 */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 text-xs">
                     <Select
                         options={jobOptions}
@@ -358,7 +345,6 @@ export default function EmployeeEligibilityPage() {
                 </div>
             </div>
 
-            {/* Table */}
             <div className="overflow-x-auto rounded-xl border border-gray-200 shadow bg-base-100">
                 <table className="table table-zebra">
                     <thead className="bg-base-200 text-xs">
@@ -369,6 +355,8 @@ export default function EmployeeEligibilityPage() {
                             <th>Nama Pegawai</th>
                             <th>Jabatan</th>
                             <th>Kode Sertifikat</th>
+                            <th>No Sertifikat</th>
+                            <th>Tgl Sertifikasi</th>
                             <th>Jenjang</th>
                             <th>Sub Bidang</th>
                             <th>SK Efektif</th>
@@ -412,17 +400,12 @@ export default function EmployeeEligibilityPage() {
                                     <td>{r.employeeName}</td>
                                     <td>{r.jobPositionTitle}</td>
                                     <td>{r.certificationCode}</td>
+                                    <td>{r.certNumber || "-"}</td>
+                                    <td>{formatDate(r.certDate)}</td>
                                     <td>{r.certificationLevelLevel ?? "-"}</td>
                                     <td>{r.subFieldCode ?? "-"}</td>
-                                    <td>
-                                        {r.effectiveDate
-                                            ? new Date(r.effectiveDate).toLocaleDateString("id-ID", {
-                                                  day: "2-digit",
-                                                  month: "short",
-                                                  year: "numeric",
-                                              })
-                                            : "-"}
-                                    </td>
+                                    <td>{formatDate(r.effectiveDate)}</td>
+
                                     <td>
                                         <span
                                             className={`badge badge-sm text-white whitespace-nowrap ${
@@ -433,15 +416,9 @@ export default function EmployeeEligibilityPage() {
                                             {formatStatusLabel(r.status)}
                                         </span>
                                     </td>
-                                    <td>
-                                        {r.dueDate
-                                            ? new Date(r.dueDate).toLocaleDateString("id-ID", {
-                                                  day: "2-digit",
-                                                  month: "short",
-                                                  year: "numeric",
-                                              })
-                                            : "-"}
-                                    </td>
+
+                                    <td>{formatDate(r.dueDate)}</td>
+
                                     <td>
                                         <span
                                             className={`badge badge-sm text-white whitespace-nowrap ${
@@ -451,6 +428,7 @@ export default function EmployeeEligibilityPage() {
                                             {formatSourceLabel(r.source)}
                                         </span>
                                     </td>
+
                                     <td className="text-center">{r.trainingCount ?? 0}</td>
                                     <td className="text-center">{r.refreshmentCount ?? 0}</td>
                                     <td className="text-center">{r.extensionCount ?? 0}</td>
@@ -461,7 +439,6 @@ export default function EmployeeEligibilityPage() {
                 </table>
             </div>
 
-            {/* Pagination */}
             <Pagination
                 page={page}
                 totalPages={totalPages}

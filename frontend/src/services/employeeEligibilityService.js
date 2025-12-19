@@ -3,7 +3,6 @@ import api from "./api";
 
 const BASE = "/employee-eligibility";
 
-/* ===== util: current employeeId (sinkron sama ProtectedRoute) ===== */
 function getCurrentEmployeeId() {
     if (typeof window === "undefined") return null;
 
@@ -14,23 +13,19 @@ function getCurrentEmployeeId() {
             const cand = user?.employeeId ?? user?.employee?.id ?? null;
             if (cand != null && !Number.isNaN(Number(cand))) {
                 const num = Number(cand);
-                // cache biar next time gak perlu parse user lagi
                 window.localStorage.setItem("employeeId", String(num));
                 return num;
             }
         }
-    } catch {
-        // ignore parsing error, fallback ke key employeeId
-    }
+    } catch {}
 
-    const raw = typeof window !== "undefined" ? window.localStorage.getItem("employeeId") : null;
-
+    const raw = window.localStorage.getItem("employeeId");
     if (raw == null || raw === "") return null;
+
     const num = Number(raw);
     return Number.isNaN(num) ? null : num;
 }
 
-/* ===== helper build query params (paged) ===== */
 function buildParams(params = {}) {
     const q = {};
     const set = (k, v) => {
@@ -38,11 +33,9 @@ function buildParams(params = {}) {
         q[k] = Array.isArray(v) ? v.join(",") : v;
     };
 
-    // paging
     set("page", params.page);
     set("size", params.size);
 
-    // filters (list)
     set("employeeIds", params.employeeIds);
     set("jobIds", params.jobIds);
     set("certCodes", params.certCodes);
@@ -52,7 +45,6 @@ function buildParams(params = {}) {
     set("sources", params.sources);
     set("search", params.search);
 
-    // dashboard filters (org & cert dim)
     set("regionalId", params.regionalId);
     set("divisionId", params.divisionId);
     set("unitId", params.unitId);
@@ -60,19 +52,16 @@ function buildParams(params = {}) {
     set("levelId", params.levelId);
     set("subFieldId", params.subFieldId);
 
-    // sort
     if (params.sortField) {
         q.sort = `${params.sortField},${params.sortDirection || "asc"}`;
     }
+
     return q;
 }
 
-/* ===== paged generic (bisa PIC / admin / personal tergantung params) ===== */
 export async function fetchEmployeeEligibilityPaged(params = {}) {
     try {
-        const { data } = await api.get(`${BASE}/paged`, {
-            params: buildParams(params),
-        });
+        const { data } = await api.get(`${BASE}/paged`, { params: buildParams(params) });
         return data || { content: [], totalPages: 0, totalElements: 0 };
     } catch (err) {
         console.error("fetchEmployeeEligibilityPaged:", err);
@@ -80,15 +69,12 @@ export async function fetchEmployeeEligibilityPaged(params = {}) {
     }
 }
 
-/* ===== paged khusus pegawai login ===== */
 export async function fetchMyEligibilityPaged({ page = 0, size = 10, statuses, sortField, sortDirection } = {}) {
     const employeeId = getCurrentEmployeeId();
-    if (!employeeId) {
-        return { content: [], totalPages: 0, totalElements: 0 };
-    }
+    if (!employeeId) return { content: [], totalPages: 0, totalElements: 0 };
 
     return fetchEmployeeEligibilityPaged({
-        employeeIds: [employeeId], // 🔹 scope ke pegawai login
+        employeeIds: [employeeId],
         statuses,
         page,
         size,
@@ -97,7 +83,6 @@ export async function fetchMyEligibilityPaged({ page = 0, size = 10, statuses, s
     });
 }
 
-/* ===== detail by employee (tanpa paging) ===== */
 export async function fetchEligibilityByEmployee(employeeId) {
     try {
         const { data } = await api.get(`${BASE}/employee/${employeeId}`);
@@ -108,7 +93,6 @@ export async function fetchEligibilityByEmployee(employeeId) {
     }
 }
 
-/* ===== refresh (admin ops) ===== */
 export async function refreshEmployeeEligibility() {
     try {
         await api.post(`${BASE}/refresh`);
@@ -119,12 +103,10 @@ export async function refreshEmployeeEligibility() {
     }
 }
 
-/* ===== counts untuk dashboard (sudah dukung scope pegawai) ===== */
 export async function fetchEligibilityCount(params = {}) {
     try {
         const q = {
-            // BE: status single string → nanti di-controller di-wrap ke List<String>
-            status: params.status, // ACTIVE, DUE, EXPIRED, NOT_YET_CERTIFIED
+            status: params.status,
             regionalId: params.regionalId,
             divisionId: params.divisionId,
             unitId: params.unitId,
@@ -133,7 +115,6 @@ export async function fetchEligibilityCount(params = {}) {
             subFieldId: params.subFieldId,
         };
 
-        // 🔹 scope ke pegawai (bisa list, bisa single)
         if (params.employeeIds?.length) {
             q.employeeIds = params.employeeIds.join(",");
         } else if (params.employeeId) {
@@ -148,12 +129,10 @@ export async function fetchEligibilityCount(params = {}) {
     }
 }
 
-/* ===== shorthand: count untuk pegawai login ===== */
 export async function fetchMyEligibilityCount(status) {
     const employeeId = getCurrentEmployeeId();
     if (!employeeId) return 0;
     return fetchEligibilityCount({ employeeId, status });
 }
 
-/* (opsional) export util kalau mau dipakai di tempat lain */
 export { getCurrentEmployeeId };

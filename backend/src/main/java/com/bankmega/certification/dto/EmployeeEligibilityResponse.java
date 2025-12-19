@@ -9,6 +9,7 @@ import java.time.LocalDate;
 @Data
 @Builder
 public class EmployeeEligibilityResponse {
+
     private Long id;
     private Long employeeId;
     private String nip;
@@ -26,15 +27,18 @@ public class EmployeeEligibilityResponse {
     private String subFieldName;
     private String subFieldCode;
 
-    private String status; // NOT_YET_CERTIFIED, ACTIVE, DUE, EXPIRED
+    private String status;
     private LocalDate dueDate;
     private String source;
 
     private Boolean isActive;
 
-    private LocalDate wajibPunyaSertifikasiSampai; // joinDate + wajibSetelahMasuk
-    private Integer masaBerlakuBulan; // validityMonths
+    private LocalDate wajibPunyaSertifikasiSampai;
+    private Integer masaBerlakuBulan;
     private String sisaWaktu;
+
+    private String certNumber;
+    private LocalDate certDate;
 
     private Instant createdAt;
     private Instant updatedAt;

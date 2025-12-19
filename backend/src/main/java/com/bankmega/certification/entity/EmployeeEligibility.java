@@ -1,4 +1,3 @@
-// src/main/java/com/bankmega/certification/entity/EmployeeEligibility.java
 package com.bankmega.certification.entity;
 
 import jakarta.persistence.*;
@@ -11,9 +10,8 @@ import java.time.Instant;
 import java.time.LocalDate;
 
 @Entity
-@Table(name = "employee_eligibilities", uniqueConstraints = {
-        @UniqueConstraint(columnNames = { "employee_id", "certification_rule_id" })
-})
+@Table(name = "employee_eligibilities", uniqueConstraints = @UniqueConstraint(columnNames = { "employee_id",
+        "certification_rule_id" }))
 @Getter
 @Setter
 @NoArgsConstructor
@@ -26,31 +24,25 @@ public class EmployeeEligibility {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // 🔗 Relasi ke Employee
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
     @JoinColumn(name = "employee_id", nullable = false)
     private Employee employee;
 
-    // 🔗 Relasi ke CertificationRule
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
     @JoinColumn(name = "certification_rule_id", nullable = false)
     private CertificationRule certificationRule;
 
-    // 🔹 Status eligibility
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
     private EligibilityStatus status;
 
-    // 🔹 Asal kewajiban
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
     private EligibilitySource source;
 
-    // 🔹 Batas waktu sertifikasi
     @Column(name = "due_date")
     private LocalDate dueDate;
 
-    // 🔹 Snapshot aturan dari CertificationRule
     @Column(name = "validity_months")
     private Integer validityMonths;
 
@@ -59,6 +51,12 @@ public class EmployeeEligibility {
 
     @Column(name = "wajib_setelah_masuk")
     private Integer wajibSetelahMasuk;
+
+    @Column(name = "cert_number", length = 100)
+    private String certNumber;
+
+    @Column(name = "cert_date")
+    private LocalDate certDate;
 
     @Builder.Default
     @Column(name = "is_active")
@@ -76,7 +74,6 @@ public class EmployeeEligibility {
     @Column(name = "extension_count", nullable = false)
     private Integer extensionCount = 0;
 
-    // 🔹 Audit
     @CreatedDate
     @Column(name = "created_at", updatable = false)
     private Instant createdAt;
@@ -88,7 +85,6 @@ public class EmployeeEligibility {
     @Column(name = "deleted_at")
     private Instant deletedAt;
 
-    // Defaulting safeguard (kalau ada record lama)
     @PrePersist
     @PreUpdate
     void ensureCounters() {
@@ -96,6 +92,8 @@ public class EmployeeEligibility {
             trainingCount = 0;
         if (refreshmentCount == null)
             refreshmentCount = 0;
+        if (extensionCount == null)
+            extensionCount = 0;
     }
 
     public enum EligibilitySource {

@@ -11,7 +11,8 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.*;
+import java.time.Instant;
+import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -60,12 +61,12 @@ public class EmployeeEligibilityService {
                 .certificationRuleId(rule != null ? rule.getId() : null)
                 .certificationCode(rule != null ? rule.getCertification().getCode() : null)
                 .certificationName(rule != null ? rule.getCertification().getName() : null)
-                .certificationLevelName(
-                        rule != null && rule.getCertificationLevel() != null ? rule.getCertificationLevel().getName()
-                                : null)
-                .certificationLevelLevel(
-                        rule != null && rule.getCertificationLevel() != null ? rule.getCertificationLevel().getLevel()
-                                : null)
+                .certificationLevelName(rule != null && rule.getCertificationLevel() != null
+                        ? rule.getCertificationLevel().getName()
+                        : null)
+                .certificationLevelLevel(rule != null && rule.getCertificationLevel() != null
+                        ? rule.getCertificationLevel().getLevel()
+                        : null)
                 .subFieldName(rule != null && rule.getSubField() != null ? rule.getSubField().getName() : null)
                 .subFieldCode(rule != null && rule.getSubField() != null ? rule.getSubField().getCode() : null)
 
@@ -77,6 +78,9 @@ public class EmployeeEligibilityService {
                 .wajibPunyaSertifikasiSampai(wajibPunya)
                 .masaBerlakuBulan(masaBerlaku)
                 .sisaWaktu(sisaWaktu)
+
+                .certNumber(e.getCertNumber())
+                .certDate(e.getCertDate())
 
                 .createdAt(e.getCreatedAt())
                 .updatedAt(e.getUpdatedAt())
@@ -204,7 +208,9 @@ public class EmployeeEligibilityService {
             return List.of();
 
         return eligibilityRepo.findByEmployee_IdAndDeletedAtIsNull(employeeId)
-                .stream().map(this::toResponse).toList();
+                .stream()
+                .map(this::toResponse)
+                .toList();
     }
 
     @Transactional(readOnly = true)
@@ -245,7 +251,6 @@ public class EmployeeEligibilityService {
 
         Set<Long> allEmployeeIds = employees.stream().map(Employee::getId).collect(Collectors.toSet());
 
-        // preload include soft-deleted agar bisa reactivate dan tidak nabrak unique
         Map<Long, List<EmployeeEligibility>> eligByEmployeeId = eligibilityRepo
                 .findByEmployeeIdIn(allEmployeeIds).stream()
                 .collect(Collectors.groupingBy(ee -> ee.getEmployee().getId()));
@@ -309,7 +314,6 @@ public class EmployeeEligibilityService {
                         e -> e.getEmployee().getId(),
                         Collectors.mapping(EmployeeEligibilityException::getCertificationRule, Collectors.toList())));
 
-        // preload include soft-deleted agar bisa reactivate dan tidak nabrak unique
         List<EmployeeEligibility> existingElig = eligibilityRepo.findByEmployeeId(employeeId);
 
         List<EmployeeEligibility> toSave = syncEligibilitiesForEmployee(employee, existingElig, jobRuleMap,
@@ -344,8 +348,10 @@ public class EmployeeEligibilityService {
         return existing;
     }
 
-    private List<EmployeeEligibility> deactivateEligibilitiesForEmployee(Employee employee,
+    private List<EmployeeEligibility> deactivateEligibilitiesForEmployee(
+            Employee employee,
             List<EmployeeEligibility> existing) {
+
         if (existing == null || existing.isEmpty())
             return List.of();
 
@@ -353,7 +359,7 @@ public class EmployeeEligibilityService {
         List<EmployeeEligibility> changed = new ArrayList<>();
         for (EmployeeEligibility ee : existing) {
             if (ee.getDeletedAt() != null)
-                continue; // jangan utak-atik yang sudah soft-deleted
+                continue;
             ee.setIsActive(false);
             ee.setDeletedAt(now);
             changed.add(ee);
@@ -390,7 +396,7 @@ public class EmployeeEligibilityService {
 
         for (EmployeeEligibility ee : existingElig) {
             if (ee.getDeletedAt() != null)
-                continue; // skip yang sudah soft-deleted
+                continue;
             Long ruleId = ee.getCertificationRule() != null ? ee.getCertificationRule().getId() : null;
 
             if (ruleId == null || !requiredIds.contains(ruleId)) {
@@ -467,7 +473,8 @@ public class EmployeeEligibilityService {
                         c -> c.getEmployee().getId() + "-" + c.getCertificationRule().getId(),
                         c -> c,
                         (c1, c2) -> {
-                            LocalDate d1 = c1.getCertDate(), d2 = c2.getCertDate();
+                            LocalDate d1 = c1.getCertDate();
+                            LocalDate d2 = c2.getCertDate();
                             if (d1 == null && d2 == null)
                                 return c2;
                             if (d1 == null)
@@ -489,8 +496,13 @@ public class EmployeeEligibilityService {
 
             EmployeeEligibility.EligibilityStatus beforeStatus = ee.getStatus();
             LocalDate beforeDue = ee.getDueDate();
+            String beforeCertNumber = ee.getCertNumber();
+            LocalDate beforeCertDate = ee.getCertDate();
 
             if (cert != null) {
+                ee.setCertNumber(cert.getCertNumber());
+                ee.setCertDate(cert.getCertDate());
+
                 ee.setDueDate(cert.getValidUntil());
                 if (cert.getValidUntil() == null) {
                     ee.setStatus(EmployeeEligibility.EligibilityStatus.NOT_YET_CERTIFIED);
@@ -502,11 +514,17 @@ public class EmployeeEligibilityService {
                     ee.setStatus(EmployeeEligibility.EligibilityStatus.ACTIVE);
                 }
             } else {
+                ee.setCertNumber(null);
+                ee.setCertDate(null);
+
                 ee.setStatus(EmployeeEligibility.EligibilityStatus.NOT_YET_CERTIFIED);
                 ee.setDueDate(null);
             }
 
-            if (!Objects.equals(beforeStatus, ee.getStatus()) || !Objects.equals(beforeDue, ee.getDueDate())) {
+            if (!Objects.equals(beforeStatus, ee.getStatus())
+                    || !Objects.equals(beforeDue, ee.getDueDate())
+                    || !Objects.equals(beforeCertNumber, ee.getCertNumber())
+                    || !Objects.equals(beforeCertDate, ee.getCertDate())) {
                 changed.add(ee);
             }
         }
