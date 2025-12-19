@@ -8,12 +8,17 @@ import com.bankmega.certification.service.EmployeeEligibilityService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.lang.reflect.Method;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -25,8 +30,6 @@ public class EmployeeEligibilityController {
 
     private final EmployeeEligibilityService service;
     private final PicCertificationScopeRepository scopeRepo;
-
-    // ===== helpers auth/PIC =====
 
     private boolean isPic(Authentication auth) {
         return auth != null && auth.getAuthorities().stream().anyMatch(a -> {
@@ -52,20 +55,13 @@ public class EmployeeEligibilityController {
         return null;
     }
 
-    /**
-     * Resolve daftar certification.id yang boleh diakses PIC.
-     * - non-PIC -> return null (tanpa filter scope)
-     * - PIC tanpa userId -> empty list (artinya 0 data)
-     * - PIC tanpa scope -> empty list (artinya 0 data)
-     */
     private List<Long> resolveAllowedCertIds(Authentication authentication, Long userIdFromPrincipal) {
         if (!isPic(authentication)) {
-            return null; // non-PIC: tidak dibatasi scope cert
+            return null;
         }
 
         Long uid = extractUserId(authentication, userIdFromPrincipal);
         if (uid == null) {
-            // nggak bisa identifikasi user PIC -> treat as no scope -> 0 data
             return List.of();
         }
 
@@ -74,11 +70,9 @@ public class EmployeeEligibilityController {
                 .map(c -> c.getId())
                 .collect(Collectors.toList());
 
-        // Kalau kosong -> PIC tanpa scope -> 0 data
         return ids;
     }
 
-    // ===================== PAGED FILTERED =====================
     @GetMapping("/paged")
     public ResponseEntity<Page<EmployeeEligibilityResponse>> getPagedFiltered(
             @RequestParam(required = false) List<Long> employeeIds,
@@ -90,7 +84,6 @@ public class EmployeeEligibilityController {
             @RequestParam(required = false) List<String> sources,
             @RequestParam(required = false) String search,
 
-            // filter "dashboard"
             @RequestParam(required = false) Long regionalId,
             @RequestParam(required = false) Long divisionId,
             @RequestParam(required = false) Long unitId,
@@ -103,8 +96,6 @@ public class EmployeeEligibilityController {
             Pageable pageable) {
 
         List<Long> allowedCertIds = resolveAllowedCertIds(authentication, userIdFromPrincipal);
-
-        // kalau PIC & nggak punya scope -> langsung 0 data
         if (allowedCertIds != null && allowedCertIds.isEmpty()) {
             return ResponseEntity.ok(Page.empty(pageable));
         }
@@ -130,14 +121,17 @@ public class EmployeeEligibilityController {
         return ResponseEntity.ok(result);
     }
 
-    // ===================== FLEXIBLE COUNT (GANTI KPI) =====================
-    @GetMapping("/count")
-    public ResponseEntity<EligibilityCountResponse> getDashboardCount(
-            // optional: 1 status atau multiple
-            @RequestParam(required = false) String status,
+    @GetMapping("/export")
+    public ResponseEntity<byte[]> exportExcel(
+            @RequestParam(required = false) List<Long> employeeIds,
+            @RequestParam(required = false) List<Long> jobIds,
+            @RequestParam(required = false) List<String> certCodes,
+            @RequestParam(required = false) List<Integer> levels,
+            @RequestParam(required = false) List<String> subCodes,
             @RequestParam(required = false) List<String> statuses,
+            @RequestParam(required = false) List<String> sources,
+            @RequestParam(required = false) String search,
 
-            // filter "dashboard"
             @RequestParam(required = false) Long regionalId,
             @RequestParam(required = false) Long divisionId,
             @RequestParam(required = false) Long unitId,
@@ -145,8 +139,54 @@ public class EmployeeEligibilityController {
             @RequestParam(required = false) Long levelId,
             @RequestParam(required = false) Long subFieldId,
 
-            // 🔹 NEW: scope per-pegawai (dipakai EmployeeDashboard,
-            // fetchMyEligibilityCount, dll)
+            Authentication authentication,
+            @AuthenticationPrincipal(expression = "id") Long userIdFromPrincipal) {
+
+        List<Long> allowedCertIds = resolveAllowedCertIds(authentication, userIdFromPrincipal);
+        if (allowedCertIds != null && allowedCertIds.isEmpty()) {
+            byte[] empty = service.exportExcel(
+                    employeeIds, jobIds, certCodes, levels, subCodes, statuses, sources, search,
+                    regionalId, divisionId, unitId, certificationId, levelId, subFieldId,
+                    allowedCertIds);
+
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
+                            .filename("eligibility-empty.xlsx")
+                            .build().toString())
+                    .contentType(MediaType
+                            .parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                    .body(empty);
+        }
+
+        byte[] bytes = service.exportExcel(
+                employeeIds, jobIds, certCodes, levels, subCodes, statuses, sources, search,
+                regionalId, divisionId, unitId, certificationId, levelId, subFieldId,
+                allowedCertIds);
+
+        String today = LocalDate.now().format(DateTimeFormatter.ISO_DATE);
+        String filename = "employee-eligibility-" + today + ".xlsx";
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
+                        .filename(filename)
+                        .build().toString())
+                .contentType(
+                        MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(bytes);
+    }
+
+    @GetMapping("/count")
+    public ResponseEntity<EligibilityCountResponse> getDashboardCount(
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) List<String> statuses,
+
+            @RequestParam(required = false) Long regionalId,
+            @RequestParam(required = false) Long divisionId,
+            @RequestParam(required = false) Long unitId,
+            @RequestParam(required = false) Long certificationId,
+            @RequestParam(required = false) Long levelId,
+            @RequestParam(required = false) Long subFieldId,
+
             @RequestParam(required = false) List<Long> employeeIds,
 
             Authentication authentication,
@@ -157,14 +197,13 @@ public class EmployeeEligibilityController {
             return ResponseEntity.ok(new EligibilityCountResponse(0L));
         }
 
-        // normalisasi status
         List<String> effectiveStatuses;
         if (statuses != null && !statuses.isEmpty()) {
             effectiveStatuses = statuses;
         } else if (status != null && !status.isBlank()) {
             effectiveStatuses = List.of(status);
         } else {
-            effectiveStatuses = null; // semua status
+            effectiveStatuses = null;
         }
 
         long count = service.countForDashboard(
@@ -181,20 +220,16 @@ public class EmployeeEligibilityController {
         return ResponseEntity.ok(new EligibilityCountResponse(count));
     }
 
-    // ===================== GET BY EMPLOYEE (DETAIL PAGE) =====================
     @GetMapping("/employee/{employeeId}")
     public ResponseEntity<List<EmployeeEligibilityResponse>> getByEmployee(@PathVariable Long employeeId) {
-        List<EmployeeEligibilityResponse> data = service.getByEmployeeId(employeeId);
-        return ResponseEntity.ok(data);
+        return ResponseEntity.ok(service.getByEmployeeId(employeeId));
     }
 
-    // ===================== GET BY ID =====================
     @GetMapping("/{id}")
     public ResponseEntity<EmployeeEligibilityResponse> getById(@PathVariable Long id) {
         return ResponseEntity.ok(service.getById(id));
     }
 
-    // ===================== REFRESH MASS (SEMUA PEGAWAI) =====================
     @PostMapping("/refresh")
     public ResponseEntity<Map<String, Object>> refreshAll() {
         int count = service.refreshEligibility();
@@ -203,7 +238,6 @@ public class EmployeeEligibilityController {
                 "refreshedCount", count));
     }
 
-    // ===================== REFRESH PER EMPLOYEE =====================
     @PostMapping("/refresh/{employeeId}")
     public ResponseEntity<Map<String, Object>> refreshForEmployee(@PathVariable Long employeeId) {
         service.refreshEligibilityForEmployee(employeeId);
@@ -211,13 +245,11 @@ public class EmployeeEligibilityController {
                 "message", "Eligibility refreshed for employee ID: " + employeeId));
     }
 
-    // ===================== TOGGLE ACTIVE =====================
     @PutMapping("/{id}/toggle")
     public ResponseEntity<EmployeeEligibilityResponse> toggleActive(@PathVariable Long id) {
         return ResponseEntity.ok(service.toggleActive(id));
     }
 
-    // ===================== SOFT DELETE =====================
     @DeleteMapping("/{id}")
     public ResponseEntity<Map<String, Object>> softDelete(@PathVariable Long id) {
         service.softDelete(id);

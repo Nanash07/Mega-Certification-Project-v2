@@ -6,13 +6,17 @@ import com.bankmega.certification.repository.*;
 import com.bankmega.certification.specification.EmployeeEligibilitySpecification;
 import jakarta.persistence.criteria.JoinType;
 import lombok.RequiredArgsConstructor;
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.data.domain.*;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.ByteArrayOutputStream;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -27,6 +31,8 @@ public class EmployeeEligibilityService {
     private final JobCertificationMappingRepository jobCertMappingRepo;
     private final EmployeeEligibilityExceptionRepository exceptionRepo;
     private final EmployeeRepository employeeRepo;
+
+    private static final DateTimeFormatter DF = DateTimeFormatter.ofPattern("dd-MMM-yyyy");
 
     private EmployeeEligibilityResponse toResponse(EmployeeEligibility e) {
         if (e == null)
@@ -109,6 +115,69 @@ public class EmployeeEligibilityService {
             List<Long> allowedCertificationIds,
             Pageable pageable) {
 
+        Specification<EmployeeEligibility> spec = buildFilteredSpec(
+                employeeIds, jobIds, certCodes, levels, subCodes,
+                statuses, sources, search,
+                regionalId, divisionId, unitId, certificationId, levelId, subFieldId,
+                allowedCertificationIds);
+
+        if (pageable.getSort().isUnsorted()) {
+            pageable = PageRequest.of(
+                    pageable.getPageNumber(),
+                    pageable.getPageSize(),
+                    defaultSort());
+        }
+
+        return eligibilityRepo.findAll(spec, pageable).map(this::toResponse);
+    }
+
+    @Transactional(readOnly = true)
+    public byte[] exportExcel(
+            List<Long> employeeIds,
+            List<Long> jobIds,
+            List<String> certCodes,
+            List<Integer> levels,
+            List<String> subCodes,
+            List<String> statuses,
+            List<String> sources,
+            String search,
+            Long regionalId,
+            Long divisionId,
+            Long unitId,
+            Long certificationId,
+            Long levelId,
+            Long subFieldId,
+            List<Long> allowedCertificationIds) {
+
+        Specification<EmployeeEligibility> spec = buildFilteredSpec(
+                employeeIds, jobIds, certCodes, levels, subCodes,
+                statuses, sources, search,
+                regionalId, divisionId, unitId, certificationId, levelId, subFieldId,
+                allowedCertificationIds);
+
+        List<EmployeeEligibility> rows = eligibilityRepo.findAll(spec, defaultSort());
+        List<EmployeeEligibilityResponse> data = rows.stream().map(this::toResponse).toList();
+
+        return buildEligibilityExcel(data);
+    }
+
+    private Specification<EmployeeEligibility> buildFilteredSpec(
+            List<Long> employeeIds,
+            List<Long> jobIds,
+            List<String> certCodes,
+            List<Integer> levels,
+            List<String> subCodes,
+            List<String> statuses,
+            List<String> sources,
+            String search,
+            Long regionalId,
+            Long divisionId,
+            Long unitId,
+            Long certificationId,
+            Long levelId,
+            Long subFieldId,
+            List<Long> allowedCertificationIds) {
+
         Specification<EmployeeEligibility> spec = EmployeeEligibilitySpecification.notDeleted()
                 .and(EmployeeEligibilitySpecification.byEmployeeIds(employeeIds))
                 .and(EmployeeEligibilitySpecification.byJobIds(jobIds))
@@ -130,18 +199,15 @@ public class EmployeeEligibilityService {
             spec = spec.and(EmployeeEligibilitySpecification.bySearch(search));
         }
 
-        if (pageable.getSort().isUnsorted()) {
-            pageable = PageRequest.of(
-                    pageable.getPageNumber(),
-                    pageable.getPageSize(),
-                    Sort.by(
-                            Sort.Order.asc("employee.nip"),
-                            Sort.Order.asc("certificationRule.certification.code"),
-                            Sort.Order.asc("certificationRule.certificationLevel.level"),
-                            Sort.Order.asc("certificationRule.subField.code")));
-        }
+        return spec;
+    }
 
-        return eligibilityRepo.findAll(spec, pageable).map(this::toResponse);
+    private Sort defaultSort() {
+        return Sort.by(
+                Sort.Order.asc("employee.nip"),
+                Sort.Order.asc("certificationRule.certification.code"),
+                Sort.Order.asc("certificationRule.certificationLevel.level"),
+                Sort.Order.asc("certificationRule.subField.code"));
     }
 
     private Specification<EmployeeEligibility> buildDashboardBaseSpec(
@@ -348,10 +414,8 @@ public class EmployeeEligibilityService {
         return existing;
     }
 
-    private List<EmployeeEligibility> deactivateEligibilitiesForEmployee(
-            Employee employee,
+    private List<EmployeeEligibility> deactivateEligibilitiesForEmployee(Employee employee,
             List<EmployeeEligibility> existing) {
-
         if (existing == null || existing.isEmpty())
             return List.of();
 
@@ -397,8 +461,8 @@ public class EmployeeEligibilityService {
         for (EmployeeEligibility ee : existingElig) {
             if (ee.getDeletedAt() != null)
                 continue;
-            Long ruleId = ee.getCertificationRule() != null ? ee.getCertificationRule().getId() : null;
 
+            Long ruleId = ee.getCertificationRule() != null ? ee.getCertificationRule().getId() : null;
             if (ruleId == null || !requiredIds.contains(ruleId)) {
                 if (ee.getStatus() != null
                         && ee.getStatus() != EmployeeEligibility.EligibilityStatus.NOT_YET_CERTIFIED) {
@@ -516,7 +580,6 @@ public class EmployeeEligibilityService {
             } else {
                 ee.setCertNumber(null);
                 ee.setCertDate(null);
-
                 ee.setStatus(EmployeeEligibility.EligibilityStatus.NOT_YET_CERTIFIED);
                 ee.setDueDate(null);
             }
@@ -532,5 +595,88 @@ public class EmployeeEligibilityService {
         if (!changed.isEmpty()) {
             eligibilityRepo.saveAll(changed);
         }
+    }
+
+    private byte[] buildEligibilityExcel(List<EmployeeEligibilityResponse> data) {
+        try (Workbook wb = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            Sheet sh = wb.createSheet("Eligibility");
+
+            CellStyle headerStyle = wb.createCellStyle();
+            Font headerFont = wb.createFont();
+            headerFont.setBold(true);
+            headerStyle.setFont(headerFont);
+
+            CellStyle dateStyle = wb.createCellStyle();
+            CreationHelper ch = wb.getCreationHelper();
+            dateStyle.setDataFormat(ch.createDataFormat().getFormat("dd-mmm-yyyy"));
+
+            String[] headers = new String[] {
+                    "NIP", "Nama", "Jabatan",
+                    "Kode Sertifikasi", "Nama Sertifikasi", "Level", "Sub Bidang",
+                    "No Sertifikat", "Tgl Sertifikasi",
+                    "Status", "Due Date", "Sumber",
+                    "SK Efektif", "Wajib Punya Sampai", "Masa Berlaku (Bulan)",
+                    "Training", "Refreshment", "Perpanjang"
+            };
+
+            Row hr = sh.createRow(0);
+            for (int i = 0; i < headers.length; i++) {
+                Cell c = hr.createCell(i);
+                c.setCellValue(headers[i]);
+                c.setCellStyle(headerStyle);
+            }
+
+            int r = 1;
+            for (EmployeeEligibilityResponse e : data) {
+                Row row = sh.createRow(r++);
+
+                int col = 0;
+                row.createCell(col++).setCellValue(nz(e.getNip()));
+                row.createCell(col++).setCellValue(nz(e.getEmployeeName()));
+                row.createCell(col++).setCellValue(nz(e.getJobPositionTitle()));
+
+                row.createCell(col++).setCellValue(nz(e.getCertificationCode()));
+                row.createCell(col++).setCellValue(nz(e.getCertificationName()));
+                row.createCell(col++)
+                        .setCellValue(e.getCertificationLevelLevel() != null ? e.getCertificationLevelLevel() : 0);
+                row.createCell(col++).setCellValue(nz(e.getSubFieldCode()));
+
+                row.createCell(col++).setCellValue(nz(e.getCertNumber()));
+                setDateCell(row, col++, e.getCertDate(), dateStyle);
+
+                row.createCell(col++).setCellValue(nz(e.getStatus()));
+                setDateCell(row, col++, e.getDueDate(), dateStyle);
+                row.createCell(col++).setCellValue(nz(e.getSource()));
+
+                setDateCell(row, col++, e.getEffectiveDate(), dateStyle);
+                setDateCell(row, col++, e.getWajibPunyaSertifikasiSampai(), dateStyle);
+                row.createCell(col++).setCellValue(e.getMasaBerlakuBulan() != null ? e.getMasaBerlakuBulan() : 0);
+
+                row.createCell(col++).setCellValue(e.getTrainingCount() != null ? e.getTrainingCount() : 0);
+                row.createCell(col++).setCellValue(e.getRefreshmentCount() != null ? e.getRefreshmentCount() : 0);
+                row.createCell(col++).setCellValue(e.getExtensionCount() != null ? e.getExtensionCount() : 0);
+            }
+
+            for (int i = 0; i < headers.length; i++) {
+                sh.autoSizeColumn(i);
+            }
+
+            wb.write(out);
+            return out.toByteArray();
+        } catch (Exception ex) {
+            throw new RuntimeException("Failed to export excel", ex);
+        }
+    }
+
+    private static String nz(String s) {
+        return s == null ? "" : s;
+    }
+
+    private static void setDateCell(Row row, int col, LocalDate date, CellStyle dateStyle) {
+        Cell c = row.createCell(col);
+        if (date == null)
+            return;
+        c.setCellValue(java.sql.Date.valueOf(date));
+        c.setCellStyle(dateStyle);
     }
 }

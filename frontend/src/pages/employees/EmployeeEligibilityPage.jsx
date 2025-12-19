@@ -9,6 +9,7 @@ import Pagination from "../../components/common/Pagination";
 import {
     fetchEmployeeEligibilityPaged,
     refreshEmployeeEligibility,
+    exportEmployeeEligibilityExcel,
     getCurrentEmployeeId,
 } from "../../services/employeeEligibilityService";
 import { fetchAllJobPositions } from "../../services/jobPositionService";
@@ -18,7 +19,7 @@ import { fetchSubFields } from "../../services/subFieldService";
 import { searchEmployees } from "../../services/employeeService";
 import { fetchMyPicScope } from "../../services/picScopeService";
 
-import { Eye, RotateCw, Eraser } from "lucide-react";
+import { Eye, RotateCw, Eraser, Download } from "lucide-react";
 
 const TABLE_COLS = 17;
 
@@ -53,6 +54,7 @@ export default function EmployeeEligibilityPage() {
     const [rows, setRows] = useState([]);
     const [loading, setLoading] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
+    const [exporting, setExporting] = useState(false);
 
     const [page, setPage] = useState(1);
     const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -160,6 +162,37 @@ export default function EmployeeEligibilityPage() {
         }
     }
 
+    async function onExport() {
+        setExporting(true);
+        try {
+            const employeeId = getCurrentEmployeeId();
+
+            const employeeIdsParam = isSelfMode
+                ? employeeId
+                    ? [employeeId]
+                    : []
+                : filterEmployee
+                ? [filterEmployee.value]
+                : [];
+
+            await exportEmployeeEligibilityExcel({
+                employeeIds: employeeIdsParam,
+                jobIds: filterJob ? [filterJob.value] : [],
+                certCodes: filterCert ? [filterCert.value] : [],
+                levels: filterLevel ? [filterLevel.value] : [],
+                subCodes: filterSub ? [filterSub.value] : [],
+                statuses: filterStatus ? [filterStatus.value] : [],
+                sources: filterSource ? [filterSource.value] : [],
+            });
+
+            toast.success("Export berhasil");
+        } catch {
+            toast.error("Gagal export excel");
+        } finally {
+            setExporting(false);
+        }
+    }
+
     async function loadFilters() {
         try {
             const [jobs, levels, subs] = await Promise.all([
@@ -244,7 +277,28 @@ export default function EmployeeEligibilityPage() {
                         )}
                     </div>
 
-                    <div className={showRefreshButton ? "col-span-3" : "col-span-4"} />
+                    <div className={showRefreshButton ? "col-span-2" : "col-span-3"} />
+
+                    <div className="col-span-1">
+                        <button
+                            type="button"
+                            className={`btn btn-neutral btn-sm w-full ${exporting ? "btn-disabled" : ""}`}
+                            onClick={onExport}
+                            disabled={exporting}
+                        >
+                            {exporting ? (
+                                <>
+                                    <span className="loading loading-spinner loading-xs" />
+                                    Exporting...
+                                </>
+                            ) : (
+                                <>
+                                    <Download className="w-4 h-4" />
+                                    Export Excel
+                                </>
+                            )}
+                        </button>
+                    </div>
 
                     {showRefreshButton && (
                         <div className="col-span-1">
