@@ -9,6 +9,7 @@ import {
     deleteException,
     toggleException,
     downloadExceptionTemplate,
+    exportExceptions,
 } from "../../services/employeeExceptionService";
 import { fetchAllJobPositions } from "../../services/jobPositionService";
 import { fetchCertifications } from "../../services/certificationService";
@@ -24,53 +25,43 @@ import { Plus, Upload, Download, Eraser, Eye, Pencil, Trash2, ChevronDown } from
 
 const TABLE_COLS = 11;
 
-// ===== helper role dari localStorage =====
 function getCurrentRole() {
     if (typeof window === "undefined") return "";
     try {
         const user = JSON.parse(localStorage.getItem("user") || "{}");
         const fromUser = (user.role || "").toString().toUpperCase();
         if (fromUser) return fromUser;
-    } catch {
-        // ignore
-    }
+    } catch {}
     return (localStorage.getItem("role") || "").toString().toUpperCase();
 }
 
 export default function EmployeeExceptionPage() {
     const navigate = useNavigate();
 
-    // ===== ROLE STATE =====
     const [role, setRole] = useState(null);
     useEffect(() => {
         setRole(getCurrentRole());
     }, []);
 
     const isRoleLoaded = role !== null;
-    const isSuperadmin = role === "SUPERADMIN";
     const isPic = role === "PIC";
     const isEmployee = role === "EMPLOYEE" || role === "PEGAWAI";
 
-    // scope PIC (kode sertifikasi)
     const [picCertCodes, setPicCertCodes] = useState(null);
 
-    // ===== DATA & UI STATE =====
     const [rows, setRows] = useState([]);
     const [loading, setLoading] = useState(false);
 
-    // Pagination
     const [page, setPage] = useState(1);
     const [rowsPerPage, setRowsPerPage] = useState(10);
     const [totalPages, setTotalPages] = useState(0);
     const [totalElements, setTotalElements] = useState(0);
 
-    // Filters options
     const [jobOptions, setJobOptions] = useState([]);
     const [certOptions, setCertOptions] = useState([]);
     const [levelOptions, setLevelOptions] = useState([]);
     const [subOptions, setSubOptions] = useState([]);
 
-    // Filters value
     const [filterEmployee, setFilterEmployee] = useState(null);
     const [filterJob, setFilterJob] = useState([]);
     const [filterCert, setFilterCert] = useState([]);
@@ -78,19 +69,15 @@ export default function EmployeeExceptionPage() {
     const [filterSub, setFilterSub] = useState([]);
     const [filterStatus, setFilterStatus] = useState([]);
 
-    // Modal
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [showEditModal, setShowEditModal] = useState(false);
     const [showImportModal, setShowImportModal] = useState(false);
 
-    // Delete confirm modal state
     const [confirm, setConfirm] = useState({ open: false, id: null });
     const [selectedRow, setSelectedRow] = useState(null);
 
-    // 🔹 Floating status menu: { row, x, y }
     const [statusMenu, setStatusMenu] = useState(null);
 
-    // ===================== LOAD FILTER MASTER (role aware) =====================
     async function loadFilters() {
         if (!isRoleLoaded || isEmployee) return;
 
@@ -112,8 +99,6 @@ export default function EmployeeExceptionPage() {
                         scopeCerts.map((s) => s.certificationCode).filter((code) => code && String(code).trim() !== "")
                     );
                     setPicCertCodes(codes);
-
-                    // PIC hanya boleh lihat sertifikasi dalam scope
                     effectiveCerts = effectiveCerts.filter((c) => codes.has(c.code));
                 } catch (e) {
                     console.error("load PIC scope error:", e);
@@ -122,12 +107,7 @@ export default function EmployeeExceptionPage() {
             }
 
             setJobOptions((jobs || []).map((j) => ({ value: j.id, label: j.name })));
-            setCertOptions(
-                (effectiveCerts || []).map((c) => ({
-                    value: c.code,
-                    label: c.code,
-                }))
-            );
+            setCertOptions((effectiveCerts || []).map((c) => ({ value: c.code, label: c.code })));
             setLevelOptions((levels || []).map((l) => ({ value: l.level, label: l.level })));
             setSubOptions((subs || []).map((s) => ({ value: s.code, label: s.code })));
         } catch (err) {
@@ -136,39 +116,41 @@ export default function EmployeeExceptionPage() {
         }
     }
 
-    // ===================== LOAD DATA =====================
+    function buildParamsForQuery() {
+        let certCodesFilter = filterCert.map((f) => f.value);
+
+        if (isPic && picCertCodes && picCertCodes.size > 0) {
+            if (certCodesFilter.length > 0) {
+                certCodesFilter = certCodesFilter.filter((code) => picCertCodes.has(code));
+            } else {
+                certCodesFilter = Array.from(picCertCodes);
+            }
+        }
+
+        return {
+            employeeIds: filterEmployee ? [filterEmployee.value] : [],
+            jobIds: filterJob.map((f) => f.value),
+            certCodes: certCodesFilter,
+            levels: filterLevel.map((f) => f.value),
+            subCodes: filterSub.map((f) => f.value),
+            statuses: filterStatus.map((f) => f.value),
+        };
+    }
+
     async function load() {
         if (!isRoleLoaded || isEmployee) return;
 
         setLoading(true);
         try {
-            // siapkan filter certCodes yang sudah diintersect dengan scope PIC
-            let certCodesFilter = filterCert.map((f) => f.value);
-
-            if (isPic && picCertCodes && picCertCodes.size > 0) {
-                if (certCodesFilter.length > 0) {
-                    certCodesFilter = certCodesFilter.filter((code) => picCertCodes.has(code));
-                } else {
-                    // kalau PIC tidak pilih filter sertifikasi, default ke semua kode dalam scope
-                    certCodesFilter = Array.from(picCertCodes);
-                }
-            }
-
             const params = {
                 page: page - 1,
                 size: rowsPerPage,
-                employeeIds: filterEmployee ? [filterEmployee.value] : [],
-                jobIds: filterJob.map((f) => f.value),
-                certCodes: certCodesFilter,
-                levels: filterLevel.map((f) => f.value),
-                subCodes: filterSub.map((f) => f.value),
-                statuses: filterStatus.map((f) => f.value),
+                ...buildParamsForQuery(),
             };
 
             const res = await fetchExceptions(params);
             let content = res.content || [];
 
-            // PIC: guard tambahan di FE (kalau backend belum enforce)
             if (isPic && picCertCodes && picCertCodes.size > 0) {
                 content = content.filter((r) => !r.certificationCode || picCertCodes.has(r.certificationCode));
             }
@@ -183,7 +165,6 @@ export default function EmployeeExceptionPage() {
         }
     }
 
-    // ===================== DELETE & STATUS =====================
     async function onDelete(id) {
         try {
             await deleteException(id);
@@ -194,7 +175,6 @@ export default function EmployeeExceptionPage() {
         }
     }
 
-    // 🔹 Ubah status (masih pakai toggle di backend)
     async function handleChangeStatus(row, targetActive) {
         if (row.isActive === targetActive) return;
 
@@ -222,37 +202,44 @@ export default function EmployeeExceptionPage() {
         }
     }
 
+    async function handleExportExcel() {
+        try {
+            const blob = await exportExceptions(buildParamsForQuery());
+            const url = window.URL.createObjectURL(new Blob([blob]));
+            const link = document.createElement("a");
+            link.href = url;
+            link.setAttribute("download", `employee-exceptions-${new Date().toISOString().slice(0, 10)}.xlsx`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+        } catch {
+            toast.error("Gagal export");
+        }
+    }
+
     const loadEmployees = async (inputValue) => {
         try {
             const res = await searchEmployees({ search: inputValue, page: 0, size: 20 });
-            return (res.content || []).map((e) => ({
-                value: e.id,
-                label: `${e.nip} - ${e.name}`,
-            }));
+            return (res.content || []).map((e) => ({ value: e.id, label: `${e.nip} - ${e.name}` }));
         } catch {
             return [];
         }
     };
 
-    // ===================== EFFECTS =====================
-    // redirect pegawai
     useEffect(() => {
         if (!isRoleLoaded) return;
         if (isEmployee) {
             toast.error("Anda tidak berwenang mengakses halaman ini");
             navigate("/", { replace: true });
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isRoleLoaded, isEmployee]);
 
     useEffect(() => {
         loadFilters();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isRoleLoaded, role]);
 
     useEffect(() => {
         load();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [
         isRoleLoaded,
         role,
@@ -273,7 +260,6 @@ export default function EmployeeExceptionPage() {
 
     const startIdx = totalElements === 0 ? 0 : (page - 1) * rowsPerPage + 1;
 
-    // 🔹 Badge status: trigger; menu-nya fixed di luar tabel
     const renderStatusBadge = (row) => {
         const isActive = row.isActive;
         const label = isActive ? "Active" : "Nonactive";
@@ -285,11 +271,7 @@ export default function EmployeeExceptionPage() {
                 className={`badge badge-sm whitespace-nowrap cursor-pointer flex items-center gap-1 ${cls} text-white`}
                 onClick={(e) => {
                     const rect = e.currentTarget.getBoundingClientRect();
-                    setStatusMenu({
-                        row,
-                        x: rect.left,
-                        y: rect.bottom + 4, // sedikit di bawah badge
-                    });
+                    setStatusMenu({ row, x: rect.left, y: rect.bottom + 4 });
                 }}
             >
                 <span>{label}</span>
@@ -298,15 +280,11 @@ export default function EmployeeExceptionPage() {
         );
     };
 
-    // kalau role belum kebaca / sedang redirect pegawai, jangan render dulu
-    if (!isRoleLoaded || isEmployee) {
-        return null;
-    }
+    if (!isRoleLoaded || isEmployee) return null;
 
     return (
         <div>
             <div className="space-y-3 mb-4">
-                {/* 🔸 Button Row */}
                 <div className="grid grid-cols-6 gap-3">
                     <div>
                         <button
@@ -337,7 +315,19 @@ export default function EmployeeExceptionPage() {
                             Download Template
                         </button>
                     </div>
-                    <div className="lg:col-span-2" />
+
+                    <div>
+                        <button
+                            className="btn btn-neutral btn-sm w-full flex items-center gap-1"
+                            onClick={handleExportExcel}
+                        >
+                            <Download className="w-4 h-4" />
+                            Export Data
+                        </button>
+                    </div>
+
+                    <div className="lg:col-span-1" />
+
                     <div>
                         <button
                             className="btn btn-accent btn-soft border-accent btn-sm w-full flex items-center gap-1"
@@ -359,9 +349,7 @@ export default function EmployeeExceptionPage() {
                     </div>
                 </div>
 
-                {/* 🔸 Filter Row */}
                 <div className="grid grid-cols-6 gap-3 items-end text-xs">
-                    {/* Pegawai */}
                     <div className="col-span-1">
                         <AsyncSelect
                             cacheOptions
@@ -374,7 +362,6 @@ export default function EmployeeExceptionPage() {
                         />
                     </div>
 
-                    {/* Jabatan */}
                     <div className="col-span-1">
                         <Select
                             isMulti
@@ -386,7 +373,6 @@ export default function EmployeeExceptionPage() {
                         />
                     </div>
 
-                    {/* Sertifikasi */}
                     <div className="col-span-1">
                         <Select
                             isMulti
@@ -398,7 +384,6 @@ export default function EmployeeExceptionPage() {
                         />
                     </div>
 
-                    {/* Level */}
                     <div className="col-span-1">
                         <Select
                             isMulti
@@ -410,7 +395,6 @@ export default function EmployeeExceptionPage() {
                         />
                     </div>
 
-                    {/* Sub Bidang */}
                     <div className="col-span-1">
                         <Select
                             isMulti
@@ -422,7 +406,6 @@ export default function EmployeeExceptionPage() {
                         />
                     </div>
 
-                    {/* Status */}
                     <div className="col-span-1">
                         <Select
                             isMulti
@@ -439,7 +422,6 @@ export default function EmployeeExceptionPage() {
                 </div>
             </div>
 
-            {/* Table */}
             <div className="overflow-x-auto rounded-xl border border-gray-200 shadow bg-base-100">
                 <table className="table table-zebra">
                     <thead className="bg-base-200 text-xs">
@@ -476,7 +458,6 @@ export default function EmployeeExceptionPage() {
                                     <td>{startIdx + idx}</td>
                                     <td>
                                         <div className="flex gap-1">
-                                            {/* Detail Pegawai */}
                                             <div className="tooltip" data-tip="Lihat detail pegawai">
                                                 <Link
                                                     to={`/employee/${r.employeeId}`}
@@ -486,7 +467,6 @@ export default function EmployeeExceptionPage() {
                                                 </Link>
                                             </div>
 
-                                            {/* Edit */}
                                             <div className="tooltip" data-tip="Edit eligibility manual">
                                                 <button
                                                     className="btn btn-xs btn-warning btn-soft border-warning"
@@ -499,7 +479,6 @@ export default function EmployeeExceptionPage() {
                                                 </button>
                                             </div>
 
-                                            {/* Delete */}
                                             <div className="tooltip" data-tip="Hapus eligibility manual">
                                                 <button
                                                     className="btn btn-xs btn-error btn-soft border-error"
@@ -534,7 +513,6 @@ export default function EmployeeExceptionPage() {
                 </table>
             </div>
 
-            {/* Pagination */}
             <Pagination
                 page={page}
                 totalPages={totalPages}
@@ -547,18 +525,15 @@ export default function EmployeeExceptionPage() {
                 }}
             />
 
-            {/* Modal Create */}
             {showCreateModal && (
                 <CreateExceptionModal
                     open={showCreateModal}
                     onClose={() => setShowCreateModal(false)}
                     onSaved={load}
-                    // PIC hanya boleh create sesuai scope (kalau modal support prop ini)
                     picCertCodes={isPic ? picCertCodes : null}
                 />
             )}
 
-            {/* Modal Edit */}
             {showEditModal && selectedRow && (
                 <EditExceptionModal
                     open={showEditModal}
@@ -569,7 +544,6 @@ export default function EmployeeExceptionPage() {
                 />
             )}
 
-            {/* Modal Import */}
             {showImportModal && (
                 <ImportExceptionModal
                     open={showImportModal}
@@ -582,7 +556,6 @@ export default function EmployeeExceptionPage() {
                 />
             )}
 
-            {/* Modal Delete */}
             {confirm.open && (
                 <dialog className="modal" open={confirm.open}>
                     <div className="modal-box">
@@ -609,7 +582,6 @@ export default function EmployeeExceptionPage() {
                 </dialog>
             )}
 
-            {/* 🔹 Floating status menu (fixed, di atas semua layer, gak ngubah tabel) */}
             {statusMenu && (
                 <div className="fixed inset-0 z-[999] flex" onClick={() => setStatusMenu(null)}>
                     <div

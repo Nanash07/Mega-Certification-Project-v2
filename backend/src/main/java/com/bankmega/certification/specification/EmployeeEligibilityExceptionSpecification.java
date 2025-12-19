@@ -7,15 +7,14 @@ import jakarta.persistence.criteria.JoinType;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 
 public class EmployeeEligibilityExceptionSpecification {
 
-    /** Hanya record yang belum soft-delete. */
     public static Specification<EmployeeEligibilityException> notDeleted() {
         return (root, query, cb) -> cb.isNull(root.get("deletedAt"));
     }
 
-    /** (Opsional) Hanya pegawai aktif: deletedAt IS NULL dan status != 'RESIGN'. */
     public static Specification<EmployeeEligibilityException> onlyActiveEmployees() {
         return (root, query, cb) -> {
             var emp = root.join("employee", JoinType.INNER);
@@ -27,86 +26,130 @@ public class EmployeeEligibilityExceptionSpecification {
         };
     }
 
-    /** Filter by employee ids. */
     public static Specification<EmployeeEligibilityException> byEmployeeIds(List<Long> employeeIds) {
-        return (root, query, cb) -> (employeeIds == null || employeeIds.isEmpty())
-                ? cb.conjunction()
-                : root.get("employee").get("id").in(employeeIds);
+        if (employeeIds == null || employeeIds.isEmpty())
+            return null;
+        return (root, query, cb) -> root.get("employee").get("id").in(employeeIds);
     }
 
-    /** Filter by job ids (employee.jobPosition.id). */
     public static Specification<EmployeeEligibilityException> byJobIds(List<Long> jobIds) {
-        return (root, query, cb) -> (jobIds == null || jobIds.isEmpty())
-                ? cb.conjunction()
-                : root.get("employee").get("jobPosition").get("id").in(jobIds);
+        if (jobIds == null || jobIds.isEmpty())
+            return null;
+        return (root, query, cb) -> root.get("employee").get("jobPosition").get("id").in(jobIds);
     }
 
-    /** Case-insensitive: certification.code IN (codes). */
     public static Specification<EmployeeEligibilityException> byCertCodes(List<String> certCodes) {
-        return (root, query, cb) -> {
-            List<String> vals = toLowerList(certCodes);
-            if (vals.isEmpty())
-                return cb.conjunction();
-            return cb.lower(root.get("certificationRule").get("certification").get("code")).in(vals);
-        };
+        List<String> vals = toLowerList(certCodes);
+        if (vals.isEmpty())
+            return null;
+        return (root, query, cb) -> cb.lower(root.get("certificationRule").get("certification").get("code")).in(vals);
     }
 
-    /** certificationLevel.level IN (levels). */
     public static Specification<EmployeeEligibilityException> byLevels(List<Integer> levels) {
-        return (root, query, cb) -> (levels == null || levels.isEmpty())
-                ? cb.conjunction()
-                : root.get("certificationRule").get("certificationLevel").get("level").in(levels);
+        if (levels == null || levels.isEmpty())
+            return null;
+        return (root, query, cb) -> root.get("certificationRule").get("certificationLevel").get("level").in(levels);
     }
 
-    /** Case-insensitive: subField.code IN (subCodes). */
     public static Specification<EmployeeEligibilityException> bySubCodes(List<String> subCodes) {
-        return (root, query, cb) -> {
-            List<String> vals = toLowerList(subCodes);
-            if (vals.isEmpty())
-                return cb.conjunction();
-            return cb.lower(root.get("certificationRule").get("subField").get("code")).in(vals);
-        };
+        List<String> vals = toLowerList(subCodes);
+        if (vals.isEmpty())
+            return null;
+        return (root, query, cb) -> cb.lower(root.get("certificationRule").get("subField").get("code")).in(vals);
     }
 
-    /**
-     * Status aktif/nonaktif:
-     * - "ACTIVE"/"AKTIF"/"TRUE"/"Y"/"1" => isActive = true
-     * - "INACTIVE"/"NONAKTIF"/"FALSE"/"N"/"0" => isActive = false
-     */
     public static Specification<EmployeeEligibilityException> byStatus(String status) {
+        Boolean active = parseActive(status);
+        if (active == null)
+            return null;
+        return (root, query, cb) -> cb.equal(root.get("isActive"), active);
+    }
+
+    public static Specification<EmployeeEligibilityException> byStatuses(List<String> statuses) {
+        if (statuses == null || statuses.isEmpty())
+            return null;
+
+        Boolean hasTrue = null;
+        Boolean hasFalse = null;
+
+        for (String s : statuses) {
+            Boolean v = parseActive(s);
+            if (v == null)
+                continue;
+            if (Boolean.TRUE.equals(v))
+                hasTrue = true;
+            if (Boolean.FALSE.equals(v))
+                hasFalse = true;
+        }
+
+        if (Boolean.TRUE.equals(hasTrue) && Boolean.TRUE.equals(hasFalse))
+            return null;
+        if (Boolean.TRUE.equals(hasTrue))
+            return (root, query, cb) -> cb.isTrue(root.get("isActive"));
+        if (Boolean.TRUE.equals(hasFalse))
+            return (root, query, cb) -> cb.isFalse(root.get("isActive"));
+
+        return null;
+    }
+
+    public static Specification<EmployeeEligibilityException> byAllowedCertificationIds(List<Long> allowedCertIds) {
+        if (allowedCertIds == null)
+            return null;
+        if (allowedCertIds.isEmpty()) {
+            return (root, query, cb) -> cb.disjunction();
+        }
+
         return (root, query, cb) -> {
-            if (status == null || status.isBlank())
-                return cb.conjunction();
-            String s = status.trim().toLowerCase(Locale.ROOT);
-            Boolean active = switch (s) {
-                case "active", "aktif", "true", "y", "1" -> true;
-                case "inactive", "nonaktif", "false", "n", "0" -> false;
-                default -> null;
-            };
-            return (active == null) ? cb.conjunction() : cb.equal(root.get("isActive"), active);
+            var rule = root.join("certificationRule", JoinType.INNER);
+            var cert = rule.join("certification", JoinType.INNER);
+            return cert.get("id").in(allowedCertIds);
         };
     }
 
-    /** Full-text ringan (case-insensitive) ke beberapa kolom. */
     public static Specification<EmployeeEligibilityException> bySearch(String keyword) {
+        if (keyword == null || keyword.trim().isEmpty())
+            return null;
+
         return (root, query, cb) -> {
-            if (keyword == null || keyword.trim().isEmpty())
-                return cb.conjunction();
             String like = "%" + keyword.trim().toLowerCase(Locale.ROOT) + "%";
 
-            var empNip = cb.like(cb.lower(root.get("employee").get("nip")), like);
-            var empName = cb.like(cb.lower(root.get("employee").get("name")), like);
-            var jobName = cb.like(cb.lower(root.get("employee").get("jobPosition").get("name")), like);
-            var certCode = cb.like(cb.lower(root.get("certificationRule").get("certification").get("code")), like);
-            var certName = cb.like(cb.lower(root.get("certificationRule").get("certification").get("name")), like);
-            var subName = cb.like(cb.lower(root.get("certificationRule").get("subField").get("name")), like);
-            var notes = cb.like(cb.lower(root.get("notes").as(String.class)), like);
+            var emp = root.join("employee", JoinType.LEFT);
+            var job = emp.join("jobPosition", JoinType.LEFT);
 
-            return cb.or(empNip, empName, jobName, certCode, certName, subName, notes);
+            var rule = root.join("certificationRule", JoinType.LEFT);
+            var cert = rule.join("certification", JoinType.LEFT);
+            var level = rule.join("certificationLevel", JoinType.LEFT);
+            var sub = rule.join("subField", JoinType.LEFT);
+
+            var empNip = cb.like(cb.lower(emp.get("nip")), like);
+            var empName = cb.like(cb.lower(emp.get("name")), like);
+            var jobName = cb.like(cb.lower(job.get("name")), like);
+
+            var certCode = cb.like(cb.lower(cert.get("code")), like);
+            var certName = cb.like(cb.lower(cert.get("name")), like);
+
+            var levelName = cb.like(cb.lower(level.get("name")), like);
+            var subCode = cb.like(cb.lower(sub.get("code")), like);
+            var subName = cb.like(cb.lower(sub.get("name")), like);
+
+            var notes = cb.like(cb.coalesce(cb.lower(root.get("notes")), ""), like);
+
+            return cb.or(empNip, empName, jobName, certCode, certName, levelName, subCode, subName, notes);
         };
     }
 
-    // ------------ utils ------------
+    private static Boolean parseActive(String status) {
+        if (status == null || status.isBlank())
+            return null;
+        String s = status.trim().toLowerCase(Locale.ROOT);
+
+        return switch (s) {
+            case "active", "aktif", "true", "y", "yes", "1" -> true;
+            case "inactive", "nonactive", "nonaktif", "false", "n", "no", "0" -> false;
+            default -> null;
+        };
+    }
+
     private static List<String> toLowerList(List<String> src) {
         if (src == null || src.isEmpty())
             return List.of();
