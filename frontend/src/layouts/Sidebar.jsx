@@ -1,5 +1,5 @@
 // src/components/Sidebar.jsx
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
     LayoutDashboard,
@@ -14,7 +14,6 @@ import {
     Settings,
 } from "lucide-react";
 
-// ================== MASTER MENU ==================
 export const MENU = [
     {
         label: "Dashboard",
@@ -25,14 +24,26 @@ export const MENU = [
     {
         label: "Pegawai",
         icon: <User size={18} />,
-        key: "employee",
+        key: "pegawai",
         subMenu: [
             { label: "Data Pegawai", href: "/employee/data" },
             { label: "Data Pegawai Resign", href: "/employee/resigned" },
-            { label: "Eligibility", href: "/employee/eligibility" },
-            { label: "Eligibility Manual", href: "/employee/exception" },
-            { label: "Sertifikat Pegawai", href: "/employee/certification" },
         ],
+    },
+    {
+        label: "Eligibility",
+        icon: <ListChecks size={18} />,
+        key: "eligibility",
+        subMenu: [
+            { label: "Data Eligibility", href: "/employee/eligibility" },
+            { label: "Eligibility Manual", href: "/employee/exception" },
+        ],
+    },
+    {
+        label: "Sertifikat Pegawai",
+        icon: <BadgeCheck size={18} />,
+        href: "/employee/certification",
+        key: "sertifikat-pegawai",
     },
     {
         label: "Batch",
@@ -83,11 +94,10 @@ export const MENU = [
             { label: "Template & Jadwal", href: "/settings/notification-settings" },
             { label: "Konfigurasi Email", href: "/settings/email-config" },
             { label: "Test Koneksi Email", href: "/settings/email-test" },
+            { label: "Notifikasi Terkirim", href: "/settings/notifications-sent" },
         ],
     },
 ];
-
-// ============ HELPERS ============
 
 const getStoredUser = () => {
     try {
@@ -97,21 +107,23 @@ const getStoredUser = () => {
     }
 };
 
-export const getCurrentRole = () => {
-    const user = getStoredUser();
-    return (user.role || localStorage.getItem("role") || "").toString().toUpperCase();
+const normalizeRole = (roleRaw) => {
+    const r = (roleRaw || "").toString().toUpperCase().trim();
+    if (!r) return "";
+    return r.startsWith("ROLE_") ? r.replace(/^ROLE_/, "") : r;
 };
 
-// =========================================
-//   ROLE-BASED FILTERING (EXPORTED)
-// =========================================
-export const filterMenuByRole = (menu, roleRaw) => {
-    const role = (roleRaw || "").toUpperCase();
+export const getCurrentRole = () => {
+    const user = getStoredUser();
+    const raw = user.role || localStorage.getItem("role") || "";
+    return normalizeRole(raw);
+};
 
-    // SUPERADMIN: full access
+export const filterMenuByRole = (menu, roleRaw) => {
+    const role = normalizeRole(roleRaw);
+
     if (role === "SUPERADMIN") return menu;
 
-    // PIC: beberapa menu di-hide / trim
     if (role === "PIC") {
         return menu
             .filter((item) => item.key !== "organization")
@@ -128,7 +140,10 @@ export const filterMenuByRole = (menu, roleRaw) => {
                     return {
                         ...item,
                         subMenu: item.subMenu.filter(
-                            (sub) => sub.label === "Template & Jadwal" || sub.label === "Test Koneksi Email"
+                            (sub) =>
+                                sub.label === "Template & Jadwal" ||
+                                sub.label === "Test Koneksi Email" ||
+                                sub.label === "Notifikasi Terkirim"
                         ),
                     };
                 }
@@ -136,13 +151,10 @@ export const filterMenuByRole = (menu, roleRaw) => {
             });
     }
 
-    // PEGAWAI:
-    // Sidebar sebenernya gak dirender (di MainLayout),
-    // tapi filter ini tetap dipakai Navbar buat title.
-    if (role === "PEGAWAI") {
-        const employeeMenu = menu.filter((item) => item.key === "dashboard" || item.key === "employee");
+    if (role === "PEGAWAI" || role === "EMPLOYEE") {
+        const allowed = menu.filter((item) => item.key === "dashboard" || item.key === "eligibility");
         return [
-            ...employeeMenu,
+            ...allowed,
             {
                 label: "Notifikasi",
                 icon: <Bell size={18} />,
@@ -152,41 +164,28 @@ export const filterMenuByRole = (menu, roleRaw) => {
         ];
     }
 
-    // default: role lain cuma boleh Dashboard + Pegawai
-    return menu.filter((item) => item.key === "dashboard" || item.key === "employee");
+    return menu.filter((item) => item.key === "dashboard" || item.key === "pegawai" || item.key === "eligibility");
 };
 
-// =========================================
-//               SIDEBAR
-// =========================================
 export default function Sidebar({ open, setOpen }) {
     const location = useLocation();
     const [openMenu, setOpenMenu] = useState("");
 
     const role = getCurrentRole();
-    const visibleMenu = filterMenuByRole(MENU, role);
+    const visibleMenu = useMemo(() => filterMenuByRole(MENU, role), [role]);
 
     const isActive = (href) => location.pathname === href || location.pathname.startsWith(href + "/");
-
     const isParentActive = (submenu) => submenu.some((sub) => isActive(sub.href));
-
     const isMenuActive = (item) => (item.subMenu ? isParentActive(item.subMenu) : isActive(item.href));
 
     useEffect(() => {
         const parent = visibleMenu.find(
             (m) => m.subMenu && m.subMenu.some((s) => location.pathname.startsWith(s.href))
         );
-        if (parent) {
-            setOpenMenu(parent.key);
-        } else {
-            setOpenMenu("");
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [location.pathname]);
+        setOpenMenu(parent ? parent.key : "");
+    }, [location.pathname, visibleMenu]);
 
-    const handleMenuClick = (key) => {
-        setOpenMenu((prev) => (prev === key ? "" : key));
-    };
+    const handleMenuClick = (key) => setOpenMenu((prev) => (prev === key ? "" : key));
 
     const handleLinkClick = () => {
         if (window.innerWidth < 1024) setOpen(false);
@@ -216,6 +215,7 @@ export default function Sidebar({ open, setOpen }) {
                         item.subMenu ? (
                             <div key={item.key} className="mb-2">
                                 <button
+                                    type="button"
                                     onClick={() => handleMenuClick(item.key)}
                                     className={`btn w-full justify-start gap-3 mb-2 text-xs ${
                                         isMenuActive(item) ? "btn-primary" : "btn-ghost"
@@ -228,9 +228,9 @@ export default function Sidebar({ open, setOpen }) {
 
                                 {openMenu === item.key && (
                                     <div className="ml-4 space-y-1">
-                                        {item.subMenu.map((sub, idx) => (
+                                        {item.subMenu.map((sub) => (
                                             <Link
-                                                key={idx}
+                                                key={sub.href}
                                                 to={sub.href}
                                                 className={`btn w-full justify-start text-xs ${
                                                     isActive(sub.href) ? "btn-primary" : "btn-ghost"

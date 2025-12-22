@@ -60,6 +60,7 @@ import EmailConfigPage from "./pages/notifications/EmailConfigPage";
 import EmailTestPage from "./pages/notifications/EmailTestPage";
 import NotificationSettingsPage from "./pages/notifications/NotificationSettingsPage";
 import NotificationPage from "./pages/notifications/NotificationPage";
+import NotificationSentPage from "./pages/notifications/NotificationSentPage";
 
 export default function App() {
     return (
@@ -74,6 +75,7 @@ export default function App() {
 
                 {/* ===== ROOT REDIRECT ===== */}
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />
+
                 {/* ===== DASHBOARD ===== */}
                 <Route
                     path="/dashboard"
@@ -85,6 +87,7 @@ export default function App() {
                         </ProtectedRoute>
                     }
                 />
+
                 {/* ===== PROFILE ===== */}
                 <Route
                     path="/profile"
@@ -96,6 +99,7 @@ export default function App() {
                         </ProtectedRoute>
                     }
                 />
+
                 {/* ===== EMPLOYEE ===== */}
                 <Route
                     path="/employee/data"
@@ -177,6 +181,7 @@ export default function App() {
                         </ProtectedRoute>
                     }
                 />
+
                 {/* ===== ORGANIZATION ===== */}
                 <Route
                     path="/organization/regional"
@@ -218,6 +223,7 @@ export default function App() {
                         </ProtectedRoute>
                     }
                 />
+
                 {/* ===== MAPPING ===== */}
                 <Route
                     path="/mapping/job-certification"
@@ -249,6 +255,7 @@ export default function App() {
                         </ProtectedRoute>
                     }
                 />
+
                 {/* ===== BATCH ===== */}
                 <Route
                     path="/batch"
@@ -270,6 +277,7 @@ export default function App() {
                         </ProtectedRoute>
                     }
                 />
+
                 {/* ===== SERTIFIKAT ===== */}
                 <Route
                     path="/sertifikat/jenis"
@@ -331,6 +339,7 @@ export default function App() {
                         </ProtectedRoute>
                     }
                 />
+
                 {/* ===== USERS ===== */}
                 <Route
                     path="/user"
@@ -342,6 +351,7 @@ export default function App() {
                         </ProtectedRoute>
                     }
                 />
+
                 {/* ===== SETTINGS / NOTIFIKASI ===== */}
                 <Route
                     path="/settings/email-config"
@@ -374,6 +384,16 @@ export default function App() {
                     }
                 />
                 <Route
+                    path="/settings/notifications-sent"
+                    element={
+                        <ProtectedRoute roles={["SUPERADMIN", "PIC"]}>
+                            <MainLayout>
+                                <NotificationSentPage />
+                            </MainLayout>
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
                     path="/notifications"
                     element={
                         <ProtectedRoute>
@@ -383,6 +403,7 @@ export default function App() {
                         </ProtectedRoute>
                     }
                 />
+
                 {/* ===== FALLBACK ===== */}
                 <Route path="*" element={<Navigate to="/login" replace />} />
             </Routes>

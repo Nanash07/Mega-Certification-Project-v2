@@ -15,6 +15,18 @@ export async function fetchNotificationsPaged(params = {}) {
     }
 }
 
+export async function fetchSentNotificationsPaged(params = {}) {
+    try {
+        const { data } = await api.get(`${BASE_URL}/sent/filter`, {
+            params,
+        });
+        return data;
+    } catch (error) {
+        console.error("[Notification] Error fetch sent paged:", error);
+        throw error;
+    }
+}
+
 export async function fetchUnreadCount() {
     try {
         const { data } = await api.get(`${BASE_URL}/unread-count`);

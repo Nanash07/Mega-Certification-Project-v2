@@ -23,7 +23,7 @@ export default function EmployeeResignedPage() {
     const [totalPages, setTotalPages] = useState(0);
     const [totalElements, setTotalElements] = useState(0);
 
-    const TABLE_COLS = 12;
+    const TABLE_COLS = 11;
 
     const [filterEmployee, setFilterEmployee] = useState(null);
     const [regionalIds, setRegionalIds] = useState([]);
@@ -45,10 +45,10 @@ export default function EmployeeResignedPage() {
     useEffect(() => {
         Promise.all([fetchRegionals(), fetchDivisions(), fetchUnits(), fetchJobPositions()])
             .then(([r, d, u, j]) => {
-                setRegionalOptions(r.map((x) => ({ value: x.id, label: x.name })));
-                setDivisionOptions(d.map((x) => ({ value: x.id, label: x.name })));
-                setUnitOptions(u.map((x) => ({ value: x.id, label: x.name })));
-                setJobOptions(j.map((x) => ({ value: x.id, label: x.name })));
+                setRegionalOptions((r || []).map((x) => ({ value: x.id, label: x.name })));
+                setDivisionOptions((d || []).map((x) => ({ value: x.id, label: x.name })));
+                setUnitOptions((u || []).map((x) => ({ value: x.id, label: x.name })));
+                setJobOptions((j || []).map((x) => ({ value: x.id, label: x.name })));
             })
             .catch(() => toast.error("Gagal memuat filter master data"));
     }, []);
@@ -56,7 +56,7 @@ export default function EmployeeResignedPage() {
     const loadEmployees = async (inputValue) => {
         try {
             const res = await searchResignedEmployees({ search: inputValue, page: 0, size: 20 });
-            return res.content.map((e) => ({
+            return (res.content || []).map((e) => ({
                 value: e.id,
                 label: `${e.nip} - ${e.name}`,
             }));
@@ -76,7 +76,6 @@ export default function EmployeeResignedPage() {
                 divisionIds: divisionIds.map((i) => i.value),
                 unitIds: unitIds.map((i) => i.value),
                 jobPositionIds: jobPositionIds.map((i) => i.value),
-                // statuses removed: resigned endpoint already fixed
             };
 
             const res = await fetchResignedEmployees(params);
@@ -120,6 +119,7 @@ export default function EmployeeResignedPage() {
                         placeholder="Filter Pegawai"
                         isClearable
                     />
+
                     <Select
                         isMulti
                         options={regionalOptions}
@@ -127,6 +127,7 @@ export default function EmployeeResignedPage() {
                         onChange={setRegionalIds}
                         placeholder="Filter Regional"
                     />
+
                     <Select
                         isMulti
                         options={divisionOptions}
@@ -134,6 +135,7 @@ export default function EmployeeResignedPage() {
                         onChange={setDivisionIds}
                         placeholder="Filter Division"
                     />
+
                     <Select
                         isMulti
                         options={unitOptions}
@@ -141,6 +143,7 @@ export default function EmployeeResignedPage() {
                         onChange={setUnitIds}
                         placeholder="Filter Unit"
                     />
+
                     <Select
                         isMulti
                         options={jobOptions}
@@ -148,6 +151,7 @@ export default function EmployeeResignedPage() {
                         onChange={setJobPositionIds}
                         placeholder="Filter Jabatan"
                     />
+
                     <div className="col-span-1 lg:col-span-1">
                         <button className="btn btn-accent btn-soft border-accent btn-sm w-full" onClick={resetFilter}>
                             <Eraser className="w-4 h-4" />
@@ -162,9 +166,9 @@ export default function EmployeeResignedPage() {
                     <thead className="bg-base-200 text-xs">
                         <tr>
                             <th>No</th>
-                            <th>Aksi</th>
                             <th>NIP</th>
                             <th>Nama</th>
+                            <th>Detail</th>
                             <th>Status</th>
                             <th>Email</th>
                             <th>Gender</th>
@@ -175,16 +179,17 @@ export default function EmployeeResignedPage() {
                             <th>SK Efektif</th>
                         </tr>
                     </thead>
+
                     <tbody className="text-xs">
                         {loading ? (
                             <tr>
-                                <td colSpan={TABLE_COLS} className="text-center py-10">
+                                <td colSpan={TABLE_COLS + 1} className="text-center py-10">
                                     <span className="loading loading-dots loading-md" />
                                 </td>
                             </tr>
                         ) : rows.length === 0 ? (
                             <tr>
-                                <td colSpan={TABLE_COLS} className="text-center text-gray-400 py-10">
+                                <td colSpan={TABLE_COLS + 1} className="text-center text-gray-400 py-10">
                                     Tidak ada data
                                 </td>
                             </tr>
@@ -192,21 +197,19 @@ export default function EmployeeResignedPage() {
                             rows.map((e, idx) => (
                                 <tr key={e.id}>
                                     <td>{startIdx + idx}</td>
-                                    <td>
-                                        <div className="flex gap-2">
-                                            <div className="tooltip" data-tip="Lihat detail pegawai">
-                                                <Link
-                                                    to={`/employee/${e.id}`}
-                                                    className="btn btn-xs btn-info btn-soft border-info"
-                                                >
-                                                    <Eye className="w-3 h-3" />
-                                                </Link>
-                                            </div>
-                                        </div>
-                                    </td>
-
                                     <td>{e.nip}</td>
                                     <td>{e.name}</td>
+
+                                    <td>
+                                        <div className="tooltip" data-tip="Lihat detail pegawai">
+                                            <Link
+                                                to={`/employee/${e.id}`}
+                                                className="btn btn-xs btn-info btn-soft border-info"
+                                            >
+                                                <Eye className="w-3 h-3" />
+                                            </Link>
+                                        </div>
+                                    </td>
 
                                     <td>
                                         <span className="badge badge-sm text-white badge-error">

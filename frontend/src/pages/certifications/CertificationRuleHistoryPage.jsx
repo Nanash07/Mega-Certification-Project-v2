@@ -202,7 +202,7 @@ export default function CertificationRuleHistoryPage() {
             {/* Filters (mirip EmployeeHistoryPage) */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 text-xs items-end">
                 {/* Filter Rule / Sertifikasi */}
-                <div className="col-span-2">
+                <div className="col-span-1">
                     <Select
                         options={ruleOptions}
                         value={filterRule}
@@ -223,7 +223,7 @@ export default function CertificationRuleHistoryPage() {
                 </div>
 
                 {/* Spacer */}
-                <div className="col-span-2 hidden lg:block" />
+                <div className="col-span-3 hidden lg:block" />
 
                 {/* Clear Filter */}
                 <div className="col-span-2 sm:col-span-1">

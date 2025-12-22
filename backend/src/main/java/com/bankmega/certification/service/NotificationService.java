@@ -6,10 +6,13 @@ import com.bankmega.certification.entity.EmployeeBatch;
 import com.bankmega.certification.entity.EmployeeCertification;
 import com.bankmega.certification.entity.Notification;
 import com.bankmega.certification.entity.NotificationTemplate;
+import com.bankmega.certification.entity.PicCertificationScope;
 import com.bankmega.certification.repository.BatchRepository;
 import com.bankmega.certification.repository.EmployeeBatchRepository;
 import com.bankmega.certification.repository.EmployeeCertificationRepository;
+import com.bankmega.certification.repository.EmployeeRepository;
 import com.bankmega.certification.repository.NotificationRepository;
+import com.bankmega.certification.repository.PicCertificationScopeRepository;
 import com.bankmega.certification.specification.NotificationSpecification;
 
 import jakarta.mail.internet.MimeMessage;
@@ -43,6 +46,9 @@ public class NotificationService {
     private final NotificationTemplateService templateService;
     private final JavaMailSenderImpl reusableMailSender;
 
+    private final EmployeeRepository employeeRepository; // map employee for admin/pic view
+    private final PicCertificationScopeRepository picCertificationScopeRepository; // pic scope repo
+
     public Notification sendNotification(
             Long userId,
             String email,
@@ -56,7 +62,7 @@ public class NotificationService {
         final Notification notif = Notification.builder()
                 .userId(userId)
                 .title(title)
-                .message(messagePlain) // in-app: plain
+                .message(messagePlain)
                 .type(type)
                 .isRead(false)
                 .relatedEntity(relatedEntity)
@@ -91,6 +97,7 @@ public class NotificationService {
             LocalDateTime to,
             String type,
             Pageable pageable) {
+
         Specification<Notification> spec = Specification.where(NotificationSpecification.byUser(userId))
                 .and(NotificationSpecification.unreadOnly(unread))
                 .and(NotificationSpecification.createdFrom(from))
@@ -98,6 +105,53 @@ public class NotificationService {
                 .and(NotificationSpecification.byType(type));
 
         return notificationRepository.findAll(spec, pageable);
+    }
+
+    public Page<Notification> searchSentNotifications(
+            boolean isSuperadmin,
+            Long currentUserId,
+            Boolean unread,
+            LocalDateTime from,
+            LocalDateTime to,
+            String type,
+            Pageable pageable) {
+
+        Specification<Notification> spec = Specification.where(NotificationSpecification.unreadOnly(unread))
+                .and(NotificationSpecification.createdFrom(from))
+                .and(NotificationSpecification.createdTo(to))
+                .and(NotificationSpecification.byType(type));
+
+        if (!isSuperadmin) {
+            Set<Long> certIds = resolvePicAllowedCertificationIds(currentUserId);
+            spec = spec.and(NotificationSpecification.visibleToPic(certIds));
+        }
+
+        return notificationRepository.findAll(spec, pageable);
+    }
+
+    private Set<Long> resolvePicAllowedCertificationIds(Long userId) {
+        if (userId == null)
+            return Collections.emptySet();
+
+        List<PicCertificationScope> scopes = picCertificationScopeRepository.findDistinctByUser_Id(userId);
+        if (scopes == null || scopes.isEmpty())
+            return Collections.emptySet();
+
+        return scopes.stream()
+                .map(s -> s.getCertification() != null ? s.getCertification().getId() : null)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    public Map<Long, Employee> mapEmployeesByIds(Collection<Long> ids) {
+        if (ids == null || ids.isEmpty())
+            return Collections.emptyMap();
+
+        List<Employee> list = employeeRepository.findAllById(ids);
+        if (list == null || list.isEmpty())
+            return Collections.emptyMap();
+
+        return list.stream().collect(Collectors.toMap(Employee::getId, e -> e, (a, b) -> a));
     }
 
     @Async
@@ -120,7 +174,7 @@ public class NotificationService {
                 helper.setText(html, true);
                 reusableMailSender.send(message);
                 log.info("Email notifikasi terkirim ke {}", to);
-                return; // sukses, stop retry
+                return;
             } catch (Exception e) {
                 if (attempt == 2) {
                     log.error("Email gagal ke {} setelah {} kali coba", to, attempt, e);

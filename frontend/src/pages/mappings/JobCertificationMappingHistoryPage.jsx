@@ -181,7 +181,7 @@ export default function JobCertificationMappingHistoryPage() {
             {/* Filters */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 text-xs items-center">
                 {/* Aksi */}
-                <div className="col-span-2">
+                <div className="col-span-1">
                     <Select
                         options={[
                             { value: "all", label: "Semua Aksi" },
@@ -221,17 +221,7 @@ export default function JobCertificationMappingHistoryPage() {
                         dateFormat="dd MMM yyyy"
                     />
                 </div>
-
-                {/* Export */}
-                <div className="col-span-1">
-                    <button
-                        className="btn btn-warning btn-sm w-full"
-                        type="button"
-                        onClick={() => toast("📥 Coming Soon: Export Excel")}
-                    >
-                        Export Excel
-                    </button>
-                </div>
+                <div className="hidden lg:block lg:col-span-2"></div>
 
                 {/* Clear Filter */}
                 <div className="col-span-1">

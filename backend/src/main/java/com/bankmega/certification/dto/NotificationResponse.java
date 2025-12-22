@@ -19,4 +19,9 @@ public class NotificationResponse {
     private String relatedEntity;
     private Long relatedEntityId;
     private String type; // CERT_REMINDER, EXPIRED_NOTICE, BATCH_NOTIFICATION, dll
+
+    private Long userId; // penerima (employeeId)
+    private String employeeName; // nama penerima
+    private String employeeNip; // nip penerima
+    private String employeeEmail; // email penerima
 }
