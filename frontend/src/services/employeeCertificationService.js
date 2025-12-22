@@ -1,10 +1,39 @@
+// src/services/employeeCertificationService.js
 import api from "./api";
 
 const BASE_URL = "/employee-certifications";
 
+function buildParams(params = {}) {
+    const q = {};
+    const set = (k, v) => {
+        if (v === undefined || v === null || v === "") return;
+        if (Array.isArray(v) && v.length === 0) return;
+        q[k] = Array.isArray(v) ? v.join(",") : v;
+    };
+
+    set("page", params.page);
+    set("size", params.size);
+    set("sort", params.sort);
+
+    set("employeeIds", params.employeeIds);
+    set("certCodes", params.certCodes);
+    set("levels", params.levels);
+    set("subCodes", params.subCodes);
+    set("institutionIds", params.institutionIds);
+    set("statuses", params.statuses);
+
+    set("search", params.search);
+    set("certDateStart", params.certDateStart);
+    set("certDateEnd", params.certDateEnd);
+    set("validUntilStart", params.validUntilStart);
+    set("validUntilEnd", params.validUntilEnd);
+
+    return q;
+}
+
 export async function fetchCertifications(params = {}) {
     try {
-        const { data } = await api.get(BASE_URL, { params });
+        const { data } = await api.get(BASE_URL, { params: buildParams(params) });
         return data || { content: [], totalPages: 0, totalElements: 0 };
     } catch (err) {
         console.error("fetchCertifications error:", err);
@@ -15,7 +44,7 @@ export async function fetchCertifications(params = {}) {
 export async function exportCertifications(params = {}) {
     try {
         const res = await api.get(`${BASE_URL}/export`, {
-            params,
+            params: buildParams(params),
             responseType: "blob",
         });
         return res.data;

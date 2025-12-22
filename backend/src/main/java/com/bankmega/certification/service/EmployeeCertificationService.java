@@ -1,3 +1,4 @@
+// src/main/java/com/bankmega/certification/service/EmployeeCertificationService.java
 package com.bankmega.certification.service;
 
 import com.bankmega.certification.dto.EmployeeCertificationRequest;
@@ -93,6 +94,26 @@ public class EmployeeCertificationService {
                 .updatedAt(ec.getUpdatedAt())
                 .deletedAt(ec.getDeletedAt())
                 .build();
+    }
+
+    private void assertRuleInScope(CertificationRule rule, List<Long> allowedCertIds) {
+        if (allowedCertIds == null) {
+            return;
+        }
+        if (rule == null || rule.getCertification() == null || rule.getCertification().getId() == null) {
+            throw new RuntimeException("Certification not found");
+        }
+        Long certId = rule.getCertification().getId();
+        if (allowedCertIds.isEmpty() || !allowedCertIds.contains(certId)) {
+            throw new RuntimeException("Certification not found");
+        }
+    }
+
+    private EmployeeCertification getByIdScoped(Long id, List<Long> allowedCertIds) {
+        EmployeeCertification ec = repo.findByIdAndDeletedAtIsNull(id)
+                .orElseThrow(() -> new RuntimeException("Certification not found"));
+        assertRuleInScope(ec.getCertificationRule(), allowedCertIds);
+        return ec;
     }
 
     private void updateValidity(EmployeeCertification ec) {
@@ -224,12 +245,14 @@ public class EmployeeCertificationService {
     }
 
     @Transactional
-    public EmployeeCertificationResponse create(EmployeeCertificationRequest req) {
+    public EmployeeCertificationResponse create(EmployeeCertificationRequest req, List<Long> allowedCertIds) {
         Employee employee = employeeRepo.findById(req.getEmployeeId())
                 .orElseThrow(() -> new RuntimeException("Employee not found"));
 
         CertificationRule rule = ruleRepo.findById(req.getCertificationRuleId())
                 .orElseThrow(() -> new RuntimeException("Certification Rule not found"));
+
+        assertRuleInScope(rule, allowedCertIds);
 
         Institution institution = (req.getInstitutionId() != null)
                 ? institutionRepo.findById(req.getInstitutionId()).orElse(null)
@@ -271,9 +294,13 @@ public class EmployeeCertificationService {
     }
 
     @Transactional
-    public EmployeeCertificationResponse update(Long id, EmployeeCertificationRequest req) {
-        EmployeeCertification ec = repo.findByIdAndDeletedAtIsNull(id)
-                .orElseThrow(() -> new RuntimeException("Certification not found"));
+    public EmployeeCertificationResponse create(EmployeeCertificationRequest req) {
+        return create(req, null);
+    }
+
+    @Transactional
+    public EmployeeCertificationResponse update(Long id, EmployeeCertificationRequest req, List<Long> allowedCertIds) {
+        EmployeeCertification ec = getByIdScoped(id, allowedCertIds);
 
         if (!hasChanged(ec, req)) {
             return toResponse(ec);
@@ -283,6 +310,7 @@ public class EmployeeCertificationService {
                 !Objects.equals(ec.getCertificationRule().getId(), req.getCertificationRuleId())) {
             CertificationRule rule = ruleRepo.findById(req.getCertificationRuleId())
                     .orElseThrow(() -> new RuntimeException("Certification Rule not found"));
+            assertRuleInScope(rule, allowedCertIds);
             ec.setCertificationRule(rule);
             ec.setRuleValidityMonths(rule.getValidityMonths());
             ec.setRuleReminderMonths(rule.getReminderMonths());
@@ -319,9 +347,13 @@ public class EmployeeCertificationService {
     }
 
     @Transactional
-    public void softDelete(Long id) {
-        EmployeeCertification ec = repo.findByIdAndDeletedAtIsNull(id)
-                .orElseThrow(() -> new RuntimeException("Certification not found"));
+    public EmployeeCertificationResponse update(Long id, EmployeeCertificationRequest req) {
+        return update(id, req, null);
+    }
+
+    @Transactional
+    public void softDelete(Long id, List<Long> allowedCertIds) {
+        EmployeeCertification ec = getByIdScoped(id, allowedCertIds);
 
         ec.setDeletedAt(LocalDateTime.now());
         ec.setStatus(EmployeeCertification.Status.INVALID);
@@ -331,6 +363,11 @@ public class EmployeeCertificationService {
         historyService.snapshot(saved, ActionType.DELETED);
 
         publishChangedEvent(saved);
+    }
+
+    @Transactional
+    public void softDelete(Long id) {
+        softDelete(id, null);
     }
 
     private EmployeeCertification handleFileUpdate(EmployeeCertification ec,
@@ -367,34 +404,75 @@ public class EmployeeCertificationService {
     }
 
     @Transactional
-    public EmployeeCertificationResponse uploadCertificate(Long id, MultipartFile file) {
-        EmployeeCertification ec = repo.findByIdAndDeletedAtIsNull(id)
-                .orElseThrow(() -> new RuntimeException("Certification not found"));
-
+    public EmployeeCertificationResponse uploadCertificate(Long id, MultipartFile file, List<Long> allowedCertIds) {
+        EmployeeCertification ec = getByIdScoped(id, allowedCertIds);
         return toResponse(handleFileUpdate(ec, file, false, false, ActionType.UPLOAD_CERTIFICATE));
     }
 
     @Transactional
-    public EmployeeCertificationResponse reuploadCertificate(Long id, MultipartFile file) {
-        EmployeeCertification ec = repo.findByIdAndDeletedAtIsNull(id)
-                .orElseThrow(() -> new RuntimeException("Certification not found"));
+    public EmployeeCertificationResponse uploadCertificate(Long id, MultipartFile file) {
+        return uploadCertificate(id, file, null);
+    }
 
+    @Transactional
+    public EmployeeCertificationResponse reuploadCertificate(Long id, MultipartFile file, List<Long> allowedCertIds) {
+        EmployeeCertification ec = getByIdScoped(id, allowedCertIds);
         return toResponse(handleFileUpdate(ec, file, true, false, ActionType.REUPLOAD_CERTIFICATE));
     }
 
     @Transactional
-    public void deleteCertificate(Long id) {
-        EmployeeCertification ec = repo.findByIdAndDeletedAtIsNull(id)
-                .orElseThrow(() -> new RuntimeException("Certification not found"));
+    public EmployeeCertificationResponse reuploadCertificate(Long id, MultipartFile file) {
+        return reuploadCertificate(id, file, null);
+    }
 
+    @Transactional
+    public void deleteCertificate(Long id, List<Long> allowedCertIds) {
+        EmployeeCertification ec = getByIdScoped(id, allowedCertIds);
         handleFileUpdate(ec, null, false, true, ActionType.DELETE_CERTIFICATE);
+    }
+
+    @Transactional
+    public void deleteCertificate(Long id) {
+        deleteCertificate(id, null);
+    }
+
+    @Transactional(readOnly = true)
+    public EmployeeCertificationResponse getDetail(Long id, List<Long> allowedCertIds) {
+        return toResponse(getByIdScoped(id, allowedCertIds));
     }
 
     @Transactional(readOnly = true)
     public EmployeeCertificationResponse getDetail(Long id) {
-        EmployeeCertification ec = repo.findByIdAndDeletedAtIsNull(id)
-                .orElseThrow(() -> new RuntimeException("Certification not found"));
-        return toResponse(ec);
+        return getDetail(id, null);
+    }
+
+    @Transactional(readOnly = true)
+    public void assertCanAccess(Long id, List<Long> allowedCertIds) {
+        getByIdScoped(id, allowedCertIds);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<EmployeeCertificationResponse> getPagedFiltered(
+            List<Long> employeeIds,
+            List<String> certCodes,
+            List<Integer> levels,
+            List<String> subCodes,
+            List<Long> institutionIds,
+            List<String> statuses,
+            String search,
+            LocalDate certDateStart,
+            LocalDate certDateEnd,
+            LocalDate validUntilStart,
+            LocalDate validUntilEnd,
+            List<Long> allowedCertIds,
+            Pageable pageable) {
+
+        Specification<EmployeeCertification> spec = buildFilteredSpec(
+                employeeIds, certCodes, levels, subCodes, institutionIds, statuses, search,
+                certDateStart, certDateEnd, validUntilStart, validUntilEnd,
+                allowedCertIds);
+
+        return repo.findAll(spec, pageable).map(this::toResponse);
     }
 
     @Transactional(readOnly = true)
@@ -412,11 +490,38 @@ public class EmployeeCertificationService {
             LocalDate validUntilEnd,
             Pageable pageable) {
 
+        return getPagedFiltered(
+                employeeIds, certCodes, levels, subCodes, institutionIds, statuses, search,
+                certDateStart, certDateEnd, validUntilStart, validUntilEnd,
+                null,
+                pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public byte[] exportExcel(
+            List<Long> employeeIds,
+            List<String> certCodes,
+            List<Integer> levels,
+            List<String> subCodes,
+            List<Long> institutionIds,
+            List<String> statuses,
+            String search,
+            LocalDate certDateStart,
+            LocalDate certDateEnd,
+            LocalDate validUntilStart,
+            LocalDate validUntilEnd,
+            List<Long> allowedCertIds) {
+
         Specification<EmployeeCertification> spec = buildFilteredSpec(
                 employeeIds, certCodes, levels, subCodes, institutionIds, statuses, search,
-                certDateStart, certDateEnd, validUntilStart, validUntilEnd);
+                certDateStart, certDateEnd, validUntilStart, validUntilEnd,
+                allowedCertIds);
 
-        return repo.findAll(spec, pageable).map(this::toResponse);
+        Sort sort = Sort.by(Sort.Order.desc("createdAt"));
+        List<EmployeeCertification> rows = repo.findAll(spec, sort);
+        List<EmployeeCertificationResponse> data = rows.stream().map(this::toResponse).toList();
+
+        return buildCertificationExcel(data);
     }
 
     @Transactional(readOnly = true)
@@ -433,15 +538,10 @@ public class EmployeeCertificationService {
             LocalDate validUntilStart,
             LocalDate validUntilEnd) {
 
-        Specification<EmployeeCertification> spec = buildFilteredSpec(
+        return exportExcel(
                 employeeIds, certCodes, levels, subCodes, institutionIds, statuses, search,
-                certDateStart, certDateEnd, validUntilStart, validUntilEnd);
-
-        Sort sort = Sort.by(Sort.Order.desc("createdAt"));
-        List<EmployeeCertification> rows = repo.findAll(spec, sort);
-        List<EmployeeCertificationResponse> data = rows.stream().map(this::toResponse).toList();
-
-        return buildCertificationExcel(data);
+                certDateStart, certDateEnd, validUntilStart, validUntilEnd,
+                null);
     }
 
     private Specification<EmployeeCertification> buildFilteredSpec(
@@ -455,7 +555,8 @@ public class EmployeeCertificationService {
             LocalDate certDateStart,
             LocalDate certDateEnd,
             LocalDate validUntilStart,
-            LocalDate validUntilEnd) {
+            LocalDate validUntilEnd,
+            List<Long> allowedCertIds) {
 
         return EmployeeCertificationSpecification.notDeleted()
                 .and(EmployeeCertificationSpecification.byEmployeeIds(employeeIds))
@@ -466,7 +567,8 @@ public class EmployeeCertificationService {
                 .and(EmployeeCertificationSpecification.byStatuses(statuses))
                 .and(EmployeeCertificationSpecification.bySearch(search))
                 .and(EmployeeCertificationSpecification.byCertDateRange(certDateStart, certDateEnd))
-                .and(EmployeeCertificationSpecification.byValidUntilRange(validUntilStart, validUntilEnd));
+                .and(EmployeeCertificationSpecification.byValidUntilRange(validUntilStart, validUntilEnd))
+                .and(EmployeeCertificationSpecification.byAllowedCertificationIds(allowedCertIds));
     }
 
     private byte[] buildCertificationExcel(List<EmployeeCertificationResponse> data) {

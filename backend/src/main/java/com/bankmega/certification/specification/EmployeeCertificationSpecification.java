@@ -1,3 +1,4 @@
+// src/main/java/com/bankmega/certification/specification/EmployeeCertificationSpecification.java
 package com.bankmega.certification.specification;
 
 import com.bankmega.certification.entity.EmployeeCertification;
@@ -13,55 +14,45 @@ public class EmployeeCertificationSpecification {
     }
 
     public static Specification<EmployeeCertification> byEmployeeIds(List<Long> ids) {
-        return (root, query, cb) ->
-                (ids == null || ids.isEmpty())
-                        ? cb.conjunction()
-                        : root.get("employee").get("id").in(ids);
+        return (root, query, cb) -> (ids == null || ids.isEmpty())
+                ? cb.conjunction()
+                : root.get("employee").get("id").in(ids);
     }
 
     public static Specification<EmployeeCertification> byRuleIds(List<Long> ids) {
-        return (root, query, cb) ->
-                (ids == null || ids.isEmpty())
-                        ? cb.conjunction()
-                        : root.get("certificationRule").get("id").in(ids);
+        return (root, query, cb) -> (ids == null || ids.isEmpty())
+                ? cb.conjunction()
+                : root.get("certificationRule").get("id").in(ids);
     }
 
     public static Specification<EmployeeCertification> byInstitutionIds(List<Long> ids) {
-        return (root, query, cb) ->
-                (ids == null || ids.isEmpty())
-                        ? cb.conjunction()
-                        : root.get("institution").get("id").in(ids);
+        return (root, query, cb) -> (ids == null || ids.isEmpty())
+                ? cb.conjunction()
+                : root.get("institution").get("id").in(ids);
     }
 
     public static Specification<EmployeeCertification> byStatuses(List<String> statuses) {
-        return (root, query, cb) ->
-                (statuses == null || statuses.isEmpty())
-                        ? cb.conjunction()
-                        : root.get("status").as(String.class).in(statuses);
+        return (root, query, cb) -> (statuses == null || statuses.isEmpty())
+                ? cb.conjunction()
+                : root.get("status").as(String.class).in(statuses);
     }
 
-    // 🔹 Filter by Certification Code
     public static Specification<EmployeeCertification> byCertCodes(List<String> codes) {
-        return (root, query, cb) ->
-                (codes == null || codes.isEmpty())
-                        ? cb.conjunction()
-                        : root.get("certificationRule").get("certification").get("code").in(codes);
+        return (root, query, cb) -> (codes == null || codes.isEmpty())
+                ? cb.conjunction()
+                : root.get("certificationRule").get("certification").get("code").in(codes);
     }
 
-    // 🔹 Filter by Certification Level
     public static Specification<EmployeeCertification> byLevels(List<Integer> levels) {
-        return (root, query, cb) ->
-                (levels == null || levels.isEmpty())
-                        ? cb.conjunction()
-                        : root.get("certificationRule").get("certificationLevel").get("level").in(levels);
+        return (root, query, cb) -> (levels == null || levels.isEmpty())
+                ? cb.conjunction()
+                : root.get("certificationRule").get("certificationLevel").get("level").in(levels);
     }
 
-    // 🔹 Filter by SubField Code
     public static Specification<EmployeeCertification> bySubCodes(List<String> codes) {
-        return (root, query, cb) ->
-                (codes == null || codes.isEmpty())
-                        ? cb.conjunction()
-                        : root.get("certificationRule").get("subField").get("code").in(codes);
+        return (root, query, cb) -> (codes == null || codes.isEmpty())
+                ? cb.conjunction()
+                : root.get("certificationRule").get("subField").get("code").in(codes);
     }
 
     public static Specification<EmployeeCertification> byCertDateRange(LocalDate start, LocalDate end) {
@@ -90,7 +81,6 @@ public class EmployeeCertificationSpecification {
         };
     }
 
-
     public static Specification<EmployeeCertification> bySearch(String keyword) {
         return (root, query, cb) -> {
             if (keyword == null || keyword.trim().isEmpty()) {
@@ -103,8 +93,19 @@ public class EmployeeCertificationSpecification {
                     cb.like(cb.lower(root.get("employee").get("name")), like),
                     cb.like(cb.lower(root.get("certificationRule").get("certification").get("name")), like),
                     cb.like(cb.lower(root.get("certificationRule").get("certification").get("code")), like),
-                    cb.like(cb.lower(root.get("institution").get("name")), like)
-            );
+                    cb.like(cb.lower(root.get("institution").get("name")), like));
+        };
+    }
+
+    public static Specification<EmployeeCertification> byAllowedCertificationIds(List<Long> allowedCertIds) {
+        return (root, query, cb) -> {
+            if (allowedCertIds == null) {
+                return cb.conjunction();
+            }
+            if (allowedCertIds.isEmpty()) {
+                return cb.disjunction();
+            }
+            return root.get("certificationRule").get("certification").get("id").in(allowedCertIds);
         };
     }
 }

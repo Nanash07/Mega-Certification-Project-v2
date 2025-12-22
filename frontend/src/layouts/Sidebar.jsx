@@ -128,7 +128,7 @@ export const filterMenuByRole = (menu, roleRaw) => {
                     return {
                         ...item,
                         subMenu: item.subMenu.filter(
-                            (sub) => sub.label === "Konfigurasi Email" || sub.label === "Test Koneksi Email"
+                            (sub) => sub.label === "Template & Jadwal" || sub.label === "Test Koneksi Email"
                         ),
                     };
                 }

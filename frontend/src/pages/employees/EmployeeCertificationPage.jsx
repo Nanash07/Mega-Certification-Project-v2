@@ -1,3 +1,4 @@
+// src/pages/employees/EmployeeCertificationPage.jsx
 import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import Select from "react-select";
@@ -14,6 +15,7 @@ import {
 import { searchEmployees } from "../../services/employeeService";
 import { fetchCertificationRules } from "../../services/certificationRuleService";
 import { fetchInstitutions } from "../../services/institutionService";
+import { fetchMyPicScope } from "../../services/picScopeService";
 
 import CreateEmployeeCertificationModal from "../../components/employee-certifications/CreateEmployeeCertificationModal";
 import EditEmployeeCertificationModal from "../../components/employee-certifications/EditEmployeeCertificationModal";
@@ -22,7 +24,21 @@ import ViewEmployeeCertificationModal from "../../components/employee-certificat
 
 const TABLE_COLS = 15;
 
+function getCurrentRole() {
+    if (typeof window === "undefined") return "";
+    try {
+        const user = JSON.parse(localStorage.getItem("user") || "{}");
+        const fromUser = (user.role || "").toString().toUpperCase();
+        if (fromUser) return fromUser;
+    } catch {}
+    return (localStorage.getItem("role") || "").toString().toUpperCase();
+}
+
 export default function EmployeeCertificationPage() {
+    const [role] = useState(() => getCurrentRole());
+    const isPic = role === "PIC";
+    const isSuperadmin = role === "SUPERADMIN";
+
     const [rows, setRows] = useState([]);
     const [loading, setLoading] = useState(false);
 
@@ -135,7 +151,7 @@ export default function EmployeeCertificationPage() {
         try {
             const [rules, insts] = await Promise.all([fetchCertificationRules(), fetchInstitutions()]);
 
-            const certCodeOpts = [...new Set((rules || []).map((r) => r.certificationCode).filter(Boolean))]
+            const allCertCodeOpts = [...new Set((rules || []).map((r) => r.certificationCode).filter(Boolean))]
                 .sort()
                 .map((code) => ({ value: code, label: code }));
 
@@ -151,7 +167,14 @@ export default function EmployeeCertificationPage() {
                 .sort()
                 .map((sf) => ({ value: sf, label: sf }));
 
-            setCertCodeOptions(certCodeOpts);
+            if (isPic) {
+                const scope = await fetchMyPicScope();
+                const allowed = new Set((scope?.certifications || []).map((c) => c.certificationCode).filter(Boolean));
+                setCertCodeOptions(allCertCodeOpts.filter((o) => allowed.has(o.value)));
+            } else {
+                setCertCodeOptions(allCertCodeOpts);
+            }
+
             setLevelOptions(levelOpts);
             setSubFieldOptions(subFieldOpts);
             setInstitutionOptions((insts || []).map((i) => ({ value: i.id, label: i.name })));
@@ -226,7 +249,8 @@ export default function EmployeeCertificationPage() {
 
     useEffect(() => {
         loadFilters();
-    }, []);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [role]);
 
     const startIdx = totalElements === 0 ? 0 : (page - 1) * rowsPerPage + 1;
 
