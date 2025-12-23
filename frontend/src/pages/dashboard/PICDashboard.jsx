@@ -410,9 +410,7 @@ export default function PicDashboard() {
             {/* Judul */}
             <div>
                 <h1 className="text-2xl md:text-3xl font-bold">Dashboard PIC</h1>
-                <p className="text-sm opacity-70">
-                    Snapshot PIC{computedAt ? ` • ${formatShortIdDateTime(computedAt)}` : ""}
-                </p>
+                <p className="text-sm opacity-70 pt-1">{computedAt ? ` ${formatShortIdDateTime(computedAt)}` : ""}</p>
             </div>
 
             {/* Filter organisasi/sertifikasi */}

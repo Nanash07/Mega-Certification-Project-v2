@@ -31,7 +31,7 @@ export default function JobPositionPage() {
             setTotalPages(Math.max(data.totalPages || 1, 1));
             setTotalElements(data.totalElements ?? data.content?.length ?? 0);
         } catch {
-            toast.error("❌ Gagal memuat job position");
+            toast.error("Gagal memuat job position");
         } finally {
             setLoading(false);
         }
@@ -90,7 +90,7 @@ export default function JobPositionPage() {
             toast.success(`Job position berhasil di${newIsActive ? "aktifkan" : "nonaktifkan"}`);
             load();
         } catch (err) {
-            toast.error(err?.response?.data?.message || "❌ Gagal update status job position");
+            toast.error(err?.response?.data?.message || "Gagal update status job position");
         }
     }
 

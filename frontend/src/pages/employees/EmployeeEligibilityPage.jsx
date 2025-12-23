@@ -262,46 +262,9 @@ export default function EmployeeEligibilityPage() {
     return (
         <div>
             <div className="mb-4 space-y-3">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 text-xs">
-                    <div className="col-span-1">
-                        {!isSelfMode && (
-                            <AsyncSelect
-                                cacheOptions
-                                defaultOptions
-                                loadOptions={loadEmployees}
-                                value={filterEmployee}
-                                onChange={setFilterEmployee}
-                                placeholder="Filter Pegawai"
-                                isClearable
-                            />
-                        )}
-                    </div>
-
-                    <div className={showRefreshButton ? "col-span-2" : "col-span-3"} />
-
-                    <div className="col-span-1">
-                        <button
-                            type="button"
-                            className={`btn btn-neutral btn-sm w-full ${exporting ? "btn-disabled" : ""}`}
-                            onClick={onExport}
-                            disabled={exporting}
-                        >
-                            {exporting ? (
-                                <>
-                                    <span className="loading loading-spinner loading-xs" />
-                                    Exporting...
-                                </>
-                            ) : (
-                                <>
-                                    <Download className="w-4 h-4" />
-                                    Export Excel
-                                </>
-                            )}
-                        </button>
-                    </div>
-
+                <div className="grid grid-cols-1 sm:grid-cols-1 lg:grid-cols-6 gap-3 text-xs">
                     {showRefreshButton && (
-                        <div className="col-span-1">
+                        <div className="col-span-1 sm:col-span-1 lg:col-span-1">
                             <button
                                 type="button"
                                 className={`btn btn-primary btn-sm w-full ${refreshing ? "btn-disabled" : ""}`}
@@ -323,7 +286,30 @@ export default function EmployeeEligibilityPage() {
                         </div>
                     )}
 
-                    <div className="col-span-1">
+                    <div className="col-span-1 sm:col-span-2 lg:col-span-1">
+                        <button
+                            type="button"
+                            className={`btn btn-neutral btn-sm w-full ${exporting ? "btn-disabled" : ""}`}
+                            onClick={onExport}
+                            disabled={exporting}
+                        >
+                            {exporting ? (
+                                <>
+                                    <span className="loading loading-spinner loading-xs" />
+                                    Exporting...
+                                </>
+                            ) : (
+                                <>
+                                    <Download className="w-4 h-4" />
+                                    Export Excel
+                                </>
+                            )}
+                        </button>
+                    </div>
+
+                    <div className="col-span-3"></div>
+
+                    <div className="col-span-1 sm:col-span-2 lg:col-span-1">
                         <button
                             type="button"
                             className="btn btn-accent btn-soft border-accent btn-sm w-full"
@@ -345,7 +331,21 @@ export default function EmployeeEligibilityPage() {
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-3 text-xs">
+                    {!isSelfMode ? (
+                        <AsyncSelect
+                            cacheOptions
+                            defaultOptions
+                            loadOptions={loadEmployees}
+                            value={filterEmployee}
+                            onChange={setFilterEmployee}
+                            placeholder="Filter Pegawai"
+                            isClearable
+                        />
+                    ) : (
+                        <div />
+                    )}
+
                     <Select
                         options={jobOptions}
                         value={filterJob}

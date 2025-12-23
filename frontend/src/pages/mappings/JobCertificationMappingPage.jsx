@@ -158,7 +158,7 @@ export default function JobCertificationMappingPage() {
             setTotalElements(res.totalElements || 0);
         } catch (e) {
             console.error("fetchJobCertificationMappingsPaged error:", e);
-            toast.error("❌ Gagal memuat mapping");
+            toast.error("Gagal memuat mapping");
         } finally {
             setLoading(false);
         }
@@ -209,8 +209,8 @@ export default function JobCertificationMappingPage() {
                 setSubOptions((subs || []).map((s) => ({ value: s.code, label: s.code })));
             }
         } catch (err) {
-            console.error("❌ loadFilters error:", err);
-            toast.error("❌ Gagal memuat filter");
+            console.error("loadFilters error:", err);
+            toast.error("Gagal memuat filter");
         }
     }
 
@@ -474,7 +474,7 @@ export default function JobCertificationMappingPage() {
                                         toast.success("Mapping dihapus");
                                         load();
                                     })
-                                    .catch(() => toast.error("❌ Gagal menghapus mapping"))
+                                    .catch(() => toast.error("Gagal menghapus mapping"))
                                     .finally(() => setConfirm({ open: false, id: null }));
                             }}
                         >

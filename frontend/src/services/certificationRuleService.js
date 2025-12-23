@@ -10,7 +10,7 @@ export async function fetchCertificationRules() {
         const { data } = await api.get(BASE_URL);
         return Array.isArray(data) ? data : [];
     } catch (err) {
-        console.error("❌ fetchCertificationRules error:", err);
+        console.error("fetchCertificationRules error:", err);
         return [];
     }
 }
@@ -21,7 +21,7 @@ export async function fetchCertificationRulesPaged(params) {
         const { data } = await api.get(`${BASE_URL}/paged`, { params });
         return data || { content: [], totalPages: 0, totalElements: 0 };
     } catch (err) {
-        console.error("❌ fetchCertificationRulesPaged error:", err);
+        console.error("fetchCertificationRulesPaged error:", err);
         return { content: [], totalPages: 0, totalElements: 0 };
     }
 }
@@ -32,7 +32,7 @@ export async function fetchCertificationRuleById(id) {
         const { data } = await api.get(`${BASE_URL}/${id}`);
         return data || null;
     } catch (err) {
-        console.error("❌ fetchCertificationRuleById error:", err);
+        console.error("fetchCertificationRuleById error:", err);
         return null;
     }
 }
@@ -43,7 +43,7 @@ export async function createCertificationRule(payload) {
         const { data } = await api.post(BASE_URL, payload);
         return data;
     } catch (err) {
-        console.error("❌ createCertificationRule error:", err);
+        console.error("createCertificationRule error:", err);
         throw err;
     }
 }
@@ -54,7 +54,7 @@ export async function updateCertificationRule(id, payload) {
         const { data } = await api.put(`${BASE_URL}/${id}`, payload);
         return data;
     } catch (err) {
-        console.error("❌ updateCertificationRule error:", err);
+        console.error("updateCertificationRule error:", err);
         throw err;
     }
 }
@@ -65,7 +65,7 @@ export async function deleteCertificationRule(id) {
         await api.delete(`${BASE_URL}/${id}`);
         return true;
     } catch (err) {
-        console.error("❌ deleteCertificationRule error:", err);
+        console.error("deleteCertificationRule error:", err);
         throw err;
     }
 }
@@ -76,7 +76,7 @@ export async function toggleCertificationRule(id) {
         const { data } = await api.put(`${BASE_URL}/${id}/toggle`);
         return data;
     } catch (err) {
-        console.error("❌ toggleCertificationRule error:", err);
+        console.error("toggleCertificationRule error:", err);
         throw err;
     }
 }
@@ -89,7 +89,7 @@ export async function fetchCertifications() {
         const { data } = await api.get("/certifications");
         return Array.isArray(data) ? data : [];
     } catch (err) {
-        console.error("❌ fetchCertifications error:", err);
+        console.error("fetchCertifications error:", err);
         return [];
     }
 }
@@ -100,7 +100,7 @@ export async function fetchCertificationLevels() {
         const { data } = await api.get("/certification-levels");
         return Array.isArray(data) ? data : [];
     } catch (err) {
-        console.error("❌ fetchCertificationLevels error:", err);
+        console.error("fetchCertificationLevels error:", err);
         return [];
     }
 }
@@ -111,7 +111,7 @@ export async function fetchSubFields() {
         const { data } = await api.get("/sub-fields");
         return Array.isArray(data) ? data : [];
     } catch (err) {
-        console.error("❌ fetchSubFields error:", err);
+        console.error("fetchSubFields error:", err);
         return [];
     }
 }

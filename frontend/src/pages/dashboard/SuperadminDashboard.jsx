@@ -402,9 +402,7 @@ export default function SuperadminDashboard() {
             {/* Judul */}
             <div>
                 <h1 className="text-2xl md:text-3xl font-bold">Superadmin Dashboard</h1>
-                <p className="text-sm opacity-70">
-                    Snapshot sistem{computedAt ? ` • ${formatShortIdDateTime(computedAt)}` : ""}
-                </p>
+                <p className="text-sm opacity-70 pt-1">{computedAt ? ` ${formatShortIdDateTime(computedAt)}` : ""}</p>
             </div>
 
             {/* Filter organisasi/sertifikasi */}

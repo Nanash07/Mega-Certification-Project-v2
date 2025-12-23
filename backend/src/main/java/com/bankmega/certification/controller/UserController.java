@@ -23,7 +23,6 @@ public class UserController {
 
     private final UserService service;
 
-    // ==== helper: cek apakah current user adalah PIC ====
     private boolean isPic(Authentication auth) {
         return auth != null && auth.getAuthorities().stream().anyMatch(a -> {
             String r = a.getAuthority();
@@ -31,7 +30,6 @@ public class UserController {
         });
     }
 
-    // ===================== GET PAGE (with filter & search) =====================
     @GetMapping
     public ResponseEntity<Page<UserResponse>> getAll(
             @RequestParam(required = false) Long roleId,
@@ -46,8 +44,6 @@ public class UserController {
         return ResponseEntity.ok(result);
     }
 
-    // ===================== GET ACTIVE USERS (for dropdown / async select)
-    // =====================
     @GetMapping("/active")
     public ResponseEntity<List<UserResponse>> getActiveUsers(
             @RequestParam(required = false) String q,
@@ -58,14 +54,12 @@ public class UserController {
         return ResponseEntity.ok(result);
     }
 
-    // ===================== GET ONE =====================
     @GetMapping("/{id}")
     public ResponseEntity<UserResponse> getById(@PathVariable Long id, Authentication auth) {
         boolean callerIsPic = isPic(auth);
         return ResponseEntity.ok(service.getById(id, callerIsPic));
     }
 
-    // ===================== CREATE =====================
     @PostMapping
     public ResponseEntity<UserResponse> create(
             @Valid @RequestBody UserRequest req,
@@ -78,7 +72,6 @@ public class UserController {
                 .body(created);
     }
 
-    // ===================== UPDATE =====================
     @PutMapping("/{id}")
     public ResponseEntity<UserResponse> update(
             @PathVariable Long id,
@@ -89,7 +82,6 @@ public class UserController {
         return ResponseEntity.ok(service.update(id, req, callerIsPic));
     }
 
-    // ===================== TOGGLE STATUS (aktif / nonaktif) =====================
     @PutMapping("/{id}/toggle")
     public ResponseEntity<UserResponse> toggle(
             @PathVariable Long id,
@@ -99,7 +91,6 @@ public class UserController {
         return ResponseEntity.ok(service.toggleStatus(id, callerIsPic));
     }
 
-    // ===================== DELETE (Soft Delete) =====================
     @DeleteMapping("/{id}")
     public ResponseEntity<Map<String, Object>> delete(
             @PathVariable Long id,

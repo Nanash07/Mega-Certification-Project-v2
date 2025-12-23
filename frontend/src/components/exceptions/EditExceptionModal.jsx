@@ -52,7 +52,7 @@ export default function EditExceptionModal({ open, onClose, onSaved, initial, pi
                 setRules(effectiveRules);
             } catch (e) {
                 console.error("load EditExceptionModal error:", e);
-                toast.error("❌ Gagal memuat data untuk edit exception");
+                toast.error("Gagal memuat data untuk edit exception");
             }
         };
 
@@ -76,7 +76,7 @@ export default function EditExceptionModal({ open, onClose, onSaved, initial, pi
             onSaved?.();
             onClose();
         } catch (err) {
-            toast.error(err?.response?.data?.message || "❌ Gagal mengupdate exception");
+            toast.error(err?.response?.data?.message || "Gagal mengupdate exception");
         }
     }
 

@@ -16,7 +16,7 @@ export async function fetchJobCertMappingHistories(params = {}) {
             size: data.size || 0,
         };
     } catch (err) {
-        console.error("❌ fetchJobCertMappingHistories error:", err);
+        console.error("fetchJobCertMappingHistories error:", err);
         return { content: [], totalPages: 0, totalElements: 0 };
     }
 }

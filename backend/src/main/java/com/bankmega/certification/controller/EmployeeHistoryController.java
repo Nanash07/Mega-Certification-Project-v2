@@ -1,3 +1,4 @@
+// src/main/java/com/bankmega/certification/controller/EmployeeHistoryController.java
 package com.bankmega.certification.controller;
 
 import com.bankmega.certification.dto.EmployeeHistoryResponse;
@@ -7,9 +8,15 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 
 @RestController
 @RequestMapping("/api/employee-histories")
@@ -19,7 +26,7 @@ public class EmployeeHistoryController {
     private final EmployeeHistoryService historyService;
 
     @GetMapping
-    public Page<EmployeeHistoryResponse> getHistories(
+    public ResponseEntity<Page<EmployeeHistoryResponse>> getHistories(
             @RequestParam(required = false) Long employeeId,
             @RequestParam(defaultValue = "all") String actionType,
             @RequestParam(required = false) String search,
@@ -30,12 +37,33 @@ public class EmployeeHistoryController {
 
         Pageable pageable = PageRequest.of(page, size);
 
-        return historyService.getPagedHistory(
+        return ResponseEntity.ok(historyService.getPagedHistory(
                 employeeId,
                 actionType,
                 search,
                 startDate,
                 endDate,
-                pageable);
+                pageable));
+    }
+
+    @GetMapping("/export")
+    public ResponseEntity<byte[]> exportExcel(
+            @RequestParam(required = false) Long employeeId,
+            @RequestParam(defaultValue = "all") String actionType,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+
+        byte[] file = historyService.exportExcel(employeeId, actionType, search, startDate, endDate);
+
+        ZoneId wib = ZoneId.of("Asia/Jakarta");
+        String ts = ZonedDateTime.now(wib).format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
+        String filename = "employee_histories_" + ts + ".xlsx";
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                .contentType(MediaType.parseMediaType(
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(file);
     }
 }

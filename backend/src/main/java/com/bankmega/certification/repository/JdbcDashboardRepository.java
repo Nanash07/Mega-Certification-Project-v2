@@ -121,7 +121,7 @@ public class JdbcDashboardRepository implements DashboardRepository {
         if (f.getEndDate() != null) {
             p.addValue("endDate", f.getEndDate());
         }
-        // ❌ batchType sudah tidak dipakai lagi
+        // batchType sudah tidak dipakai lagi
         return p;
     }
 

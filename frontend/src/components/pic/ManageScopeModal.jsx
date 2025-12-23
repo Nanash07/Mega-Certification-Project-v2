@@ -35,7 +35,7 @@ export default function ManageScopeModal({ open, onClose, user, onSaved }) {
                     })) || [];
                 setSelected(current);
             } catch (e) {
-                console.error("❌ Gagal load certifications:", e);
+                console.error("Gagal load certifications:", e);
                 toast.error("Gagal memuat certifications");
             }
         })();
@@ -59,7 +59,7 @@ export default function ManageScopeModal({ open, onClose, user, onSaved }) {
             onSaved?.();
             onClose?.();
         } catch (e) {
-            console.error("❌ Gagal simpan scope PIC:", e);
+            console.error("Gagal simpan scope PIC:", e);
             toast.error("Gagal menyimpan scope PIC");
         } finally {
             setLoading(false);

@@ -2,9 +2,15 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import Select from "react-select";
+import AsyncSelect from "react-select/async";
 import Pagination from "../../components/common/Pagination";
-import { fetchEmployeeHistories } from "../../services/employeeHistoryService";
-import { ArrowLeft } from "lucide-react";
+import {
+    fetchEmployeeHistories,
+    exportEmployeeHistoriesExcel,
+    searchEmployeeOptionsFromHistories,
+    fetchDefaultEmployeeOptionsFromHistories,
+} from "../../services/employeeHistoryService";
+import { ArrowLeft, Download } from "lucide-react";
 
 const ACTION_OPTIONS = [
     { value: "all", label: "Semua Aksi" },
@@ -38,24 +44,19 @@ const badgeClass = (actionType) => {
 export default function EmployeeHistoryPage() {
     const navigate = useNavigate();
 
-    // data
     const [rows, setRows] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [exporting, setExporting] = useState(false);
 
-    // pagination
     const [page, setPage] = useState(1);
     const [rowsPerPage, setRowsPerPage] = useState(10);
     const [totalPages, setTotalPages] = useState(0);
     const [totalElements, setTotalElements] = useState(0);
 
-    // filters
-    const [filterEmployee, setFilterEmployee] = useState(null); // {value,label}
+    const [filterEmployee, setFilterEmployee] = useState(null);
     const [filterAction, setFilterAction] = useState(ACTION_OPTIONS[0]);
     const [startDate, setStartDate] = useState("");
     const [endDate, setEndDate] = useState("");
-
-    // options pegawai (react-select biasa)
-    const [employeeOptions, setEmployeeOptions] = useState([]);
 
     const startIdx = useMemo(
         () => (totalElements === 0 ? 0 : (page - 1) * rowsPerPage + 1),
@@ -67,47 +68,17 @@ export default function EmployeeHistoryPage() {
         const d = new Date(val);
         if (Number.isNaN(d.getTime())) return "-";
         return d.toLocaleDateString("id-ID", {
+            timeZone: "Asia/Jakarta",
             day: "2-digit",
             month: "short",
             year: "numeric",
         });
     };
 
-    // ====== Load list pegawai (simple, seperti sebelumnya) ======
-    // NOTE: Ini masih fallback dari histories. Kalau mau lengkap, idealnya endpoint employees/options.
-    const loadEmployeeList = useCallback(async () => {
-        try {
-            const data = await fetchEmployeeHistories({ page: 0, size: 2000 });
-
-            const unique = new Map();
-            data.content.forEach((h) => {
-                if (h?.employeeId && !unique.has(h.employeeId)) {
-                    unique.set(h.employeeId, {
-                        value: h.employeeId,
-                        label: `${h.employeeNip || "-"} - ${h.employeeName || "-"}`,
-                    });
-                }
-            });
-
-            // sort biar enak dicari di dropdown
-            const opts = Array.from(unique.values()).sort((a, b) => a.label.localeCompare(b.label));
-
-            setEmployeeOptions(opts);
-        } catch (err) {
-            console.error("❌ Gagal load list pegawai:", err);
-        }
-    }, []);
-
-    useEffect(() => {
-        loadEmployeeList();
-    }, [loadEmployeeList]);
-
-    // ====== Reset page kalau filter berubah (biar filter gak “kayak ga jalan”) ======
     useEffect(() => {
         setPage(1);
     }, [filterEmployee, filterAction, startDate, endDate]);
 
-    // ====== Load histories ======
     const load = useCallback(async () => {
         setLoading(true);
         try {
@@ -149,29 +120,78 @@ export default function EmployeeHistoryPage() {
         toast.success("Filter berhasil direset");
     };
 
+    const handleExport = async () => {
+        try {
+            if (startDate && endDate && startDate > endDate) {
+                toast.error("Tanggal awal tidak boleh melebihi tanggal akhir");
+                return;
+            }
+
+            setExporting(true);
+
+            await exportEmployeeHistoriesExcel({
+                actionType: filterAction?.value || "all",
+                employeeId: filterEmployee?.value ?? null,
+                startDate,
+                endDate,
+            });
+
+            toast.success("Export Excel berhasil");
+        } catch (err) {
+            toast.error("Gagal export Excel");
+        } finally {
+            setExporting(false);
+        }
+    };
+
+    const loadEmployeeOptions = useCallback(async (inputValue) => {
+        try {
+            const q = (inputValue ?? "").trim();
+
+            // default: munculin 10 tanpa search
+            if (q.length === 0) {
+                return await fetchDefaultEmployeeOptionsFromHistories();
+            }
+
+            // biar gak berat: search minimal 3 huruf
+            if (q.length < 3) {
+                return [];
+            }
+
+            return await searchEmployeeOptionsFromHistories(q);
+        } catch (err) {
+            return [];
+        }
+    }, []);
+
     return (
         <div className="p-4 space-y-5">
-            {/* Back button */}
             <div className="flex justify-start mb-3">
                 <button className="btn btn-accent btn-sm flex items-center gap-2" onClick={() => navigate(-1)}>
                     <ArrowLeft size={16} /> Kembali
                 </button>
             </div>
 
-            {/* Filters */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 text-xs items-end">
-                {/* Pegawai (react-select biasa) */}
-                <Select
-                    options={employeeOptions}
+                <AsyncSelect
+                    cacheOptions
+                    defaultOptions={true}
+                    loadOptions={loadEmployeeOptions}
                     value={filterEmployee}
                     onChange={setFilterEmployee}
-                    placeholder="Filter Pegawai"
+                    placeholder="Cari Pegawai"
                     isClearable
                     isSearchable
                     className="text-sm"
+                    noOptionsMessage={({ inputValue }) => {
+                        const q = (inputValue ?? "").trim();
+                        if (q.length === 0) return "Tidak ada data";
+                        if (q.length < 3) return "Ketik minimal 3 huruf untuk mencari";
+                        return "Tidak ditemukan";
+                    }}
+                    loadingMessage={() => "Mencari..."}
                 />
 
-                {/* Aksi */}
                 <Select
                     options={ACTION_OPTIONS}
                     value={filterAction}
@@ -180,7 +200,6 @@ export default function EmployeeHistoryPage() {
                     className="text-sm"
                 />
 
-                {/* Start Date */}
                 <div className="flex flex-col gap-1">
                     <label className="text-xs font-medium text-gray-600">Tanggal Mulai</label>
                     <input
@@ -191,7 +210,6 @@ export default function EmployeeHistoryPage() {
                     />
                 </div>
 
-                {/* End Date */}
                 <div className="flex flex-col gap-1">
                     <label className="text-xs font-medium text-gray-600">Tanggal Akhir</label>
                     <input
@@ -203,18 +221,29 @@ export default function EmployeeHistoryPage() {
                     />
                 </div>
 
-                {/* Export */}
-                <button className="btn btn-warning btn-sm w-full" onClick={() => toast("📥 Coming Soon: Export Excel")}>
-                    Export Excel
+                <button
+                    className="btn btn-neutral btn-sm w-full flex items-center gap-2"
+                    onClick={handleExport}
+                    disabled={exporting}
+                >
+                    {exporting ? (
+                        <>
+                            <span className="loading loading-spinner loading-sm" />
+                            Exporting
+                        </>
+                    ) : (
+                        <>
+                            <Download size={16} />
+                            Export Excel
+                        </>
+                    )}
                 </button>
 
-                {/* Clear Filter */}
                 <button className="btn btn-accent btn-soft border-accent btn-sm w-full" onClick={resetFilter}>
                     Clear Filter
                 </button>
             </div>
 
-            {/* Table */}
             <div className="overflow-x-auto rounded-xl border border-gray-200 shadow bg-base-100">
                 <table className="table table-zebra text-xs">
                     <thead className="bg-base-200">
@@ -226,9 +255,12 @@ export default function EmployeeHistoryPage() {
                             <th>Nama Pegawai</th>
                             <th>Jabatan Lama</th>
                             <th>Jabatan Baru</th>
-                            <th>Unit</th>
-                            <th>Divisi</th>
-                            <th>Regional</th>
+                            <th>Unit Lama</th>
+                            <th>Unit Baru</th>
+                            <th>Divisi Lama</th>
+                            <th>Divisi Baru</th>
+                            <th>Regional Lama</th>
+                            <th>Regional Baru</th>
                             <th>Tanggal Efektif</th>
                         </tr>
                     </thead>
@@ -236,13 +268,13 @@ export default function EmployeeHistoryPage() {
                     <tbody>
                         {loading ? (
                             <tr>
-                                <td colSpan={11} className="text-center py-10">
+                                <td colSpan={14} className="text-center py-10">
                                     <span className="loading loading-dots loading-md" />
                                 </td>
                             </tr>
                         ) : rows.length === 0 ? (
                             <tr>
-                                <td colSpan={11} className="text-center text-gray-400 py-10">
+                                <td colSpan={14} className="text-center text-gray-400 py-10">
                                     Tidak ada data
                                 </td>
                             </tr>
@@ -260,8 +292,11 @@ export default function EmployeeHistoryPage() {
                                     <td>{h.employeeName || "-"}</td>
                                     <td>{h.oldJobTitle || "-"}</td>
                                     <td>{h.newJobTitle || "-"}</td>
+                                    <td>{h.oldUnitName || "-"}</td>
                                     <td>{h.newUnitName || "-"}</td>
+                                    <td>{h.oldDivisionName || "-"}</td>
                                     <td>{h.newDivisionName || "-"}</td>
+                                    <td>{h.oldRegionalName || "-"}</td>
                                     <td>{h.newRegionalName || "-"}</td>
                                     <td>{formatDate(h.effectiveDate)}</td>
                                 </tr>
@@ -271,7 +306,6 @@ export default function EmployeeHistoryPage() {
                 </table>
             </div>
 
-            {/* Pagination */}
             <Pagination
                 page={page}
                 totalPages={totalPages}

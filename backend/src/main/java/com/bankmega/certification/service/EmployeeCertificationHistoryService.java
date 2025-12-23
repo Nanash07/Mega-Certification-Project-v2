@@ -23,7 +23,7 @@ public class EmployeeCertificationHistoryService {
         public void snapshot(EmployeeCertification ec, EmployeeCertificationHistory.ActionType actionType) {
                 // Kalau UPDATE, cek dulu apakah ada perubahan nyata
                 if (actionType == EmployeeCertificationHistory.ActionType.UPDATED && !hasChanged(ec)) {
-                        return; // ❌ skip, ga perlu catet history
+                        return; // skip, ga perlu catet history
                 }
 
                 EmployeeCertificationHistory history = EmployeeCertificationHistory.builder()

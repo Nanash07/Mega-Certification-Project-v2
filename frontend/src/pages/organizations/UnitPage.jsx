@@ -35,7 +35,7 @@ export default function UnitPage() {
             setTotalPages(Math.max(data.totalPages || 1, 1));
             setTotalElements(data.totalElements ?? data.content?.length ?? 0);
         } catch {
-            toast.error("❌ Gagal memuat unit");
+            toast.error("Gagal memuat unit");
         } finally {
             setLoading(false);
         }
@@ -51,7 +51,7 @@ export default function UnitPage() {
             toast.success("Status unit berhasil diperbarui");
             load();
         } catch (err) {
-            const msg = err?.response?.data?.message || "❌ Gagal update status unit";
+            const msg = err?.response?.data?.message || "Gagal update status unit";
             toast.error(msg);
         }
     }
@@ -105,7 +105,7 @@ export default function UnitPage() {
             toast.success(`Unit berhasil di${newIsActive ? "aktifkan" : "nonaktifkan"}`);
             load();
         } catch (err) {
-            const msg = err?.response?.data?.message || "❌ Gagal update status unit";
+            const msg = err?.response?.data?.message || "Gagal update status unit";
             toast.error(msg);
         }
     }

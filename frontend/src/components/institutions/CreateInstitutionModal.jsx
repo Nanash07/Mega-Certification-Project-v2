@@ -35,7 +35,7 @@ export default function CreateInstitutionModal({ open, onClose, onSaved }) {
             onSaved?.();
             onClose?.();
         } catch (err) {
-            toast.error(err?.response?.data?.message || err?.message || "❌ Gagal menambah institution");
+            toast.error(err?.response?.data?.message || err?.message || "Gagal menambah institution");
         } finally {
             setSubmitting(false);
         }

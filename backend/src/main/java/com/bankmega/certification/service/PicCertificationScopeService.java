@@ -27,7 +27,6 @@ public class PicCertificationScopeService {
         private final UserRepository userRepo;
         private final CertificationRepository certRepo;
 
-        // Ambil semua PIC + scope-nya
         public List<PicCertificationScopeResponse> getAll() {
                 return userRepo.findByDeletedAtIsNull().stream()
                                 .filter(u -> u.getRole() != null && "PIC".equalsIgnoreCase(u.getRole().getName()))
@@ -35,14 +34,12 @@ public class PicCertificationScopeService {
                                 .toList();
         }
 
-        // Ambil scope untuk 1 PIC
         public PicCertificationScopeResponse getByUser(Long userId) {
                 User user = userRepo.findById(userId)
                                 .orElseThrow(() -> new NotFoundException("User not found: " + userId));
                 return mapUserToResponse(user);
         }
 
-        // Update scope PIC
         @Transactional
         public PicCertificationScopeResponse updateScope(Long userId, PicCertificationScopeRequest req) {
                 User user = userRepo.findById(userId)
@@ -59,12 +56,10 @@ public class PicCertificationScopeService {
                         return mapUserToResponse(user);
                 }
 
-                // remove yang tidak ada di request
                 existing.stream()
                                 .filter(s -> !newIds.contains(s.getCertification().getId()))
                                 .forEach(scopeRepo::delete);
 
-                // tambah yang baru
                 newIds.stream()
                                 .filter(id -> !existingIds.contains(id))
                                 .forEach(certId -> {

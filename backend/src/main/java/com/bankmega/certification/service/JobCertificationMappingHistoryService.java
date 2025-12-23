@@ -22,10 +22,9 @@ public class JobCertificationMappingHistoryService {
 
         private final JobCertificationMappingHistoryRepository historyRepo;
 
-        // ============================================================
-        // 🔹 Snapshot otomatis saat ada aksi CREATE / UPDATE / TOGGLE / DELETE
-        // ============================================================
-        public void snapshot(JobCertificationMapping mapping, JobCertificationMappingHistory.ActionType action) {
+        public void snapshot(
+                        JobCertificationMapping mapping,
+                        JobCertificationMappingHistory.ActionType action) {
                 if (mapping == null) {
                         return;
                 }
@@ -33,8 +32,10 @@ public class JobCertificationMappingHistoryService {
                 try {
                         JobCertificationMappingHistory h = JobCertificationMappingHistory.builder()
                                         .mapping(mapping)
-                                        .jobName(mapping.getJobPosition() != null ? mapping.getJobPosition().getName()
-                                                        : null)
+                                        .jobName(
+                                                        mapping.getJobPosition() != null
+                                                                        ? mapping.getJobPosition().getName()
+                                                                        : null)
                                         .certificationCode(
                                                         mapping.getCertificationRule() != null
                                                                         && mapping.getCertificationRule()
@@ -65,10 +66,13 @@ public class JobCertificationMappingHistoryService {
                                         .build();
 
                         historyRepo.save(h);
-                        log.info("History mapping tersimpan: [{} - {}] action={}",
-                                        h.getJobName(), h.getCertificationCode(), action);
+                        log.info(
+                                        "History mapping tersimpan: [{} - {}] action={}",
+                                        h.getJobName(),
+                                        h.getCertificationCode(),
+                                        action);
                 } catch (Exception e) {
-                        log.error("❌ Gagal menyimpan history mapping: {}", e.getMessage());
+                        log.error("Gagal menyimpan history mapping: {}", e.getMessage());
                 }
         }
 
@@ -90,8 +94,9 @@ public class JobCertificationMappingHistoryService {
                                 .and(JobCertificationMappingHistorySpecification.byActionType(actionType))
                                 .and(JobCertificationMappingHistorySpecification.byDateRange(start, end))
                                 .and(JobCertificationMappingHistorySpecification.bySearch(search))
-                                .and(JobCertificationMappingHistorySpecification
-                                                .byAllowedCertificationIds(allowedCertificationIds));
+                                .and(
+                                                JobCertificationMappingHistorySpecification
+                                                                .byAllowedCertificationIds(allowedCertificationIds));
 
                 Pageable sorted = PageRequest.of(
                                 pageable.getPageNumber(),
@@ -101,10 +106,8 @@ public class JobCertificationMappingHistoryService {
                 return historyRepo.findAll(spec, sorted).map(this::toResponse);
         }
 
-        // ============================================================
-        // 🔹 Mapping Entity → DTO
-        // ============================================================
-        private JobCertificationMappingHistoryResponse toResponse(JobCertificationMappingHistory h) {
+        private JobCertificationMappingHistoryResponse toResponse(
+                        JobCertificationMappingHistory h) {
                 if (h == null) {
                         return null;
                 }

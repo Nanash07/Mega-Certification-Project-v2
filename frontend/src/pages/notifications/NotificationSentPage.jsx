@@ -9,9 +9,9 @@ import Pagination from "../../components/common/Pagination";
 
 const TABS = [
     { id: "ALL", label: "Semua" },
-    { id: "CERT_REMINDER", label: "Reminder" },
-    { id: "BATCH_NOTIFICATION", label: "Batch" },
-    { id: "EXPIRED_NOTICE", label: "Expired" },
+    { id: "CERT_REMINDER", label: "Due Reminder" },
+    { id: "BATCH_NOTIFICATION", label: "Batch Reminder" },
+    { id: "EXPIRED_NOTICE", label: "Expired Reminder" },
 ];
 
 const STATUS_OPTIONS = [
@@ -39,7 +39,6 @@ export default function NotificationSentPage() {
 
     const [selected, setSelected] = useState(null);
 
-    // Handle open modal from navbar dropdown
     const urlParams = new URLSearchParams(location.search);
     const openId = urlParams.get("open");
 
@@ -71,7 +70,6 @@ export default function NotificationSentPage() {
         load();
     }, [page, rowsPerPage, activeTab, status, startDate, endDate]);
 
-    // Buka modal otomatis kalau datang dari navbar
     useEffect(() => {
         if (!openId || rows.length === 0) return;
 
@@ -90,9 +88,9 @@ export default function NotificationSentPage() {
 
     const getTypeLabel = (type) => {
         const map = {
-            CERT_REMINDER: "Reminder",
-            BATCH_NOTIFICATION: "Batch",
-            EXPIRED_NOTICE: "Expired",
+            CERT_REMINDER: "Due Reminder",
+            BATCH_NOTIFICATION: "Batch Reminder",
+            EXPIRED_NOTICE: "Expired Reminder",
         };
         return map[type] || "-";
     };
@@ -127,12 +125,10 @@ export default function NotificationSentPage() {
 
     return (
         <div className="space-y-6 w-full">
-            {/* Back Button */}
             <button className="btn btn-sm btn-accent mb-2 flex items-center gap-2" onClick={() => navigate(-1)}>
                 <ArrowLeft size={16} /> Kembali
             </button>
 
-            {/* Tabs di luar card */}
             <div className="tabs tabs-lift w-full mb-0">
                 {TABS.map((t) => (
                     <button
@@ -148,9 +144,7 @@ export default function NotificationSentPage() {
                 ))}
             </div>
 
-            {/* Card */}
             <div className="card bg-base-100 shadow p-6 w-full border-t-0 rounded-t-none">
-                {/* Filters */}
                 <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-5 text-xs">
                     <div className="flex flex-col gap-1">
                         <label className="font-semibold">Status (Penerima)</label>
@@ -185,7 +179,6 @@ export default function NotificationSentPage() {
                     </div>
                 </div>
 
-                {/* List */}
                 {loading ? (
                     <div className="flex justify-center py-10">
                         <span className="loading loading-dots loading-md" />
@@ -220,7 +213,6 @@ export default function NotificationSentPage() {
                     </div>
                 )}
 
-                {/* Pagination */}
                 <Pagination
                     page={page}
                     totalPages={totalPages}
@@ -234,7 +226,6 @@ export default function NotificationSentPage() {
                 />
             </div>
 
-            {/* Modal */}
             {selected && (
                 <dialog className="modal modal-open">
                     <div className="modal-box max-w-xl">

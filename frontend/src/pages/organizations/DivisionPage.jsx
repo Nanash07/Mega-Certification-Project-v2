@@ -31,7 +31,7 @@ export default function DivisionPage() {
             setTotalPages(Math.max(data.totalPages || 1, 1));
             setTotalElements(data.totalElements ?? data.content?.length ?? 0);
         } catch {
-            toast.error("❌ Gagal memuat division");
+            toast.error("Gagal memuat division");
         } finally {
             setLoading(false);
         }
@@ -90,7 +90,7 @@ export default function DivisionPage() {
             toast.success(`Division berhasil di${newIsActive ? "aktifkan" : "nonaktifkan"}`);
             load();
         } catch (err) {
-            toast.error(err?.response?.data?.message || "❌ Gagal update status division");
+            toast.error(err?.response?.data?.message || "Gagal update status division");
         }
     }
 

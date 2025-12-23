@@ -67,14 +67,10 @@ public class EmployeeImportProcessor {
                                 .build()));
     }
 
-    // ===========================================================
-    // PUBLIC
-    // ===========================================================
-
     @Transactional(readOnly = true)
     public EmployeeImportResponse dryRun(MultipartFile file, User user) throws Exception {
         preloadMasters();
-        ImportPlan plan = buildPlan(file, true, true); // strictGuard ON
+        ImportPlan plan = buildPlan(file, true, true);
         EmployeeImportResponse res = plan.toResponse(file.getOriginalFilename(), true);
         res.setMessage("Dry run selesai oleh " + user.getUsername());
         return res;
@@ -83,20 +79,17 @@ public class EmployeeImportProcessor {
     @Transactional
     public EmployeeImportResponse confirm(MultipartFile file, User user) throws Exception {
         preloadMasters();
-        ImportPlan plan = buildPlan(file, false, true); // strictGuard ON
+        ImportPlan plan = buildPlan(file, false, true);
 
-        // 1) Persist employees (batch)
         batchSave(plan.newEmployees, empRepo::saveAll);
-        batchSave(plan.rehiredEmployees, empRepo::saveAll); // REHIRED saved
+        batchSave(plan.rehiredEmployees, empRepo::saveAll);
         batchSave(plan.updatedEmployees, empRepo::saveAll);
         batchSave(plan.mutatedEmployees, empRepo::saveAll);
         batchSave(plan.resignedEmployees, empRepo::saveAll);
 
         historyService.flushBatch();
 
-        // 2) AFTER COMMIT — aman FK
         runAfterCommit(() -> {
-            // akun (by NIP)
             if (!plan.createdOrRehiredForAccount.isEmpty()) {
                 List<String> upsertNips = plan.createdOrRehiredForAccount.stream()
                         .map(Employee::getNip)
@@ -106,7 +99,6 @@ public class EmployeeImportProcessor {
                 safe(() -> userService.batchUpsertAccountsByNips(upsertNips, pegawaiRole));
             }
 
-            // resign → deactivate accounts + invalidate certs
             if (!plan.resignedEmployees.isEmpty()) {
                 List<Long> resignedIds = plan.resignedEmployees.stream()
                         .map(Employee::getId)
@@ -117,7 +109,6 @@ public class EmployeeImportProcessor {
                 safe(() -> certificationService.bulkInvalidateByEmployeeIds(resignedIds));
             }
 
-            // rehire → re-enable cert flow
             if (!plan.rehiredEmployees.isEmpty()) {
                 List<Long> rehiredIds = plan.rehiredEmployees.stream()
                         .map(Employee::getId)
@@ -129,7 +120,6 @@ public class EmployeeImportProcessor {
             }
         });
 
-        // 3) Log
         saveImportLog(user, file, plan);
 
         EmployeeImportResponse res = plan.toResponse(file.getOriginalFilename(), false);
@@ -148,17 +138,12 @@ public class EmployeeImportProcessor {
             jobRepo.findAll().forEach(j -> jobCache.put(norm(j.getName()), j));
     }
 
-    // ===========================================================
-    // CORE
-    // ===========================================================
-
     private ImportPlan buildPlan(MultipartFile file, boolean dryRun, boolean strictGuard) throws Exception {
         List<ImportRow> rows = parseExcel(file);
         ImportPlan plan = new ImportPlan();
         if (rows.isEmpty())
             return plan;
 
-        // Guard: full snapshot detection (hindari mass-resign karena file parsial)
         if (strictGuard) {
             int activeNow = empRepo.findByDeletedAtIsNull().size();
             if (!dryRun && rows.size() < Math.max(50, (int) (activeNow * 0.6))) {
@@ -170,7 +155,6 @@ public class EmployeeImportProcessor {
 
         plan.processed = rows.size();
 
-        // Deteksi NIP duplikat di file
         Map<String, List<Integer>> dupMap = new HashMap<>();
         for (ImportRow rr : rows) {
             if (rr.nip != null && !rr.nip.isBlank()) {
@@ -183,7 +167,6 @@ public class EmployeeImportProcessor {
                 plan.errors++;
                 plan.errorDetails.add("Duplikat NIP " + e.getKey() + " pada baris " + e.getValue());
             }
-            // Proses kemunculan pertama saja (deterministic)
             rows = rows.stream()
                     .collect(Collectors.toMap(r -> r.nip, Function.identity(), (a, b) -> a, LinkedHashMap::new))
                     .values().stream().toList();
@@ -228,12 +211,23 @@ public class EmployeeImportProcessor {
 
                 boolean wasResign = "RESIGN".equalsIgnoreCase(existing.getStatus());
 
-                // REHIRED: RESIGN -> ACTIVE, masuk counter rehired, BUKAN updated/mutated
                 if (wasResign) {
                     if (!dryRun) {
+                        String oldJobTitle = existing.getJobPosition() != null ? existing.getJobPosition().getName()
+                                : null;
+                        String oldUnitName = existing.getUnit() != null ? existing.getUnit().getName() : null;
+                        String oldDivisionName = existing.getDivision() != null ? existing.getDivision().getName()
+                                : null;
+                        String oldRegionalName = existing.getRegional() != null ? existing.getRegional().getName()
+                                : null;
+
+                        boolean orgChanged = !sameEntity(existing.getRegional(), regional)
+                                || !sameEntity(existing.getDivision(), division)
+                                || !sameEntity(existing.getUnit(), unit)
+                                || !sameEntity(existing.getJobPosition(), job);
+
                         existing.setStatus("ACTIVE");
 
-                        // sinkronin data dari file
                         existing.setName(r.name);
                         existing.setEmail(r.email);
                         existing.setGender(r.gender);
@@ -246,14 +240,24 @@ public class EmployeeImportProcessor {
 
                         existing.setUpdatedAt(Instant.now());
 
-                        // harus udah ada di enum + DB constraint
-                        historyService.snapshot(existing, EmployeeHistory.EmployeeActionType.REHIRED, r.effectiveDate);
+                        EmployeeHistory.EmployeeActionType type = orgChanged
+                                ? EmployeeHistory.EmployeeActionType.MUTASI
+                                : EmployeeHistory.EmployeeActionType.REHIRED;
+
+                        historyService.snapshotWithOldValues(
+                                existing,
+                                oldJobTitle,
+                                oldUnitName,
+                                oldDivisionName,
+                                oldRegionalName,
+                                type,
+                                r.effectiveDate);
                     }
 
                     plan.rehiredEmployees.add(existing);
                     plan.createdOrRehiredForAccount.add(existing);
                     plan.rehired++;
-                    continue; // 🔥 stop biar gak masuk updated/mutated
+                    continue;
                 }
 
                 boolean mutasi = placementChanged(existing, regional, division, unit, job);
@@ -261,19 +265,44 @@ public class EmployeeImportProcessor {
 
                 if (mutasi) {
                     if (!dryRun) {
+                        String oldJobTitle = existing.getJobPosition() != null ? existing.getJobPosition().getName()
+                                : null;
+                        String oldUnitName = existing.getUnit() != null ? existing.getUnit().getName() : null;
+                        String oldDivisionName = existing.getDivision() != null ? existing.getDivision().getName()
+                                : null;
+                        String oldRegionalName = existing.getRegional() != null ? existing.getRegional().getName()
+                                : null;
+
                         existing.setRegional(regional);
                         existing.setDivision(division);
                         existing.setUnit(unit);
                         existing.setJobPosition(job);
                         if (r.effectiveDate != null)
                             existing.setEffectiveDate(r.effectiveDate);
+
                         existing.setUpdatedAt(Instant.now());
-                        historyService.snapshot(existing, EmployeeHistory.EmployeeActionType.MUTASI);
+
+                        historyService.snapshotWithOldValues(
+                                existing,
+                                oldJobTitle,
+                                oldUnitName,
+                                oldDivisionName,
+                                oldRegionalName,
+                                EmployeeHistory.EmployeeActionType.MUTASI,
+                                existing.getEffectiveDate());
                     }
                     plan.mutatedEmployees.add(existing);
                     plan.mutated++;
                 } else if (changedProfile) {
                     if (!dryRun) {
+                        String oldJobTitle = existing.getJobPosition() != null ? existing.getJobPosition().getName()
+                                : null;
+                        String oldUnitName = existing.getUnit() != null ? existing.getUnit().getName() : null;
+                        String oldDivisionName = existing.getDivision() != null ? existing.getDivision().getName()
+                                : null;
+                        String oldRegionalName = existing.getRegional() != null ? existing.getRegional().getName()
+                                : null;
+
                         if (!Objects.equals(existing.getName(), r.name))
                             existing.setName(r.name);
                         if (!Objects.equals(existing.getEmail(), r.email))
@@ -294,7 +323,28 @@ public class EmployeeImportProcessor {
                             existing.setEffectiveDate(r.effectiveDate);
 
                         existing.setUpdatedAt(Instant.now());
-                        historyService.snapshot(existing, EmployeeHistory.EmployeeActionType.UPDATED, r.effectiveDate);
+
+                        boolean orgChanged = !sameEntityName(oldRegionalName,
+                                existing.getRegional() != null ? existing.getRegional().getName() : null)
+                                || !sameEntityName(oldDivisionName,
+                                        existing.getDivision() != null ? existing.getDivision().getName() : null)
+                                || !sameEntityName(oldUnitName,
+                                        existing.getUnit() != null ? existing.getUnit().getName() : null)
+                                || !sameEntityName(oldJobTitle,
+                                        existing.getJobPosition() != null ? existing.getJobPosition().getName() : null);
+
+                        EmployeeHistory.EmployeeActionType type = orgChanged
+                                ? EmployeeHistory.EmployeeActionType.MUTASI
+                                : EmployeeHistory.EmployeeActionType.UPDATED;
+
+                        historyService.snapshotWithOldValues(
+                                existing,
+                                oldJobTitle,
+                                oldUnitName,
+                                oldDivisionName,
+                                oldRegionalName,
+                                type,
+                                r.effectiveDate);
                     }
                     plan.updatedEmployees.add(existing);
                     plan.updated++;
@@ -305,7 +355,6 @@ public class EmployeeImportProcessor {
             }
         }
 
-        // Resign detection via set-diff (non-deleted)
         List<Employee> allNonDeleted = empRepo.findByDeletedAtIsNull();
         for (Employee e : allNonDeleted) {
             if (!importedNips.contains(e.getNip())) {
@@ -323,10 +372,6 @@ public class EmployeeImportProcessor {
 
         return plan;
     }
-
-    // ===========================================================
-    // Excel & Utils
-    // ===========================================================
 
     private List<ImportRow> parseExcel(MultipartFile file) throws Exception {
         List<ImportRow> out = new ArrayList<>();
@@ -405,6 +450,14 @@ public class EmployeeImportProcessor {
         } catch (Exception e) {
             return false;
         }
+    }
+
+    private boolean sameEntityName(String a, String b) {
+        if (a == b)
+            return true;
+        if (a == null || b == null)
+            return false;
+        return a.trim().equalsIgnoreCase(b.trim());
     }
 
     private LocalDate parseDateSafe(Cell cell, String val) {
@@ -495,7 +548,6 @@ public class EmployeeImportProcessor {
         }
     }
 
-    // ================== DTO internal ==================
     private record ImportRow(
             int rowIndex, String regionalName, String divisionName, String unitName, String jobName,
             String nip, String name, String gender, String email, LocalDate effectiveDate) {
@@ -511,7 +563,6 @@ public class EmployeeImportProcessor {
         List<Employee> mutatedEmployees = new ArrayList<>();
         List<Employee> resignedEmployees = new ArrayList<>();
 
-        // NEW
         List<Employee> rehiredEmployees = new ArrayList<>();
         List<Employee> createdOrRehiredForAccount = new ArrayList<>();
 

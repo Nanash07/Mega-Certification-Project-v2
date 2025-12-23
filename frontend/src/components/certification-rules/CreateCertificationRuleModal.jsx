@@ -40,7 +40,7 @@ export default function CreateCertificationRuleModal({ open, onClose, onSaved })
                     setSubs(s);
                     setRefreshments(r);
                 } catch {
-                    toast.error("❌ Gagal memuat data master");
+                    toast.error("Gagal memuat data master");
                 }
             })();
         }
@@ -59,7 +59,7 @@ export default function CreateCertificationRuleModal({ open, onClose, onSaved })
             onSaved?.();
             onClose?.();
         } catch (err) {
-            toast.error(err?.response?.data?.message || "❌ Gagal membuat aturan");
+            toast.error(err?.response?.data?.message || "Gagal membuat aturan");
         } finally {
             setSubmitting(false);
         }

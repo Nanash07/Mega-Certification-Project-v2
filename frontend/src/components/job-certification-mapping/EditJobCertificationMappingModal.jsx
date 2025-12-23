@@ -79,8 +79,8 @@ export default function EditJobCertificationMappingModal({ open, onClose, onSave
                         }${initial.subFieldCode ? " - " + initial.subFieldCode : ""}`,
                     });
                 } catch (err) {
-                    console.error("❌ load master error:", err);
-                    toast.error("❌ Gagal memuat data master");
+                    console.error("load master error:", err);
+                    toast.error("Gagal memuat data master");
                 }
             })();
         }
@@ -103,8 +103,8 @@ export default function EditJobCertificationMappingModal({ open, onClose, onSave
             onSaved?.();
             onClose?.();
         } catch (err) {
-            console.error("❌ update error:", err);
-            toast.error(err?.response?.data?.message || "❌ Gagal update mapping");
+            console.error("update error:", err);
+            toast.error(err?.response?.data?.message || "Gagal update mapping");
         } finally {
             setSubmitting(false);
         }

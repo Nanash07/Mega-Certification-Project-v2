@@ -29,7 +29,6 @@ public class EmployeeService {
         private final JobPositionRepository jobPositionRepo;
         private final EmployeeHistoryService historyService;
 
-        // ====================== GET ALL ACTIVE (for dropdown) ======================
         @Transactional(readOnly = true)
         public List<EmployeeResponse> getAllActive() {
                 return repo.findByStatusIgnoreCaseNotAndDeletedAtIsNull("RESIGN").stream()
@@ -37,7 +36,6 @@ public class EmployeeService {
                                 .toList();
         }
 
-        // ====================== SEARCH ACTIVE (EmployeePage) ======================
         @Transactional(readOnly = true)
         public Page<EmployeeResponse> search(
                         List<Long> employeeIds,
@@ -66,8 +64,6 @@ public class EmployeeService {
                 return repo.findAll(spec, pageable).map(this::toResponse);
         }
 
-        // ====================== SEARCH RESIGNED (EmployeeResignedPage)
-        // ======================
         @Transactional(readOnly = true)
         public Page<EmployeeResponse> searchResigned(
                         List<Long> employeeIds,
@@ -96,7 +92,6 @@ public class EmployeeService {
                 return repo.findAll(spec, pageable).map(this::toResponse);
         }
 
-        // ====================== COUNT ACTIVE (DASHBOARD) ======================
         @Transactional(readOnly = true)
         public long countActive(Long regionalId, Long divisionId, Long unitId) {
                 Specification<Employee> spec = Specification.where(EmployeeSpecification.activePageOnly())
@@ -107,21 +102,13 @@ public class EmployeeService {
                 return repo.count(spec);
         }
 
-        // ====================== GET DETAIL (ALL, except deleted)
-        // ======================
         @Transactional(readOnly = true)
         public EmployeeResponse getById(Long id) {
                 Employee emp = repo.findById(id)
                                 .orElseThrow(() -> new NotFoundException("Employee not found with id " + id));
-
-                // kalau lo mau: jangan bisa buka detail yang udah dihapus dari sistem
-                // if (emp.getDeletedAt() != null) throw new NotFoundException("Employee
-                // deleted: " + id);
-
                 return toResponse(emp);
         }
 
-        // ====================== CREATE ======================
         @Transactional
         public EmployeeResponse create(EmployeeRequest req) {
                 if (repo.existsByNipIgnoreCaseAndDeletedAtIsNull(req.getNip())) {
@@ -139,8 +126,6 @@ public class EmployeeService {
                 return toResponse(saved);
         }
 
-        // ====================== UPDATE (allowed as long as not deleted)
-        // ======================
         @Transactional
         public EmployeeResponse update(Long id, EmployeeRequest req) {
                 Employee emp = repo.findByIdAndDeletedAtIsNull(id)
@@ -155,16 +140,45 @@ public class EmployeeService {
                         return toResponse(emp);
                 }
 
+                String oldJobTitle = emp.getJobPosition() != null ? emp.getJobPosition().getName() : null;
+                String oldUnitName = emp.getUnit() != null ? emp.getUnit().getName() : null;
+                String oldDivisionName = emp.getDivision() != null ? emp.getDivision().getName() : null;
+                String oldRegionalName = emp.getRegional() != null ? emp.getRegional().getName() : null;
+
+                Long oldJobId = emp.getJobPosition() != null ? emp.getJobPosition().getId() : null;
+                Long oldUnitId = emp.getUnit() != null ? emp.getUnit().getId() : null;
+                Long oldDivisionId = emp.getDivision() != null ? emp.getDivision().getId() : null;
+                Long oldRegionalId = emp.getRegional() != null ? emp.getRegional().getId() : null;
+
                 emp = mapRequestToEntity(emp, req);
                 emp.setUpdatedAt(Instant.now());
 
                 Employee saved = repo.save(emp);
-                historyService.snapshot(saved, EmployeeHistory.EmployeeActionType.UPDATED, saved.getEffectiveDate());
+
+                boolean orgChanged = !Objects.equals(oldRegionalId,
+                                saved.getRegional() != null ? saved.getRegional().getId() : null)
+                                || !Objects.equals(oldDivisionId,
+                                                saved.getDivision() != null ? saved.getDivision().getId() : null)
+                                || !Objects.equals(oldUnitId, saved.getUnit() != null ? saved.getUnit().getId() : null)
+                                || !Objects.equals(oldJobId,
+                                                saved.getJobPosition() != null ? saved.getJobPosition().getId() : null);
+
+                EmployeeHistory.EmployeeActionType type = orgChanged
+                                ? EmployeeHistory.EmployeeActionType.MUTASI
+                                : EmployeeHistory.EmployeeActionType.UPDATED;
+
+                historyService.snapshotWithOldValues(
+                                saved,
+                                oldJobTitle,
+                                oldUnitName,
+                                oldDivisionName,
+                                oldRegionalName,
+                                type,
+                                saved.getEffectiveDate());
 
                 return toResponse(saved);
         }
 
-        // ====================== RESIGN (status change only) ======================
         @Transactional
         public EmployeeResponse resign(Long id) {
                 Employee emp = repo.findByIdAndDeletedAtIsNull(id)
@@ -182,7 +196,6 @@ public class EmployeeService {
                 return toResponse(emp);
         }
 
-        // ====================== SOFT DELETE (hapus dari sistem) ======================
         @Transactional
         public void softDelete(Long id) {
                 Employee emp = repo.findByIdAndDeletedAtIsNull(id)
@@ -196,7 +209,6 @@ public class EmployeeService {
                 historyService.snapshot(saved, EmployeeHistory.EmployeeActionType.TERMINATED, saved.getEffectiveDate());
         }
 
-        // ====================== HELPER ======================
         private Employee mapRequestToEntity(Employee emp, EmployeeRequest req) {
                 Regional reg = regionalRepo.findById(req.getRegionalId())
                                 .orElseThrow(() -> new NotFoundException("Regional not found: " + req.getRegionalId()));

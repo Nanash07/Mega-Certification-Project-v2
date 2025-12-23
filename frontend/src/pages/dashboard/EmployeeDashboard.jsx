@@ -896,9 +896,7 @@ export default function EmployeeDashboard() {
             {/* Judul */}
             <div>
                 <h1 className="text-2xl md:text-3xl font-bold">Dashboard Pegawai</h1>
-                <p className="text-sm opacity-70">
-                    Status sertifikasi Anda{computedAt ? ` • ${formatShortIdDateTime(computedAt)}` : ""}
-                </p>
+                <p className="text-sm opacity-70 pt-1">{computedAt ? ` ${formatShortIdDateTime(computedAt)}` : ""}</p>
             </div>
 
             {/* Kartu ringkas */}

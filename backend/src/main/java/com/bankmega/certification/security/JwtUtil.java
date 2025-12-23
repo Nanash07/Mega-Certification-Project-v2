@@ -10,15 +10,11 @@ import java.util.function.Function;
 
 public class JwtUtil {
 
-    // MINIMAL 32 CHAR, simpan di ENV
     private static final String SECRET = "B4nKMegaGantengP4keJwTSecretKey123!!XXSecureKey";
     private static final long EXPIRATION_MS = 24 * 60 * 60 * 1000; // 24 jam
 
     private static final SecretKey SECRET_KEY = Keys.hmacShaKeyFor(SECRET.getBytes());
 
-    // ===============================
-    // 🔹 Extract ALL CLAIMS
-    // ===============================
     private static Claims extractAllClaims(String token) {
         return Jwts.parser()
                 .verifyWith(SECRET_KEY)
@@ -27,14 +23,10 @@ public class JwtUtil {
                 .getPayload();
     }
 
-    // 🔹 Extract specific claim
     public static <T> T extractClaim(String token, Function<Claims, T> resolver) {
         return resolver.apply(extractAllClaims(token));
     }
 
-    // ===============================
-    // 🔹 CLAIM GETTERS
-    // ===============================
     public static String getUsername(String token) {
         return extractClaim(token, Claims::getSubject);
     }
@@ -55,9 +47,6 @@ public class JwtUtil {
         return extractClaim(token, Claims::getExpiration);
     }
 
-    // ===============================
-    // 🔹 Generate Token (FINAL FIX)
-    // ===============================
     public static String generateToken(String username,
             String role,
             Long userId,
@@ -74,9 +63,6 @@ public class JwtUtil {
                 .compact();
     }
 
-    // ===============================
-    // 🔹 Validate Token
-    // ===============================
     public static boolean isValid(String token, String username) {
         try {
             String usernameInToken = getUsername(token);

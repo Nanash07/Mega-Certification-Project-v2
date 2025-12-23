@@ -83,7 +83,7 @@ export default function JobCertificationMappingHistoryPage() {
 
                 setAllowedCertIds(ids);
             } catch (err) {
-                console.error("❌ Gagal load PIC scope:", err);
+                console.error("Gagal load PIC scope:", err);
                 toast.error("Gagal memuat scope sertifikasi PIC");
                 setAllowedCertIds([]); // fail-safe
             }
@@ -126,8 +126,8 @@ export default function JobCertificationMappingHistoryPage() {
             setTotalPages(data.totalPages || 1);
             setTotalElements(data.totalElements || 0);
         } catch (err) {
-            console.error("❌ Gagal load history mapping:", err);
-            toast.error("❌ Gagal memuat histori mapping jabatan");
+            console.error("Gagal load history mapping:", err);
+            toast.error("Gagal memuat histori mapping jabatan");
         } finally {
             setLoading(false);
         }

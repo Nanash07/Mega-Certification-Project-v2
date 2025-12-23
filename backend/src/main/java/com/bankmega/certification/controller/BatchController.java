@@ -58,25 +58,23 @@ public class BatchController {
 
     private List<Long> resolveAllowedCertIds(Authentication auth, Long userIdFromPrincipal) {
         if (!isPic(auth))
-            return null; // non-PIC: tidak dibatasi scope sertifikasi
+            return null;
 
         Long uid = extractUserId(auth, userIdFromPrincipal);
         if (uid == null)
-            return List.of(-1L); // sentinel kosong
+            return List.of(-1L);
 
         List<Long> ids = scopeRepo.findByUser_Id(uid).stream()
                 .map(PicCertificationScope::getCertification)
                 .map(c -> c.getId())
                 .collect(Collectors.toList());
 
-        // 🔐 PIC tanpa scope apapun -> pakai sentinel supaya hasil selalu kosong
         if (ids.isEmpty()) {
             return List.of(-1L);
         }
         return ids;
     }
 
-    // 🔹 Create
     @PostMapping
     public ResponseEntity<BatchResponse> create(
             @RequestBody BatchRequest request,
@@ -85,7 +83,6 @@ public class BatchController {
         return ResponseEntity.ok(batchService.create(request, username));
     }
 
-    // 🔹 Search + Filter + Paging (Superadmin + PIC + Dashboard)
     @GetMapping("/paged")
     public ResponseEntity<Page<BatchResponse>> search(
             @RequestParam(required = false) String search,
@@ -93,7 +90,6 @@ public class BatchController {
             @RequestParam(required = false) Batch.BatchType type,
             @RequestParam(required = false) Long certificationRuleId,
             @RequestParam(required = false) Long institutionId,
-            // filter dashboard tambahan:
             @RequestParam(required = false) Long regionalId,
             @RequestParam(required = false) Long divisionId,
             @RequestParam(required = false) Long unitId,

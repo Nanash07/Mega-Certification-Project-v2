@@ -31,7 +31,7 @@ export default function RegionalPage() {
             setTotalPages(Math.max(data.totalPages || 1, 1));
             setTotalElements(data.totalElements ?? data.content?.length ?? 0);
         } catch {
-            toast.error("❌ Gagal memuat regional");
+            toast.error("Gagal memuat regional");
         } finally {
             setLoading(false);
         }
@@ -91,7 +91,7 @@ export default function RegionalPage() {
             toast.success(`Regional berhasil di${newIsActive ? "aktifkan" : "nonaktifkan"}`);
             load();
         } catch (err) {
-            toast.error(err?.response?.data?.message || "❌ Gagal update status regional");
+            toast.error(err?.response?.data?.message || "Gagal update status regional");
         }
     }
 

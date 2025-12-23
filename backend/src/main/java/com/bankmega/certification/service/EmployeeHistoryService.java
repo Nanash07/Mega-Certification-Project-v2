@@ -1,3 +1,4 @@
+// src/main/java/com/bankmega/certification/service/EmployeeHistoryService.java
 package com.bankmega.certification.service;
 
 import com.bankmega.certification.dto.EmployeeHistoryResponse;
@@ -8,13 +9,17 @@ import com.bankmega.certification.repository.EmployeeHistoryRepository;
 import com.bankmega.certification.specification.EmployeeHistorySpecification;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.data.domain.*;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.ByteArrayOutputStream;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.*;
 
 @Slf4j
@@ -24,11 +29,9 @@ public class EmployeeHistoryService {
 
         private final EmployeeHistoryRepository historyRepo;
 
-        // Buffer untuk batch insert
         private final List<EmployeeHistory> batchBuffer = new ArrayList<>();
         private static final int BATCH_SIZE = 200;
 
-        // ===================== SNAPSHOT DENGAN BATCH =====================
         @Transactional
         public void snapshot(Employee emp,
                         JobPosition oldJob,
@@ -37,13 +40,6 @@ public class EmployeeHistoryService {
                         EmployeeHistory.EmployeeActionType actionType) {
                 if (emp == null)
                         return;
-
-                // Skip kalau gak ada perubahan signifikan
-                if ((actionType == EmployeeHistory.EmployeeActionType.UPDATED ||
-                                actionType == EmployeeHistory.EmployeeActionType.MUTASI)
-                                && !hasChanged(emp)) {
-                        return;
-                }
 
                 EmployeeHistory history = EmployeeHistory.builder()
                                 .employee(emp)
@@ -60,6 +56,46 @@ public class EmployeeHistoryService {
                                 .newDivisionName(emp.getDivision() != null ? emp.getDivision().getName() : null)
                                 .newRegionalName(emp.getRegional() != null ? emp.getRegional().getName() : null)
                                 .effectiveDate(effective != null ? effective : emp.getEffectiveDate())
+                                .actionType(actionType)
+                                .actionAt(Instant.now())
+                                .build();
+
+                batchBuffer.add(history);
+
+                if (batchBuffer.size() >= BATCH_SIZE) {
+                        flushBatch();
+                }
+        }
+
+        @Transactional
+        public void snapshotWithOldValues(
+                        Employee newEmp,
+                        String oldJobTitle,
+                        String oldUnitName,
+                        String oldDivisionName,
+                        String oldRegionalName,
+                        EmployeeHistory.EmployeeActionType actionType,
+                        LocalDate effective) {
+
+                if (newEmp == null)
+                        return;
+
+                JobPosition newJob = newEmp.getJobPosition();
+
+                EmployeeHistory history = EmployeeHistory.builder()
+                                .employee(newEmp)
+                                .employeeNip(newEmp.getNip())
+                                .employeeName(newEmp.getName())
+                                .oldJobTitle(oldJobTitle)
+                                .oldUnitName(oldUnitName)
+                                .oldDivisionName(oldDivisionName)
+                                .oldRegionalName(oldRegionalName)
+                                .newJobPosition(newJob)
+                                .newJobTitle(newJob != null ? newJob.getName() : null)
+                                .newUnitName(newEmp.getUnit() != null ? newEmp.getUnit().getName() : null)
+                                .newDivisionName(newEmp.getDivision() != null ? newEmp.getDivision().getName() : null)
+                                .newRegionalName(newEmp.getRegional() != null ? newEmp.getRegional().getName() : null)
+                                .effectiveDate(effective != null ? effective : newEmp.getEffectiveDate())
                                 .actionType(actionType)
                                 .actionAt(Instant.now())
                                 .build();
@@ -89,36 +125,9 @@ public class EmployeeHistoryService {
         }
 
         public void snapshot(Employee emp, EmployeeHistory.EmployeeActionType actionType) {
-                snapshot(emp, emp.getJobPosition(), emp.getJobPosition(),
-                                emp.getEffectiveDate(), actionType);
+                snapshot(emp, emp.getJobPosition(), emp.getJobPosition(), emp.getEffectiveDate(), actionType);
         }
 
-        // ===================== CEK PERUBAHAN =====================
-        private boolean hasChanged(Employee emp) {
-                if (emp == null)
-                        return false;
-                EmployeeHistory last = historyRepo.findTopByEmployee_IdOrderByActionAtDesc(emp.getId()).orElse(null);
-                if (last == null)
-                        return true;
-
-                return !Objects.equals(last.getEmployeeName(), emp.getName())
-                                || !Objects.equals(last.getEmployeeNip(), emp.getNip())
-                                || !Objects.equals(last.getNewJobTitle(),
-                                                emp.getJobPosition() != null ? emp.getJobPosition().getName() : null)
-                                || !Objects.equals(last.getNewUnitName(),
-                                                emp.getUnit() != null ? emp.getUnit().getName() : null)
-                                || !Objects.equals(last.getNewDivisionName(),
-                                                emp.getDivision() != null ? emp.getDivision().getName() : null)
-                                || !Objects.equals(last.getNewRegionalName(),
-                                                emp.getRegional() != null ? emp.getRegional().getName() : null)
-                                || !Objects.equals(last.getEffectiveDate(), emp.getEffectiveDate());
-        }
-
-        // ===================== PAGINATION =====================
-
-        /**
-         * Versi lama (tanpa filter tanggal) — biar backward compatible.
-         */
         @Transactional(readOnly = true)
         public Page<EmployeeHistoryResponse> getPagedHistory(
                         Long employeeId, String actionType, String search, Pageable pageable) {
@@ -126,9 +135,6 @@ public class EmployeeHistoryService {
                 return getPagedHistory(employeeId, actionType, search, null, null, pageable);
         }
 
-        /**
-         * Versi baru (support filter tanggal)
-         */
         @Transactional(readOnly = true)
         public Page<EmployeeHistoryResponse> getPagedHistory(
                         Long employeeId,
@@ -151,7 +157,119 @@ public class EmployeeHistoryService {
                 return historyRepo.findAll(spec, sorted).map(this::toResponse);
         }
 
-        // ===================== MAPPING ENTITY -> DTO =====================
+        @Transactional(readOnly = true)
+        public byte[] exportExcel(
+                        Long employeeId,
+                        String actionType,
+                        String search,
+                        LocalDate startDate,
+                        LocalDate endDate) {
+
+                Specification<EmployeeHistory> spec = EmployeeHistorySpecification.byEmployeeId(employeeId)
+                                .and(EmployeeHistorySpecification.byActionType(actionType))
+                                .and(EmployeeHistorySpecification.bySearch(search))
+                                .and(EmployeeHistorySpecification.byDateRange(startDate, endDate));
+
+                List<EmployeeHistory> rows = historyRepo.findAll(spec, Sort.by(Sort.Direction.DESC, "actionAt"));
+
+                ZoneId wib = ZoneId.of("Asia/Jakarta");
+
+                try (Workbook wb = new XSSFWorkbook()) {
+                        Sheet sheet = wb.createSheet("Employee History");
+
+                        CellStyle headerStyle = wb.createCellStyle();
+                        Font headerFont = wb.createFont();
+                        headerFont.setBold(true);
+                        headerStyle.setFont(headerFont);
+
+                        CellStyle dateStyle = wb.createCellStyle();
+                        short dFmt = wb.getCreationHelper().createDataFormat().getFormat("dd-mmm-yyyy");
+                        dateStyle.setDataFormat(dFmt);
+
+                        String[] headers = {
+                                        "No",
+                                        "NIP",
+                                        "Nama Pegawai",
+                                        "Aksi",
+                                        "Tanggal Aksi (WIB)",
+                                        "Jabatan Lama",
+                                        "Jabatan Baru",
+                                        "Unit Lama",
+                                        "Unit Baru",
+                                        "Divisi Lama",
+                                        "Divisi Baru",
+                                        "Regional Lama",
+                                        "Regional Baru",
+                                        "Tanggal Efektif (WIB)"
+                        };
+
+                        Row headerRow = sheet.createRow(0);
+                        for (int i = 0; i < headers.length; i++) {
+                                Cell cell = headerRow.createCell(i);
+                                cell.setCellValue(headers[i]);
+                                cell.setCellStyle(headerStyle);
+                        }
+
+                        int rowIdx = 1;
+                        for (EmployeeHistory h : rows) {
+                                Row row = sheet.createRow(rowIdx);
+                                int col = 0;
+
+                                row.createCell(col++).setCellValue(rowIdx);
+                                row.createCell(col++).setCellValue(nvl(h.getEmployeeNip()));
+                                row.createCell(col++).setCellValue(nvl(h.getEmployeeName()));
+                                row.createCell(col++).setCellValue(nvl(h.getActionType()));
+
+                                Cell actionAtCell = row.createCell(col++);
+                                if (h.getActionAt() != null) {
+                                        Instant instant = h.getActionAt().atZone(wib).toInstant();
+                                        actionAtCell.setCellValue(Date.from(instant));
+                                        actionAtCell.setCellStyle(dateStyle);
+                                } else {
+                                        actionAtCell.setCellValue("");
+                                }
+
+                                row.createCell(col++).setCellValue(nvl(h.getOldJobTitle()));
+                                row.createCell(col++).setCellValue(nvl(h.getNewJobTitle()));
+
+                                row.createCell(col++).setCellValue(nvl(h.getOldUnitName()));
+                                row.createCell(col++).setCellValue(nvl(h.getNewUnitName()));
+
+                                row.createCell(col++).setCellValue(nvl(h.getOldDivisionName()));
+                                row.createCell(col++).setCellValue(nvl(h.getNewDivisionName()));
+
+                                row.createCell(col++).setCellValue(nvl(h.getOldRegionalName()));
+                                row.createCell(col++).setCellValue(nvl(h.getNewRegionalName()));
+
+                                Cell effCell = row.createCell(col++);
+                                if (h.getEffectiveDate() != null) {
+                                        Instant effInstant = h.getEffectiveDate().atStartOfDay(wib).toInstant();
+                                        effCell.setCellValue(Date.from(effInstant));
+                                        effCell.setCellStyle(dateStyle);
+                                } else {
+                                        effCell.setCellValue("");
+                                }
+
+                                rowIdx++;
+                        }
+
+                        for (int i = 0; i < headers.length; i++) {
+                                sheet.autoSizeColumn(i);
+                        }
+
+                        ByteArrayOutputStream out = new ByteArrayOutputStream();
+                        wb.write(out);
+                        return out.toByteArray();
+
+                } catch (Exception e) {
+                        throw new RuntimeException("Gagal export Excel employee history", e);
+                }
+        }
+
+        private String nvl(Object v) {
+                return v == null ? "" : v.toString();
+        }
+
         private EmployeeHistoryResponse toResponse(EmployeeHistory h) {
                 return EmployeeHistoryResponse.builder()
                                 .id(h.getId())
@@ -159,6 +277,9 @@ public class EmployeeHistoryService {
                                 .employeeNip(h.getEmployeeNip())
                                 .employeeName(h.getEmployeeName())
                                 .oldJobTitle(h.getOldJobTitle())
+                                .oldUnitName(h.getOldUnitName())
+                                .oldDivisionName(h.getOldDivisionName())
+                                .oldRegionalName(h.getOldRegionalName())
                                 .newJobTitle(h.getNewJobTitle())
                                 .newUnitName(h.getNewUnitName())
                                 .newDivisionName(h.getNewDivisionName())

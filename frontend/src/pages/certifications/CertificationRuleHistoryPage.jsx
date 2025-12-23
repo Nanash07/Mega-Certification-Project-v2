@@ -143,7 +143,7 @@ export default function CertificationRuleHistoryPage() {
             setTotalElements(res.totalElements || 0);
         } catch (err) {
             console.error("load histories error:", err);
-            toast.error("❌ Gagal memuat histori aturan sertifikasi");
+            toast.error("Gagal memuat histori aturan sertifikasi");
         } finally {
             setLoading(false);
         }

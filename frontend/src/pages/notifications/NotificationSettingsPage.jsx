@@ -8,12 +8,19 @@ export default function NotificationSettingsPage() {
     const [loading, setLoading] = useState(true);
     const [templates, setTemplates] = useState([]);
     const [schedules, setSchedules] = useState([]);
-    const [activeTab, setActiveTab] = useState(null); // State untuk tab aktif
+    const [activeTab, setActiveTab] = useState(null);
     const [editing, setEditing] = useState({});
     const [saving, setSaving] = useState(false);
-    const textareaRef = useRef(null); // Ref tunggal untuk textarea yang aktif
+    const textareaRef = useRef(null);
 
-    // ===== Variabel Placeholder yang Didukung (disesuaikan BE) =====
+    const TAB_LABELS = {
+        BATCH_NOTIFICATION: "Batch Reminder",
+        CERT_REMINDER: "Due Reminder",
+        EXPIRED_NOTICE: "Expired Reminder",
+    };
+
+    const getTabLabel = (code) => TAB_LABELS[code] || code.replaceAll("_", " ");
+
     const VARIABLE_GUIDE = {
         sapaan: "Bapak/Ibu sesuai gender",
         nama: "Nama karyawan",
@@ -28,7 +35,6 @@ export default function NotificationSettingsPage() {
         return keys.filter((k) => text.includes(`{{${k}}}`));
     };
 
-    // ===== Auto-resize Textarea Logic =====
     const adjustTextarea = () => {
         const ta = textareaRef.current;
         if (ta) {
@@ -37,15 +43,12 @@ export default function NotificationSettingsPage() {
         }
     };
 
-    // Load data
     useEffect(() => {
         loadAll();
     }, []);
 
-    // Adjust textarea height when tab changes or data loads
     useEffect(() => {
         if (!loading && activeTab) {
-            // Beri sedikit delay agar DOM selesai render sebelum diukur
             setTimeout(adjustTextarea, 50);
         }
     }, [activeTab, loading]);
@@ -57,7 +60,6 @@ export default function NotificationSettingsPage() {
             setTemplates(tplData);
             setSchedules(schedData);
 
-            // Hanya set tab aktif jika sebelumnya belum ada (first load)
             if (tplData.length > 0) {
                 setActiveTab((prev) => prev ?? tplData[0].code);
             }
@@ -69,7 +71,6 @@ export default function NotificationSettingsPage() {
         }
     };
 
-    // ===== Template Logic =====
     const handleChangeTemplate = (id, field, value) => {
         setEditing((prev) => ({
             ...prev,
@@ -78,7 +79,6 @@ export default function NotificationSettingsPage() {
                 [field]: value,
             },
         }));
-        // Langsung adjust height saat mengetik
         adjustTextarea();
     };
 
@@ -99,14 +99,12 @@ export default function NotificationSettingsPage() {
 
             toast.success("Template berhasil diperbarui");
 
-            // Hapus state editing setelah simpan
             setEditing((prev) => {
                 const newState = { ...prev };
                 delete newState[id];
                 return newState;
             });
 
-            // Muat ulang data untuk refresh 'updatedAt' dll
             await loadAll();
         } catch (err) {
             console.error(err);
@@ -116,7 +114,6 @@ export default function NotificationSettingsPage() {
         }
     };
 
-    // ===== Schedule Logic (Tidak berubah) =====
     const getScheduleByType = (type) =>
         schedules.find((s) => s.type === type) || {
             time: "",
@@ -156,7 +153,6 @@ export default function NotificationSettingsPage() {
         }
     };
 
-    // ===== Preview Helper (dibuat HTML + nilai variabel dibold) =====
     const escapeHtml = (str = "") =>
         str
             .replaceAll("&", "&amp;")
@@ -176,13 +172,11 @@ export default function NotificationSettingsPage() {
             jenisBatch: "Sertifikasi",
         };
 
-        // SUBJECT: plain (email subject tidak support HTML)
         let hasilJudul = judul || "";
         for (const [key, val] of Object.entries(variabel)) {
             hasilJudul = hasilJudul.replaceAll(`{{${key}}}`, val);
         }
 
-        // BODY: escape dulu, lalu ganti placeholder -> <b>…</b>, lalu newline -> <br/>
         let html = escapeHtml(isiPesan || "");
         for (const [key, val] of Object.entries(variabel)) {
             const safeVal = `<b>${escapeHtml(String(val))}</b>`;
@@ -193,8 +187,6 @@ export default function NotificationSettingsPage() {
         return { hasilJudul, hasilIsiHTML: html };
     };
 
-    // ===== RENDER =====
-
     if (loading) {
         return (
             <div className="flex justify-center items-center h-64">
@@ -203,47 +195,39 @@ export default function NotificationSettingsPage() {
         );
     }
 
-    // Handle jika tidak ada template
     if (!activeTab || templates.length === 0) {
         return <div className="text-center p-10">Tidak ada template notifikasi yang ditemukan.</div>;
     }
 
-    // Cari data untuk tab yang aktif
     const tpl = templates.find((t) => t.code === activeTab);
     const schedule = getScheduleByType(activeTab);
 
-    if (!tpl) return null; // Safety check
+    if (!tpl) return null;
 
-    // Ambil data dari state 'editing' jika ada, jika tidak, ambil dari data 'tpl'
     const currentTitle = editing[tpl.id]?.title ?? tpl.title;
     const currentBody = editing[tpl.id]?.body ?? tpl.body;
     const previewData = renderPreview(currentTitle, currentBody);
 
-    // Selalu tampilkan semua variabel (BE default)
     const allKeys = Object.keys(VARIABLE_GUIDE);
 
     return (
-        <div className="space-y-2">
-            {/* NAVIGASI TAB */}
-            <div role="tablist" className="tabs tabs-border">
+        <div className="space-y-6 w-full">
+            <div className="tabs tabs-lift w-full mb-0">
                 {templates.map((tabTpl) => (
-                    <a
+                    <button
                         key={tabTpl.code}
-                        role="tab"
-                        className={`tab ${activeTab === tabTpl.code ? "tab-active" : ""} capitalize`}
+                        className={`tab ${activeTab === tabTpl.code ? "tab-active" : ""}`}
                         onClick={() => setActiveTab(tabTpl.code)}
                     >
-                        {tabTpl.code.replaceAll("_", " ")}
-                    </a>
+                        {getTabLabel(tabTpl.code)}
+                    </button>
                 ))}
             </div>
 
-            {/* KONTEN TAB - Sekarang hanya render 1 card */}
-            <div key={tpl.id} className="card bg-base-100 shadow p-4 space-y-2">
-                {/* Header Template */}
+            <div className="card bg-base-100 shadow p-6 w-full border-t-0 rounded-t-none">
                 <div className="flex justify-between items-center flex-wrap gap-3">
                     <div>
-                        <h3 className="font-semibold text-lg capitalize">{tpl.code.replaceAll("_", " ")}</h3>
+                        <h3 className="font-semibold text-lg">{getTabLabel(tpl.code)}</h3>
                         <p className="text-xs text-gray-400">
                             Terakhir diperbarui{" "}
                             {new Date(tpl.updatedAt).toLocaleString("id-ID", {
@@ -258,16 +242,14 @@ export default function NotificationSettingsPage() {
                     </div>
                 </div>
 
-                {/* Grid Editor + Preview */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-3 items-stretch">
-                    {/* LEFT - Editor */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-5 items-stretch">
                     <div className="flex flex-col space-y-3 h-full">
                         <div>
                             <label className="text-gray-500 mb-1 block text-xs">Judul Notifikasi</label>
                             <input
                                 type="text"
                                 className="input input-bordered w-full text-xs"
-                                value={currentTitle} // Gunakan 'value' agar konsisten
+                                value={currentTitle}
                                 onChange={(e) => handleChangeTemplate(tpl.id, "title", e.target.value)}
                             />
                         </div>
@@ -276,7 +258,7 @@ export default function NotificationSettingsPage() {
                             <label className="text-gray-500 mb-1 block text-xs">Isi Pesan</label>
                             <textarea
                                 ref={textareaRef}
-                                key={tpl.id} // Penting: 'key' di sini agar React me-remount textarea saat tab ganti
+                                key={tpl.id}
                                 className="textarea textarea-bordered w-full text-xs resize-none overflow-hidden break-words"
                                 style={{
                                     wordBreak: "break-word",
@@ -284,36 +266,30 @@ export default function NotificationSettingsPage() {
                                     lineHeight: "1.6",
                                     minHeight: "80px",
                                 }}
-                                value={currentBody} // Gunakan 'value' agar konsisten
+                                value={currentBody}
                                 onChange={(e) => handleChangeTemplate(tpl.id, "body", e.target.value)}
                             />
                         </div>
 
-                        {/* Penjelasan Variabel yang Dipakai - 2 kolom grid */}
                         <div className="mt-2">
                             <label className="text-gray-500 mb-3 block text-xs">Penjelasan variabel yang dipakai</label>
-                            <div className="">
-                                <div className="grid grid-cols-2 gap-3 text-xs">
-                                    {allKeys.map((key) => (
-                                        <div key={key} className="flex items-start gap-2">
-                                            <code className="badge badge-xs badge-soft">{`{{${key}}}`}</code>
-                                            <span className="text-gray-600">{VARIABLE_GUIDE[key]}</span>
-                                        </div>
-                                    ))}
-                                </div>
+                            <div className="grid grid-cols-2 gap-3 text-xs">
+                                {allKeys.map((key) => (
+                                    <div key={key} className="flex items-start gap-2">
+                                        <code className="badge badge-xs badge-soft">{`{{${key}}}`}</code>
+                                        <span className="text-gray-600">{VARIABLE_GUIDE[key]}</span>
+                                    </div>
+                                ))}
                             </div>
                         </div>
                     </div>
 
-                    {/* RIGHT - Preview */}
                     <div className="flex flex-col h-full">
                         <label className="text-gray-500 mb-1 block text-xs">Preview</label>
                         <div className="border border-gray-300 rounded-xl p-4 flex-1 text-xs leading-relaxed bg-gray-50 break-words">
                             <p className="font-semibold text-base text-black mb-2 break-words">
                                 {previewData.hasilJudul}
                             </p>
-
-                            {/* Body render as HTML (nilai variabel <b>...</b>) */}
                             <div
                                 className="text-gray-700 break-words"
                                 dangerouslySetInnerHTML={{ __html: previewData.hasilIsiHTML }}
@@ -321,8 +297,8 @@ export default function NotificationSettingsPage() {
                         </div>
                     </div>
                 </div>
-                {/* Tombol Simpan Template */}
-                <div className="flex justify-end py-1">
+
+                <div className="flex justify-end py-3">
                     <button
                         className="btn btn-primary btn-sm flex items-center gap-2"
                         onClick={() => handleSaveTemplate(tpl.id)}
@@ -333,11 +309,9 @@ export default function NotificationSettingsPage() {
                     </button>
                 </div>
 
-                {/* Jadwal Otomatis */}
-                <div className="border-t pt-4">
+                <div className="border-t pt-5">
                     <h4 className="font-semibold text-xs mb-3 text-gray-600">Jadwal Notifikasi Otomatis</h4>
 
-                    {/* wrapper dibatasi setengah halaman */}
                     <div className="w-full md:w-1/2 space-y-4">
                         <div>
                             <label className="text-gray-500 text-xs mb-1 block">Jam</label>
@@ -379,16 +353,16 @@ export default function NotificationSettingsPage() {
                             </div>
                         </div>
 
-                        {/* Tombol Aksi */}
                         <div className="flex justify-end gap-2 pt-2">
                             <button
                                 className="btn btn-primary btn-sm flex items-center gap-2"
                                 onClick={() => handleSaveSchedule(schedule)}
+                                disabled={saving}
                             >
                                 <Save size={16} />
-                                Simpan Jadwal
+                                {saving ? "Menyimpan..." : "Simpan Jadwal"}
                             </button>
-                            {/* (Opsional) tombol run now kalau masih mau dipakai */}
+
                             {/* <button className="btn btn-ghost btn-sm" onClick={() => handleRunNow(tpl.code)}>Run Now</button> */}
                         </div>
                     </div>

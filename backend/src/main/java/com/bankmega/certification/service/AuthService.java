@@ -26,8 +26,6 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordResetService passwordResetService;
 
-    // ================= LOGIN ================= //
-
     public LoginResponse login(LoginRequest request) {
         if (request == null || request.getUsername() == null || request.getUsername().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Username wajib diisi");
@@ -68,8 +66,6 @@ public class AuthService {
                 .token(token)
                 .build();
     }
-
-    // ================= FORGOT / RESET PASSWORD ================= //
 
     public boolean forgotPassword(ForgotPasswordRequest req) {
         String email = trimToNull(req != null ? req.getEmail() : null);
