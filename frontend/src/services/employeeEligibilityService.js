@@ -3,7 +3,6 @@ import api from "./api";
 
 const BASE = "/employee-eligibility";
 
-/* ===== util: current employeeId (sinkron sama ProtectedRoute) ===== */
 function getCurrentEmployeeId() {
     if (typeof window === "undefined") return null;
 
@@ -27,7 +26,6 @@ function getCurrentEmployeeId() {
     return Number.isNaN(num) ? null : num;
 }
 
-/* ===== helper build query params ===== */
 function buildParams(params = {}) {
     const q = {};
     const set = (k, v) => {
@@ -62,7 +60,6 @@ function buildParams(params = {}) {
     return q;
 }
 
-/* ===== paged generic ===== */
 export async function fetchEmployeeEligibilityPaged(params = {}) {
     try {
         const { data } = await api.get(`${BASE}/paged`, {
@@ -75,7 +72,6 @@ export async function fetchEmployeeEligibilityPaged(params = {}) {
     }
 }
 
-/* ===== paged khusus pegawai login ===== */
 export async function fetchMyEligibilityPaged({ page = 0, size = 10, statuses, sortField, sortDirection } = {}) {
     const employeeId = getCurrentEmployeeId();
     if (!employeeId) return { content: [], totalPages: 0, totalElements: 0 };
@@ -90,7 +86,6 @@ export async function fetchMyEligibilityPaged({ page = 0, size = 10, statuses, s
     });
 }
 
-/* ===== detail by employee (tanpa paging) ===== */
 export async function fetchEligibilityByEmployee(employeeId) {
     try {
         const { data } = await api.get(`${BASE}/employee/${employeeId}`);
@@ -101,7 +96,6 @@ export async function fetchEligibilityByEmployee(employeeId) {
     }
 }
 
-/* ===== refresh (admin/pic ops) ===== */
 export async function refreshEmployeeEligibility() {
     try {
         await api.post(`${BASE}/refresh`);
@@ -112,7 +106,6 @@ export async function refreshEmployeeEligibility() {
     }
 }
 
-/* ===== counts untuk dashboard ===== */
 export async function fetchEligibilityCount(params = {}) {
     try {
         const q = {
@@ -139,14 +132,20 @@ export async function fetchEligibilityCount(params = {}) {
     }
 }
 
-/* ===== shorthand: count untuk pegawai login ===== */
 export async function fetchMyEligibilityCount(status) {
     const employeeId = getCurrentEmployeeId();
     if (!employeeId) return 0;
     return fetchEligibilityCount({ employeeId, status });
 }
 
-/* ===== export excel (filters sama kayak paged) ===== */
+function todayYmdJakartaSafe() {
+    const d = new Date();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+}
+
 export async function exportEmployeeEligibilityExcel(filters = {}) {
     const res = await api.get(`${BASE}/export`, {
         params: buildParams(filters),
@@ -159,7 +158,8 @@ export async function exportEmployeeEligibilityExcel(filters = {}) {
 
     const url = window.URL.createObjectURL(blob);
 
-    let filename = "employee-eligibility.xlsx";
+    let filename = `employee-eligibility-${todayYmdJakartaSafe()}.xlsx`;
+
     const cd = res.headers?.["content-disposition"];
     if (cd) {
         const match = /filename\*?=(?:UTF-8'')?("?)([^";]+)\1/i.exec(cd);

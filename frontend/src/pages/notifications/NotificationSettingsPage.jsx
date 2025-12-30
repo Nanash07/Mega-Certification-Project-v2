@@ -23,7 +23,7 @@ export default function NotificationSettingsPage() {
 
     const VARIABLE_GUIDE = {
         sapaan: "Bapak/Ibu sesuai gender",
-        nama: "Nama karyawan",
+        nama: "Nama pegawai",
         namaSertifikasi: "Nama sertifikasi.",
         berlakuSampai: "Tanggal akhir masa berlaku",
         namaBatch: "Kode/nama batch pelaksanaan.",

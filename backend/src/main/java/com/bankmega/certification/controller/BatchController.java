@@ -13,6 +13,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -31,8 +33,6 @@ public class BatchController {
     private final BatchService batchService;
     private final PicCertificationScopeRepository scopeRepo;
 
-    // ==== helpers PIC / principal ====
-
     private boolean isPic(Authentication auth) {
         return auth != null && auth.getAuthorities().stream().anyMatch(a -> {
             String r = a.getAuthority();
@@ -45,14 +45,19 @@ public class BatchController {
             return injectedUserId;
         if (auth == null)
             return null;
+
         Object principal = auth.getPrincipal();
+        if (principal == null)
+            return null;
+
         try {
             Method m = principal.getClass().getMethod("getId");
             Object v = m.invoke(principal);
-            if (v instanceof Number)
-                return ((Number) v).longValue();
+            if (v instanceof Number n)
+                return n.longValue();
         } catch (Exception ignore) {
         }
+
         return null;
     }
 
@@ -69,10 +74,7 @@ public class BatchController {
                 .map(c -> c.getId())
                 .collect(Collectors.toList());
 
-        if (ids.isEmpty()) {
-            return List.of(-1L);
-        }
-        return ids;
+        return ids.isEmpty() ? List.of(-1L) : ids;
     }
 
     @PostMapping
@@ -119,16 +121,60 @@ public class BatchController {
                 startDate,
                 endDate,
                 allowedCertIds,
-                null, // employeeId (khusus endpoint employee)
+                null,
                 pageable);
 
         return ResponseEntity.ok(result);
     }
 
-    // 🔹 Summary count untuk dashboard (Superadmin / PIC)
+    @GetMapping("/export-excel")
+    public ResponseEntity<byte[]> exportExcel(
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) Batch.Status status,
+            @RequestParam(required = false) Batch.BatchType type,
+            @RequestParam(required = false) Long certificationRuleId,
+            @RequestParam(required = false) Long institutionId,
+            @RequestParam(required = false) Long regionalId,
+            @RequestParam(required = false) Long divisionId,
+            @RequestParam(required = false) Long unitId,
+            @RequestParam(required = false) Long certificationId,
+            @RequestParam(required = false) Long levelId,
+            @RequestParam(required = false) Long subFieldId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            Authentication auth,
+            @AuthenticationPrincipal(expression = "id") Long userId) {
+
+        List<Long> allowedCertIds = resolveAllowedCertIds(auth, userId);
+
+        byte[] bytes = batchService.exportExcel(
+                search,
+                status,
+                type,
+                certificationRuleId,
+                institutionId,
+                regionalId,
+                divisionId,
+                unitId,
+                certificationId,
+                levelId,
+                subFieldId,
+                startDate,
+                endDate,
+                allowedCertIds,
+                null);
+
+        String filename = "batches.xlsx";
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                .contentType(MediaType.parseMediaType(
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(bytes);
+    }
+
     @GetMapping("/dashboard-count")
-    public BatchCountResponse dashboardCount(
-            // bisa kirim 1 status atau banyak
+    public ResponseEntity<BatchCountResponse> dashboardCount(
             @RequestParam(required = false) Batch.Status status,
             @RequestParam(required = false) List<Batch.Status> statuses,
             @RequestParam(required = false) Batch.BatchType type,
@@ -144,18 +190,11 @@ public class BatchController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
             Authentication auth,
             @AuthenticationPrincipal(expression = "id") Long userId) {
+
         List<Long> allowedCertIds = resolveAllowedCertIds(auth, userId);
 
-        // Normalisasi: kalau FE kirim 'statuses' pakai itu, kalau nggak fallback ke
-        // 'status'
-        List<Batch.Status> effectiveStatuses;
-        if (statuses != null && !statuses.isEmpty()) {
-            effectiveStatuses = statuses;
-        } else if (status != null) {
-            effectiveStatuses = List.of(status);
-        } else {
-            effectiveStatuses = null; // null -> semua status
-        }
+        List<Batch.Status> effectiveStatuses = (statuses != null && !statuses.isEmpty()) ? statuses
+                : (status != null ? List.of(status) : null);
 
         long count = batchService.countForDashboard(
                 effectiveStatuses,
@@ -171,15 +210,13 @@ public class BatchController {
                 startDate,
                 endDate,
                 allowedCertIds,
-                null // employeeId (khusus self endpoint)
-        );
+                null);
 
-        return new BatchCountResponse(count);
+        return ResponseEntity.ok(new BatchCountResponse(count));
     }
 
-    // 🔹 Monthly batch chart untuk dashboard (Superadmin / PIC / Employee)
     @GetMapping("/monthly")
-    public List<MonthlyPoint> monthly(
+    public ResponseEntity<List<MonthlyPoint>> monthly(
             @RequestParam(required = false) Long regionalId,
             @RequestParam(required = false) Long divisionId,
             @RequestParam(required = false) Long unitId,
@@ -191,13 +228,11 @@ public class BatchController {
             @RequestParam(required = false) Batch.BatchType type,
             Authentication auth,
             @AuthenticationPrincipal(expression = "id") Long userId,
-            @AuthenticationPrincipal(expression = "employeeId") Long employeeId // 🔹 ambil employeeId untuk dashboard
-                                                                                // pegawai
-    ) {
+            @AuthenticationPrincipal(expression = "employeeId") Long employeeId) {
 
         List<Long> allowedCertIds = resolveAllowedCertIds(auth, userId);
 
-        return batchService.monthlyBatchCount(
+        List<MonthlyPoint> points = batchService.monthlyBatchCount(
                 regionalId,
                 divisionId,
                 unitId,
@@ -208,11 +243,11 @@ public class BatchController {
                 endDate,
                 type,
                 allowedCertIds,
-                employeeId // 🔹 kalau employeeId ada, chart hanya batch yg dia ikuti
-        );
+                employeeId);
+
+        return ResponseEntity.ok(points);
     }
 
-    // 🔹 Batch berjalan khusus Pegawai (self)
     @GetMapping("/employee/ongoing-paged")
     public ResponseEntity<Page<BatchResponse>> employeeOngoing(
             @AuthenticationPrincipal(expression = "employeeId") Long employeeId,
@@ -223,28 +258,26 @@ public class BatchController {
         }
 
         Page<BatchResponse> result = batchService.search(
-                null, // search
-                Batch.Status.ONGOING, // status
-                null, // type
-                null, // certificationRuleId
-                null, // institutionId
-                null, null, null, // regional/division/unit (scope employee sudah via join)
-                null, null, null, // cert/level/subfield
-                null, null, // startDate/endDate
-                null, // allowedCertIds (PIC nggak relevan di sini)
-                employeeId, // employeeId
+                null,
+                Batch.Status.ONGOING,
+                null,
+                null,
+                null,
+                null, null, null,
+                null, null, null,
+                null, null,
+                null,
+                employeeId,
                 pageable);
 
         return ResponseEntity.ok(result);
     }
 
-    // 🔹 Get by ID
     @GetMapping("/{id}")
     public ResponseEntity<BatchResponse> getById(@PathVariable Long id) {
         return ResponseEntity.ok(batchService.getByIdResponse(id));
     }
 
-    // 🔹 Update
     @PutMapping("/{id}")
     public ResponseEntity<BatchResponse> update(
             @PathVariable Long id,
@@ -254,7 +287,6 @@ public class BatchController {
         return ResponseEntity.ok(batchService.update(id, request, username));
     }
 
-    // 🔹 Delete (soft delete)
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(
             @PathVariable Long id,

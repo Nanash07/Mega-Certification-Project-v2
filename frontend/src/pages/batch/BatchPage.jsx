@@ -1,27 +1,44 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import toast from "react-hot-toast";
 import Select from "react-select";
 import AsyncSelect from "react-select/async";
+
 import Pagination from "../../components/common/Pagination";
-import { Plus, Pencil, Trash2, Eye, ChevronDown, Eraser } from "lucide-react";
-import { fetchBatches, deleteBatch, searchBatches, updateBatch } from "../../services/batchService";
+import { Plus, Pencil, Trash2, Eye, ChevronDown, Eraser, Download } from "lucide-react";
+
+import { fetchBatches, deleteBatch, searchBatches, updateBatch, exportBatchesExcel } from "../../services/batchService";
 import { fetchCertificationRules } from "../../services/certificationRuleService";
 import { fetchMyPicScope } from "../../services/picScopeService";
 import CreateBatchModal from "../../components/batches/CreateBatchModal";
 import EditBatchModal from "../../components/batches/EditBatchModal";
 
-// ===== helpers role =====
 function getCurrentRole() {
     if (typeof window === "undefined") return "";
     try {
         const user = JSON.parse(localStorage.getItem("user") || "{}");
         const fromUser = (user.role || "").toString().toUpperCase();
         if (fromUser) return fromUser;
-    } catch {
-        // ignore
-    }
+    } catch {}
     return (localStorage.getItem("role") || "").toString().toUpperCase();
+}
+
+function formatDateId(dateLike) {
+    if (!dateLike) return "-";
+    const d = new Date(dateLike);
+    if (Number.isNaN(d.getTime())) return "-";
+
+    const s = new Intl.DateTimeFormat("id-ID", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+    }).format(d);
+
+    return s
+        .replace(/\./g, "")
+        .split(" ")
+        .map((p, i) => (i === 1 ? p.charAt(0).toUpperCase() + p.slice(1) : p))
+        .join(" ");
 }
 
 export default function BatchPage() {
@@ -32,48 +49,60 @@ export default function BatchPage() {
 
     const [rows, setRows] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [exporting, setExporting] = useState(false);
 
-    // Pagination
     const [page, setPage] = useState(1);
     const [rowsPerPage, setRowsPerPage] = useState(10);
     const [totalPages, setTotalPages] = useState(0);
     const [totalElements, setTotalElements] = useState(0);
 
-    // Filters
     const [filterBatch, setFilterBatch] = useState(null);
     const [status, setStatus] = useState(null);
+    const [type, setType] = useState(null);
     const [certRule, setCertRule] = useState(null);
 
-    // Master options
+    const [startDate, setStartDate] = useState("");
+    const [endDate, setEndDate] = useState("");
+
     const [ruleOptions, setRuleOptions] = useState([]);
 
-    const statusOptions = [
-        { value: "PLANNED", label: "Planned" },
-        { value: "ONGOING", label: "Ongoing" },
-        { value: "FINISHED", label: "Finished" },
-        { value: "CANCELED", label: "Canceled" },
-    ];
+    const statusOptions = useMemo(
+        () => [
+            { value: "PLANNED", label: "Planned" },
+            { value: "ONGOING", label: "Ongoing" },
+            { value: "FINISHED", label: "Finished" },
+            { value: "CANCELED", label: "Canceled" },
+        ],
+        []
+    );
 
-    // Modals
+    const typeOptions = useMemo(
+        () => [
+            { value: "CERTIFICATION", label: "Sertifikasi" },
+            { value: "TRAINING", label: "Training" },
+            { value: "REFRESHMENT", label: "Refreshment" },
+            { value: "EXTENSION", label: "Perpanjang" },
+        ],
+        []
+    );
+
     const [openCreate, setOpenCreate] = useState(false);
     const [editItem, setEditItem] = useState(null);
     const [confirmDelete, setConfirmDelete] = useState({ open: false, id: null });
 
-    // Floating status menu
     const [statusMenu, setStatusMenu] = useState(null);
 
     const TABLE_COLS = 12;
 
-    // Badge jenis batch
-    function renderTypeBadge(type) {
-        if (!type) return "-";
+    function renderTypeBadge(t) {
+        if (!t) return "-";
         const map = {
             CERTIFICATION: { label: "Sertifikasi", cls: "badge-info text-white" },
             TRAINING: { label: "Training", cls: "badge-primary text-white" },
             REFRESHMENT: { label: "Refreshment", cls: "badge-secondary text-white" },
             EXTENSION: { label: "Perpanjang", cls: "badge-success text-white" },
         };
-        const m = map[type] || { label: type, cls: "badge-neutral" };
+        const m = map[t] || { label: t, cls: "badge-neutral" };
         return <span className={`badge badge-sm ${m.cls}`}>{m.label}</span>;
     }
 
@@ -83,8 +112,8 @@ export default function BatchPage() {
         return val.charAt(0).toUpperCase() + val.slice(1);
     }
 
-    function getStatusStyle(status) {
-        switch (status) {
+    function getStatusStyle(st) {
+        switch (st) {
             case "PLANNED":
                 return { label: "Planned", badgeCls: "badge-warning", btnCls: "btn-warning" };
             case "ONGOING":
@@ -97,10 +126,8 @@ export default function BatchPage() {
         }
     }
 
-    // Status badge: pegawai cuma lihat, PIC/SUPERADMIN bisa klik ganti
     function renderStatusBadge(row) {
         if (!row.status) return "-";
-
         const { label, badgeCls } = getStatusStyle(row.status);
 
         if (isEmployee) {
@@ -115,8 +142,8 @@ export default function BatchPage() {
                     const rect = e.currentTarget.getBoundingClientRect();
                     setStatusMenu({
                         row,
-                        x: rect.left,
-                        y: rect.bottom + 4,
+                        x: rect.left + window.scrollX,
+                        y: rect.bottom + window.scrollY + 4,
                     });
                 }}
             >
@@ -126,7 +153,6 @@ export default function BatchPage() {
         );
     }
 
-    // Async search batches (untuk filter)
     const loadBatches = async (inputValue) => {
         try {
             const res = await searchBatches({ search: inputValue, page: 0, size: 20 });
@@ -136,9 +162,7 @@ export default function BatchPage() {
         }
     };
 
-    // ===== Load Certification Rules (role-aware) =====
     useEffect(() => {
-        // Pegawai: ruleOptions akan diisi dari data batch di load(), jadi di sini skip
         if (isEmployee) return;
 
         async function loadRules() {
@@ -147,7 +171,6 @@ export default function BatchPage() {
                 let filtered = rules || [];
 
                 if (isPic) {
-                    // PIC: batasi rule berdasarkan PIC scope (pakai certificationCode aja biar simple & robust)
                     try {
                         const scope = await fetchMyPicScope();
                         const scopeCerts = scope?.certifications || [];
@@ -156,7 +179,6 @@ export default function BatchPage() {
                                 .map((c) => c.certificationCode)
                                 .filter((code) => code && String(code).trim() !== "")
                         );
-
                         filtered = filtered.filter((r) => allowedCodes.has(r.certificationCode));
                     } catch (e) {
                         console.error("load PIC scope error", e);
@@ -192,7 +214,6 @@ export default function BatchPage() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isPic, isEmployee, isSuperadmin]);
 
-    // ===== Load batch list (role-aware) =====
     async function load() {
         setLoading(true);
         try {
@@ -201,13 +222,15 @@ export default function BatchPage() {
                 size: rowsPerPage,
                 batchIds: filterBatch ? [filterBatch.value] : undefined,
                 status: status?.value,
+                type: type?.value,
                 certificationRuleId: certRule?.value,
+                startDate: startDate || undefined,
+                endDate: endDate || undefined,
             };
 
             const res = await fetchBatches(params);
             const content = res.content || [];
 
-            // PEGAWAI: generate Certification Rule filter dari batch yang dia lihat
             if (isEmployee) {
                 const uniqueRules = new Map();
                 content.forEach((b) => {
@@ -220,10 +243,8 @@ export default function BatchPage() {
                         b.certificationLevelName,
                         b.subFieldCode ?? b.subBidangCode,
                     ].filter((x) => x && String(x).trim() !== "");
-                    uniqueRules.set(id, {
-                        value: id,
-                        label: labelParts.join(" - "),
-                    });
+
+                    uniqueRules.set(id, { value: id, label: labelParts.join(" - ") });
                 });
                 setRuleOptions(Array.from(uniqueRules.values()));
             }
@@ -242,18 +263,41 @@ export default function BatchPage() {
     useEffect(() => {
         load();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [page, rowsPerPage, filterBatch, status, certRule]);
+    }, [page, rowsPerPage, filterBatch, status, type, certRule, startDate, endDate]);
 
-    // Reset filter
     function resetFilter() {
         setFilterBatch(null);
         setStatus(null);
+        setType(null);
         setCertRule(null);
+        setStartDate("");
+        setEndDate("");
         setPage(1);
         toast.success("Clear filter berhasil");
     }
 
-    // Delete batch (non-pegawai)
+    async function handleExport() {
+        if (exporting) return;
+
+        setExporting(true);
+        try {
+            await exportBatchesExcel({
+                batchIds: filterBatch ? [filterBatch.value] : undefined,
+                status: status?.value,
+                type: type?.value,
+                certificationRuleId: certRule?.value,
+                startDate: startDate || undefined,
+                endDate: endDate || undefined,
+            });
+            toast.success("Export berhasil");
+        } catch (err) {
+            console.error("export batches error:", err);
+            toast.error(err?.response?.data?.message || "Gagal export excel");
+        } finally {
+            setExporting(false);
+        }
+    }
+
     async function handleDelete(id) {
         try {
             await deleteBatch(id);
@@ -266,14 +310,12 @@ export default function BatchPage() {
         }
     }
 
-    // Ubah status batch (non-pegawai)
     async function handleChangeStatus(batch, newStatus) {
         if (isEmployee) return;
         if (batch.status === newStatus) return;
 
         try {
-            const payload = { status: newStatus };
-            await updateBatch(batch.id, payload);
+            await updateBatch(batch.id, { status: newStatus });
             await load();
             toast.success(`Status diubah ke ${formatStatusLabel(newStatus)}`);
         } catch (err) {
@@ -286,36 +328,10 @@ export default function BatchPage() {
 
     return (
         <div>
-            {/* Toolbar */}
-            <div className="mb-4 space-y-3">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 text-xs">
-                    <AsyncSelect
-                        cacheOptions
-                        defaultOptions
-                        loadOptions={loadBatches}
-                        value={filterBatch}
-                        onChange={setFilterBatch}
-                        placeholder="Search Batch"
-                        isClearable
-                    />
-                    <Select
-                        options={statusOptions}
-                        value={status}
-                        onChange={setStatus}
-                        placeholder="Filter Status"
-                        isClearable
-                    />
-                    <Select
-                        options={ruleOptions}
-                        value={certRule}
-                        onChange={setCertRule}
-                        placeholder="Filter Certification Rule"
-                        isClearable
-                    />
-                    <div className="col-span-1" />
-                    {/* Tambah Batch hanya untuk non-pegawai */}
-                    <div className="col-span-1">
-                        {!isEmployee && (
+            <div className="space-y-4 w-full mb-6">
+                <div className="grid grid-cols-1 sm:grid-cols-1 lg:grid-cols-6 gap-3 text-xs">
+                    {!isEmployee && (
+                        <div className="col-span-1 sm:col-span-1 lg:col-span-1">
                             <button
                                 type="button"
                                 className="btn btn-primary btn-sm w-full"
@@ -324,9 +340,35 @@ export default function BatchPage() {
                                 <Plus className="w-4 h-4" />
                                 Tambah Batch
                             </button>
-                        )}
-                    </div>
-                    <div className="col-span-1">
+                        </div>
+                    )}
+
+                    {!isEmployee && (
+                        <div className="col-span-1 sm:col-span-2 lg:col-span-1">
+                            <button
+                                type="button"
+                                className={`btn btn-neutral btn-sm w-full ${exporting ? "btn-disabled" : ""}`}
+                                onClick={handleExport}
+                                disabled={exporting}
+                            >
+                                {exporting ? (
+                                    <>
+                                        <span className="loading loading-spinner loading-xs" />
+                                        Exporting...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Download className="w-4 h-4" />
+                                        Export Excel
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    )}
+
+                    <div className="col-span-3" />
+
+                    <div className="col-span-1 sm:col-span-2 lg:col-span-1">
                         <button
                             type="button"
                             className="btn btn-accent btn-soft border-accent btn-sm w-full"
@@ -337,9 +379,98 @@ export default function BatchPage() {
                         </button>
                     </div>
                 </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4 text-xs">
+                    <div className="flex flex-col gap-1">
+                        <label className="font-normal text-base-content/70">Search</label>
+                        <AsyncSelect
+                            cacheOptions
+                            defaultOptions
+                            loadOptions={loadBatches}
+                            value={filterBatch}
+                            onChange={(v) => {
+                                setFilterBatch(v);
+                                setPage(1);
+                            }}
+                            placeholder="Cari batch"
+                            isClearable
+                            styles={{ control: (base) => ({ ...base, minHeight: 36 }) }}
+                        />
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                        <label className="font-normal text-base-content/70">Status</label>
+                        <Select
+                            options={statusOptions}
+                            value={status}
+                            onChange={(v) => {
+                                setStatus(v);
+                                setPage(1);
+                            }}
+                            placeholder="Pilih status"
+                            isClearable
+                            styles={{ control: (base) => ({ ...base, minHeight: 36 }) }}
+                        />
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                        <label className="font-normal text-base-content/70">Jenis</label>
+                        <Select
+                            options={typeOptions}
+                            value={type}
+                            onChange={(v) => {
+                                setType(v);
+                                setPage(1);
+                            }}
+                            placeholder="Pilih jenis"
+                            isClearable
+                            styles={{ control: (base) => ({ ...base, minHeight: 36 }) }}
+                        />
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                        <label className="font-normal text-base-content/70">Rule</label>
+                        <Select
+                            options={ruleOptions}
+                            value={certRule}
+                            onChange={(v) => {
+                                setCertRule(v);
+                                setPage(1);
+                            }}
+                            placeholder="Pilih rule"
+                            isClearable
+                            styles={{ control: (base) => ({ ...base, minHeight: 36 }) }}
+                        />
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                        <label className="font-normal text-base-content/70">Tanggal Mulai</label>
+                        <input
+                            type="date"
+                            className="input input-sm input-bordered w-full"
+                            value={startDate}
+                            onChange={(e) => {
+                                setStartDate(e.target.value);
+                                setPage(1);
+                            }}
+                        />
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                        <label className="font-normal text-base-content/70">Tanggal Selesai</label>
+                        <input
+                            type="date"
+                            className="input input-sm input-bordered w-full"
+                            value={endDate}
+                            onChange={(e) => {
+                                setEndDate(e.target.value);
+                                setPage(1);
+                            }}
+                        />
+                    </div>
+                </div>
             </div>
 
-            {/* Table */}
             <div className="overflow-x-auto rounded-xl border border-gray-200 shadow bg-base-100">
                 <table className="table table-zebra">
                     <thead className="bg-base-200 text-xs">
@@ -358,6 +489,7 @@ export default function BatchPage() {
                             <th>Status</th>
                         </tr>
                     </thead>
+
                     <tbody className="text-xs">
                         {loading ? (
                             <tr>
@@ -376,10 +508,8 @@ export default function BatchPage() {
                                 <tr key={b.id}>
                                     <td>{startIdx + idx}</td>
 
-                                    {/* Aksi */}
                                     <td>
                                         <div className="flex gap-2">
-                                            {/* Detail – semua role boleh */}
                                             <div className="tooltip" data-tip="Lihat detail batch">
                                                 <Link
                                                     to={`/batch/${b.id}`}
@@ -389,7 +519,6 @@ export default function BatchPage() {
                                                 </Link>
                                             </div>
 
-                                            {/* Edit & Hapus hanya non-pegawai */}
                                             {!isEmployee && (
                                                 <>
                                                     <div className="tooltip" data-tip="Edit batch">
@@ -418,6 +547,7 @@ export default function BatchPage() {
 
                                     <td>{b.batchName}</td>
                                     <td>{renderTypeBadge(b.type)}</td>
+
                                     <td>
                                         {[
                                             b.certificationCode,
@@ -427,9 +557,10 @@ export default function BatchPage() {
                                             .filter((x) => x && String(x).trim() !== "")
                                             .join(" - ") || "-"}
                                     </td>
+
                                     <td>{b.institutionName || "-"}</td>
-                                    <td>{b.startDate ? new Date(b.startDate).toLocaleDateString("id-ID") : "-"}</td>
-                                    <td>{b.endDate ? new Date(b.endDate).toLocaleDateString("id-ID") : "-"}</td>
+                                    <td>{formatDateId(b.startDate)}</td>
+                                    <td>{formatDateId(b.endDate)}</td>
                                     <td>{b.quota ?? "-"}</td>
                                     <td>{b.totalParticipants ?? 0}</td>
                                     <td>{b.totalPassed ?? 0}</td>
@@ -441,7 +572,6 @@ export default function BatchPage() {
                 </table>
             </div>
 
-            {/* Pagination */}
             <Pagination
                 page={page}
                 totalPages={totalPages}
@@ -454,11 +584,9 @@ export default function BatchPage() {
                 }}
             />
 
-            {/* Modals */}
             <CreateBatchModal open={openCreate} onClose={() => setOpenCreate(false)} onSaved={load} />
             <EditBatchModal open={!!editItem} data={editItem} onClose={() => setEditItem(null)} onSaved={load} />
 
-            {/* Confirm Delete Modal */}
             <dialog className="modal" open={confirmDelete.open}>
                 <div className="modal-box">
                     <h3 className="font-bold text-lg">Hapus Batch?</h3>
@@ -476,12 +604,14 @@ export default function BatchPage() {
                         </button>
                     </div>
                 </div>
+
                 <form method="dialog" className="modal-backdrop">
-                    <button onClick={() => setConfirmDelete({ open: false, id: null })}>close</button>
+                    <button type="button" onClick={() => setConfirmDelete({ open: false, id: null })}>
+                        close
+                    </button>
                 </form>
             </dialog>
 
-            {/* Floating status menu – hanya non-pegawai */}
             {statusMenu && !isEmployee && (
                 <div className="fixed inset-0 z-[999]" onClick={() => setStatusMenu(null)}>
                     <div
@@ -495,6 +625,7 @@ export default function BatchPage() {
                                 return (
                                     <button
                                         key={st}
+                                        type="button"
                                         className={`btn btn-xs ${btnCls} text-white rounded-full w-full justify-center`}
                                         onClick={async () => {
                                             await handleChangeStatus(statusMenu.row, st);

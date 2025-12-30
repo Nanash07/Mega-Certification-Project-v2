@@ -21,7 +21,7 @@ public class MailSenderConfig {
     public JavaMailSender reusableMailSender() {
         EmailConfig config = emailConfigService.getActiveConfigEntity();
         if (config == null) {
-            throw new IllegalStateException("⚠️ Tidak ada konfigurasi email aktif di database!");
+            throw new IllegalStateException("Tidak ada konfigurasi email aktif di database!");
         }
 
         JavaMailSenderImpl mailSender = new JavaMailSenderImpl();

@@ -1,9 +1,7 @@
-// src/services/batchService.js
 import api from "./api";
 
 const BASE = "/batches";
 
-/** helper: bersihin params dan serialize array ke comma-separated */
 function buildParams(params = {}) {
     const q = {};
     const set = (k, v) => {
@@ -12,15 +10,12 @@ function buildParams(params = {}) {
         else q[k] = v;
     };
 
-    // paging
     set("page", params.page);
     set("size", params.size);
 
-    // filter umum
     set("batchIds", params.batchIds);
     set("status", params.status);
 
-    // support param `type` dan juga alias `batchType` dari dashboard
     const resolvedType = params.type ?? params.batchType;
     set("type", resolvedType);
 
@@ -28,7 +23,6 @@ function buildParams(params = {}) {
     set("institutionId", params.institutionId);
     set("search", params.search);
 
-    // filter dashboard / organisasi / sertifikasi
     set("regionalId", params.regionalId);
     set("divisionId", params.divisionId);
     set("unitId", params.unitId);
@@ -36,26 +30,98 @@ function buildParams(params = {}) {
     set("levelId", params.levelId);
     set("subFieldId", params.subFieldId);
 
-    // NOTE:
-    // BE /batches/paged sekarang BELUM baca employeeId dari query param,
-    // scope pegawai dipakai di endpoint khusus:
-    // - /batches/employee/ongoing-paged (pakai AuthenticationPrincipal.employeeId)
-    // - /batches/monthly (juga pakai AuthenticationPrincipal.employeeId)
-    // jadi di sini nggak perlu kirim employeeId, tapi kalaupun ada akan diabaikan.
-    // set("employeeId", params.employeeId);
-
-    // date range
     set("startDate", params.startDate);
     set("endDate", params.endDate);
 
-    // sort: Spring format -> sort=field,direction
     if (params.sortField) {
         q.sort = `${params.sortField},${params.sortDirection || "asc"}`;
     }
+
     return q;
 }
 
-// ================== BATCH CRUD ==================
+function todayYmd() {
+    const d = new Date();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+}
+
+function safeSlug(s) {
+    return String(s || "")
+        .trim()
+        .replace(/[^\w.-]+/g, "-")
+        .replace(/-+/g, "-")
+        .replace(/^-|-$/g, "");
+}
+
+function ensureXlsx(name) {
+    if (!name) return "batches.xlsx";
+    return name.toLowerCase().endsWith(".xlsx") ? name : `${name}.xlsx`;
+}
+
+function hasDateToken(name) {
+    return /\b\d{4}[-_]\d{2}[-_]\d{2}\b/.test(name) || /\b\d{8}\b/.test(name);
+}
+
+function getFilenameFromDisposition(disposition) {
+    if (!disposition) return null;
+
+    const utf = /filename\*\s*=\s*UTF-8''([^;]+)/i.exec(disposition);
+    if (utf?.[1]) {
+        try {
+            return decodeURIComponent(utf[1].trim());
+        } catch {
+            return utf[1].trim();
+        }
+    }
+
+    const plain = /filename\s*=\s*"?([^";]+)"?/i.exec(disposition);
+    if (plain?.[1]) {
+        try {
+            return decodeURIComponent(plain[1].trim());
+        } catch {
+            return plain[1].trim();
+        }
+    }
+
+    return null;
+}
+
+function makeDatedFilename(params = {}, headerFilename) {
+    const dateKey =
+        params?.startDate && params?.endDate
+            ? `${params.startDate}_to_${params.endDate}`
+            : params?.startDate
+            ? `${params.startDate}`
+            : params?.endDate
+            ? `${params.endDate}`
+            : todayYmd();
+
+    const datePart = safeSlug(dateKey);
+
+    if (headerFilename) {
+        const clean = ensureXlsx(headerFilename);
+        if (hasDateToken(clean)) return clean;
+        const base = clean.replace(/\.xlsx$/i, "");
+        return `${base}-${datePart}.xlsx`;
+    }
+
+    return `batches-${datePart}.xlsx`;
+}
+
+function downloadBlob(blob, filename) {
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = ensureXlsx(filename || "batches.xlsx");
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+}
+
 export async function fetchBatches(params = {}) {
     try {
         const { data } = await api.get(`${BASE}/paged`, { params: buildParams(params) });
@@ -73,152 +139,119 @@ export async function fetchBatches(params = {}) {
 }
 
 export async function createBatch(payload) {
-    try {
-        const { data } = await api.post(BASE, payload);
-        return data;
-    } catch (err) {
-        console.error("createBatch error:", err);
-        throw err;
-    }
+    const { data } = await api.post(BASE, payload);
+    return data;
 }
 
 export async function updateBatch(id, payload) {
-    try {
-        const { data } = await api.put(`${BASE}/${id}`, payload);
-        return data;
-    } catch (err) {
-        console.error("updateBatch error:", err);
-        throw err;
-    }
+    const { data } = await api.put(`${BASE}/${id}`, payload);
+    return data;
 }
 
 export async function deleteBatch(id) {
-    try {
-        await api.delete(`${BASE}/${id}`);
-        return true;
-    } catch (err) {
-        console.error("deleteBatch error:", err);
-        return false;
-    }
+    await api.delete(`${BASE}/${id}`);
+    return true;
 }
 
-export async function searchBatches({ search, page = 0, size = 20 } = {}) {
-    try {
-        const { data } = await api.get(`${BASE}/paged`, {
-            params: buildParams({ search, page, size }),
-        });
-        return (
-            data || {
-                content: [],
-                totalPages: 0,
-                totalElements: 0,
-            }
-        );
-    } catch (err) {
-        console.error("searchBatches error:", err);
-        return { content: [], totalPages: 0, totalElements: 0 };
-    }
+export async function searchBatches({ search, page = 0, size = 20, type } = {}) {
+    const { data } = await api.get(`${BASE}/paged`, {
+        params: buildParams({ search, page, size, type }),
+    });
+    return (
+        data || {
+            content: [],
+            totalPages: 0,
+            totalElements: 0,
+        }
+    );
 }
 
 export async function fetchBatchById(id) {
-    try {
-        const { data } = await api.get(`${BASE}/${id}`);
-        return data || null;
-    } catch (err) {
-        console.error("fetchBatchById error:", err);
-        return null;
-    }
+    const { data } = await api.get(`${BASE}/${id}`);
+    return data || null;
 }
 
 export async function sendBatchNotifications(batchId, { status } = {}) {
-    try {
-        const { data } = await api.post(`/notifications/batches/${batchId}/send`, null, {
-            params: status ? { status } : {},
-        });
-        return typeof data === "number" ? data : data?.sent ?? 0;
-    } catch (err) {
-        console.error("sendBatchNotifications error:", err);
-        throw err;
-    }
+    const { data } = await api.post(`/notifications/batches/${batchId}/send`, null, {
+        params: status ? { status } : {},
+    });
+    return typeof data === "number" ? data : data?.sent ?? 0;
 }
 
 export async function fetchEmployeeOngoingBatchesPaged({ page = 0, size = 10 } = {}) {
-    try {
-        const { data } = await api.get(`${BASE}/employee/ongoing-paged`, {
-            params: { page, size },
-        });
-        return (
-            data || {
-                content: [],
-                totalPages: 0,
-                totalElements: 0,
-            }
-        );
-    } catch (err) {
-        console.error("fetchEmployeeOngoingBatchesPaged error:", err);
-        return { content: [], totalPages: 0, totalElements: 0 };
-    }
+    const { data } = await api.get(`${BASE}/employee/ongoing-paged`, {
+        params: { page, size },
+    });
+    return (
+        data || {
+            content: [],
+            totalPages: 0,
+            totalElements: 0,
+        }
+    );
 }
 
-// MONTHLY batch untuk dashboard:
-// - Superadmin / PIC: hasil global (plus scope PIC)
-// - Pegawai: otomatis ke-filter batch yang dia ikuti (BE pakai AuthenticationPrincipal.employeeId)
 export async function fetchMonthlyBatches(params = {}) {
-    try {
-        const q = {};
-        const set = (k, v) => {
-            if (v === undefined || v === null || v === "") return;
-            q[k] = v;
-        };
+    const q = {};
+    const set = (k, v) => {
+        if (v === undefined || v === null || v === "") return;
+        q[k] = v;
+    };
 
-        // filter yang memang didukung endpoint /monthly
-        set("regionalId", params.regionalId);
-        set("divisionId", params.divisionId);
-        set("unitId", params.unitId);
-        set("certificationId", params.certificationId);
-        set("levelId", params.levelId);
-        set("subFieldId", params.subFieldId);
-        set("startDate", params.startDate);
-        set("endDate", params.endDate);
+    set("regionalId", params.regionalId);
+    set("divisionId", params.divisionId);
+    set("unitId", params.unitId);
+    set("certificationId", params.certificationId);
+    set("levelId", params.levelId);
+    set("subFieldId", params.subFieldId);
+    set("startDate", params.startDate);
+    set("endDate", params.endDate);
 
-        // support type / batchType
-        const resolvedType = params.type ?? params.batchType;
-        set("type", resolvedType);
+    const resolvedType = params.type ?? params.batchType;
+    set("type", resolvedType);
 
-        // employeeId TIDAK perlu dikirim, BE baca dari principal
-
-        const { data } = await api.get(`${BASE}/monthly`, {
-            params: q,
-        });
-        return Array.isArray(data) ? data : [];
-    } catch (err) {
-        console.error("fetchMonthlyBatches error:", err);
-        return [];
-    }
+    const { data } = await api.get(`${BASE}/monthly`, { params: q });
+    return Array.isArray(data) ? data : [];
 }
 
-// ================== BATCH COUNT (DASHBOARD) ==================
 export async function fetchBatchCount(params = {}) {
-    try {
-        const { data } = await api.get(`${BASE}/dashboard-count`, {
-            params: {
-                status: params.status, // single status
-                statuses: params.statuses, // atau list status
-                type: params.type ?? params.batchType,
-                regionalId: params.regionalId,
-                divisionId: params.divisionId,
-                unitId: params.unitId,
-                certificationId: params.certificationId,
-                levelId: params.levelId,
-                subFieldId: params.subFieldId,
-                startDate: params.startDate,
-                endDate: params.endDate,
-                // employeeId: nggak dipakai di endpoint ini (BE selalu null di service)
-            },
-        });
-        return Number(data?.count ?? 0);
-    } catch (err) {
-        console.error("fetchBatchCount error:", err);
-        return 0;
-    }
+    const q = {};
+    const set = (k, v) => {
+        if (v === undefined || v === null || v === "") return;
+        if (Array.isArray(v)) q[k] = v.join(",");
+        else q[k] = v;
+    };
+
+    set("status", params.status);
+    set("statuses", params.statuses);
+    set("type", params.type ?? params.batchType);
+    set("regionalId", params.regionalId);
+    set("divisionId", params.divisionId);
+    set("unitId", params.unitId);
+    set("certificationId", params.certificationId);
+    set("levelId", params.levelId);
+    set("subFieldId", params.subFieldId);
+    set("startDate", params.startDate);
+    set("endDate", params.endDate);
+
+    const { data } = await api.get(`${BASE}/dashboard-count`, { params: q });
+    return Number(data?.count ?? 0);
+}
+
+export async function exportBatchesExcel(params = {}) {
+    const res = await api.get(`${BASE}/export-excel`, {
+        params: buildParams(params),
+        responseType: "blob",
+        transformResponse: (r) => r,
+    });
+
+    const headerName = getFilenameFromDisposition(res?.headers?.["content-disposition"]);
+    const filename = makeDatedFilename(params, headerName);
+
+    const blob = new Blob([res.data], {
+        type: res?.headers?.["content-type"] || "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+
+    downloadBlob(blob, filename);
+    return true;
 }
