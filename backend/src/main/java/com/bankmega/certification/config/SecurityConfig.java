@@ -2,6 +2,7 @@ package com.bankmega.certification.config;
 
 import com.bankmega.certification.security.JwtAuthenticationFilter;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -14,7 +15,9 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Configuration
 @EnableMethodSecurity
@@ -22,6 +25,9 @@ public class SecurityConfig {
 
     @Autowired
     private JwtAuthenticationFilter jwtAuthenticationFilter;
+
+    @Value("${app.cors.allowed-origins:http://localhost:5173}")
+    private String allowedOrigins;
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -50,7 +56,7 @@ public class SecurityConfig {
 
                         // employee certifications → file endpoint khusus
                         .requestMatchers(HttpMethod.GET, "/api/employee-certifications/*/file").permitAll()
-                        // kalau upload/edit/delete tetap proteksi
+
                         .requestMatchers(HttpMethod.POST, "/api/employee-certifications/**")
                         .hasAnyRole("SUPERADMIN", "PIC")
                         .requestMatchers(HttpMethod.PUT, "/api/employee-certifications/**")
@@ -74,14 +80,17 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration c = new CorsConfiguration();
-        c.setAllowedOrigins(List.of(
-                "http://localhost:5173",
-                "https://mega-certification-project.vercel.app",
-                "https://843a182d52ad.ngrok-free.app"));
+
+        List<String> origins = Arrays.stream(allowedOrigins.split("\\s*,\\s*"))
+                .filter(s -> !s.isBlank())
+                .collect(Collectors.toList());
+
+        c.setAllowedOrigins(origins);
         c.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         c.addAllowedHeader("*");
         c.setExposedHeaders(List.of("Location"));
         c.setAllowCredentials(true);
+
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", c);
         return source;
