@@ -2,7 +2,6 @@ package com.bankmega.certification.config;
 
 import com.bankmega.certification.security.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -11,13 +10,6 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.web.cors.CorsConfiguration;
-import org.springframework.web.cors.CorsConfigurationSource;
-import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-
-import java.util.Arrays;
-import java.util.List;
-import java.util.stream.Collectors;
 
 @Configuration
 @EnableMethodSecurity
@@ -26,29 +18,19 @@ public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
-    /**
-     * Set di ENV Railway:
-     * APP_CORS_ALLOWED_ORIGINS=https://mega-certification-project-v2-1ogr.vercel.app,https://*.vercel.app,http://localhost:5173
-     */
-    @Value("${app.cors.allowed-origins:http://localhost:5173}")
-    private String allowedOrigins;
-
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-                // CORS & CSRF
                 .csrf(csrf -> csrf.disable())
-                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-
-                // JWT stateless
+                // cors handled by CorsFilterConfig (global)
+                .cors(cors -> {
+                })
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-
-                // Authorization
                 .authorizeHttpRequests(auth -> auth
-                        // preflight
+                        // preflight MUST pass
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
-                        // auth
+                        // auth endpoints public
                         .requestMatchers("/api/auth/**").permitAll()
 
                         // roles
@@ -63,7 +45,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PUT, "/api/certifications/**").hasRole("SUPERADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/certifications/**").hasRole("SUPERADMIN")
 
-                        // employee certifications → file endpoint khusus
+                        // employee certifications file endpoint public
                         .requestMatchers(HttpMethod.GET, "/api/employee-certifications/*/file").permitAll()
 
                         .requestMatchers(HttpMethod.POST, "/api/employee-certifications/**")
@@ -84,45 +66,5 @@ public class SecurityConfig {
 
         http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
-    }
-
-    @Bean
-    public CorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration c = new CorsConfiguration();
-
-        // Parse comma-separated origins/patterns
-        List<String> originPatterns = Arrays.stream(allowedOrigins.split("\\s*,\\s*"))
-                .map(String::trim)
-                .filter(s -> !s.isBlank())
-                .collect(Collectors.toList());
-
-        // IMPORTANT:
-        // - Pakai allowedOriginPatterns supaya bisa dukung https://*.vercel.app
-        // - Kalau lu pakai Bearer token (Authorization header) dan BUKAN cookie,
-        // lebih aman bikin allowCredentials(false).
-        c.setAllowedOriginPatterns(originPatterns);
-
-        c.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
-
-        // allow headers yg umum dipakai FE
-        c.setAllowedHeaders(List.of(
-                "Authorization",
-                "Content-Type",
-                "Accept",
-                "Origin",
-                "X-Requested-With"));
-
-        // kalau FE butuh baca header tertentu dari response
-        c.setExposedHeaders(List.of("Location"));
-
-        // Karena lu pakai Bearer token (localStorage) -> ga perlu cookie
-        c.setAllowCredentials(false);
-
-        // Optional: cache preflight (detik)
-        c.setMaxAge(3600L);
-
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", c);
-        return source;
     }
 }

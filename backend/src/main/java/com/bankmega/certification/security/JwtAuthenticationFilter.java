@@ -5,6 +5,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
@@ -20,7 +21,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final CustomUserDetailsService customUserDetailsService;
 
-    @SuppressWarnings("null")
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        // Preflight must pass without touching auth
+        return HttpMethod.OPTIONS.matches(request.getMethod());
+    }
+
     @Override
     protected void doFilterInternal(
             HttpServletRequest request,
@@ -35,7 +41,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         if (token != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-
             String username;
             try {
                 username = JwtUtil.getUsername(token);
@@ -49,9 +54,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             if (JwtUtil.isValid(token, userDetails.getUsername())) {
                 UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
                         userDetails, null, userDetails.getAuthorities());
-                auth.setDetails(
-                        new WebAuthenticationDetailsSource().buildDetails(request));
-
+                auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                 SecurityContextHolder.getContext().setAuthentication(auth);
             }
         }
