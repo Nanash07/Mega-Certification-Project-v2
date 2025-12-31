@@ -270,7 +270,7 @@ export default function App() {
                 <Route
                     path="/batch/:id"
                     element={
-                        <ProtectedRoute roles={["SUPERADMIN", "PIC"]}>
+                        <ProtectedRoute>
                             <MainLayout>
                                 <DetailBatchPage />
                             </MainLayout>

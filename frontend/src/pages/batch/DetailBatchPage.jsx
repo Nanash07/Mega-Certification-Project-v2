@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import {
     fetchEmployeeBatchesPaged,
-    fetchEmployeeBatches, // untuk build opsi filter lengkap
+    fetchEmployeeBatches,
     updateEmployeeBatchStatus,
     deleteEmployeeFromBatch,
     retryEmployeeBatch,
@@ -15,13 +15,41 @@ import Pagination from "../../components/common/Pagination";
 import { ArrowLeft, Plus, Send, RotateCcw, Pencil } from "lucide-react";
 import Select from "react-select";
 
+function getStoredUser() {
+    try {
+        return JSON.parse(localStorage.getItem("user") || "{}");
+    } catch {
+        return {};
+    }
+}
+
+function getCurrentRole() {
+    const storedUser = getStoredUser();
+    return (storedUser.role || localStorage.getItem("role") || "").toString().toUpperCase();
+}
+
 export default function DetailBatchPage() {
     const { id } = useParams();
     const navigate = useNavigate();
 
+    // ===== AUTH / LIMITATION =====
+    const storedUser = getStoredUser();
+    const role = getCurrentRole();
+    const isEmployee = role === "PEGAWAI";
+    const canManageBatch = !isEmployee; // PIC + SUPERADMIN (dan non pegawai lainnya)
+
+    const currentEmployeeId = storedUser.employeeId ?? null;
+
+    // IMPORTANT: participant row harus punya employeeId
+    const isOwnRow = (p) => {
+        if (!currentEmployeeId) return false;
+        if (!p?.employeeId) return false;
+        return Number(p.employeeId) === Number(currentEmployeeId);
+    };
+
     const [batch, setBatch] = useState(null);
     const [participants, setParticipants] = useState([]);
-    const [allParticipants, setAllParticipants] = useState([]); // sumber opsi filter
+    const [allParticipants, setAllParticipants] = useState([]);
     const [loading, setLoading] = useState(false);
 
     // pagination
@@ -35,7 +63,7 @@ export default function DetailBatchPage() {
     const [confirmDelete, setConfirmDelete] = useState({ open: false, id: null });
     const [confirmSend, setConfirmSend] = useState(false);
 
-    // filters (table)
+    // filters
     const [filterEmployee, setFilterEmployee] = useState(null);
     const [filterStatus, setFilterStatus] = useState(null);
     const [filterRegional, setFilterRegional] = useState(null);
@@ -56,14 +84,13 @@ export default function DetailBatchPage() {
         { value: "FAILED", label: "Failed" },
     ];
 
-    // badge jenis
     function renderTypeBadge(type) {
         if (!type) return "-";
         const map = {
             CERTIFICATION: { label: "Sertifikasi", cls: "badge-info text-white" },
             TRAINING: { label: "Training", cls: "badge-primary text-white" },
             REFRESHMENT: { label: "Refreshment", cls: "badge-secondary text-white" },
-            EXTENSION: { label: "Perpanjang", cls: "badge-success text-white" }, // 🔹 baru
+            EXTENSION: { label: "Perpanjang", cls: "badge-success text-white" },
         };
         const m = map[type] || { label: type, cls: "badge-neutral" };
         return <span className={`badge badge-sm ${m.cls}`}>{m.label}</span>;
@@ -79,7 +106,7 @@ export default function DetailBatchPage() {
                     batchId: id,
                     page: page - 1,
                     size: rowsPerPage,
-                    search: filterEmployee?.value ?? null, // NIP / nama (BE handle both)
+                    search: filterEmployee?.value ?? null,
                     status: filterStatus?.value ?? null,
                     regional: filterRegional?.value ?? null,
                     division: filterDivision?.value ?? null,
@@ -103,7 +130,7 @@ export default function DetailBatchPage() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [id, page, rowsPerPage, filterEmployee, filterStatus, filterRegional, filterDivision, filterUnit, filterJob]);
 
-    // load SEMUA peserta utk build opsi filter (sekali saat batch id berubah)
+    // load semua peserta utk filter options
     useEffect(() => {
         async function loadAll() {
             try {
@@ -155,14 +182,11 @@ export default function DetailBatchPage() {
         }
     }
 
-    // Kirim email
     async function doSendEmails() {
         try {
             if (!batch) return;
             setSendingEmails(true);
-            const sent = await sendBatchNotifications(batch.id, {
-                status: filterStatus?.value, // optional
-            });
+            const sent = await sendBatchNotifications(batch.id, { status: filterStatus?.value });
             toast.success(`Email terkirim ke ${sent} peserta`);
         } catch (err) {
             console.error(err);
@@ -216,25 +240,27 @@ export default function DetailBatchPage() {
     // ================== RENDER ==================
     return (
         <div className="space-y-6">
-            {/* Header Row: Back (kiri) — Edit (kanan) */}
+            {/* Header Row */}
             <div className="flex items-center justify-between gap-2">
                 <button className="btn btn-sm btn-accent flex items-center gap-1" onClick={() => navigate(-1)}>
                     <ArrowLeft className="w-4 h-4" />
                     Kembali
                 </button>
 
-                <button
-                    className="btn btn-secondary btn-sm flex items-center gap-1 disabled:opacity-60"
-                    onClick={() => setOpenEdit(true)}
-                    disabled={!batch}
-                    title="Edit detail batch"
-                >
-                    <Pencil className="w-4 h-4" />
-                    Edit Batch
-                </button>
+                {/* Edit batch: only PIC/SUPERADMIN */}
+                {canManageBatch && (
+                    <button
+                        className="btn btn-secondary btn-sm flex items-center gap-1 disabled:opacity-60"
+                        onClick={() => setOpenEdit(true)}
+                        disabled={!batch}
+                        title="Edit detail batch"
+                    >
+                        <Pencil className="w-4 h-4" />
+                        Edit Batch
+                    </button>
+                )}
             </div>
 
-            {/* Title */}
             <h2 className="text-xl font-bold">Detail Batch</h2>
 
             {/* Batch Info */}
@@ -246,7 +272,6 @@ export default function DetailBatchPage() {
                             <div>{batch.batchName}</div>
                         </div>
 
-                        {/* JENIS BATCH */}
                         <div>
                             <span className="font-bold">Jenis Batch:</span>
                             <div>{renderTypeBadge(batch.type)}</div>
@@ -264,6 +289,7 @@ export default function DetailBatchPage() {
                                     .join(" - ") || "-"}
                             </div>
                         </div>
+
                         <div>
                             <span className="font-bold">Lembaga:</span>
                             <div>{batch.institutionName || "-"}</div>
@@ -288,6 +314,7 @@ export default function DetailBatchPage() {
                             <span className="font-bold">Total Lulus:</span>
                             <div>{batch.totalPassed ?? 0}</div>
                         </div>
+
                         <div>
                             <span className="font-bold">Status:</span>
                             <div>
@@ -319,39 +346,44 @@ export default function DetailBatchPage() {
             )}
 
             {/* Actions */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-6 gap-3 items-center">
-                {/* Tambah Peserta */}
-                <div className="col-span-1">
-                    <button
-                        className="btn btn-primary btn-sm w-full flex items-center gap-1"
-                        onClick={() => setOpenAdd(true)}
-                    >
-                        <Plus className="w-4 h-4" />
-                        Tambah Peserta
-                    </button>
-                </div>
+            {canManageBatch ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-6 gap-3 items-center">
+                    <div className="col-span-1">
+                        <button
+                            className="btn btn-primary btn-sm w-full flex items-center gap-1"
+                            onClick={() => setOpenAdd(true)}
+                        >
+                            <Plus className="w-4 h-4" />
+                            Tambah Peserta
+                        </button>
+                    </div>
 
-                {/* Kirim Email */}
-                <div className="col-span-1">
-                    <button
-                        className="btn btn-success btn-sm w-full flex items-center gap-1 disabled:opacity-60"
-                        onClick={() => setConfirmSend(true)}
-                        disabled={sendingEmails || !batch}
-                    >
-                        <Send className="w-4 h-4" />
-                        Kirim Email ke Peserta
-                    </button>
-                </div>
+                    <div className="col-span-1">
+                        <button
+                            className="btn btn-success btn-sm w-full flex items-center gap-1 disabled:opacity-60"
+                            onClick={() => setConfirmSend(true)}
+                            disabled={sendingEmails || !batch}
+                        >
+                            <Send className="w-4 h-4" />
+                            Kirim Email ke Peserta
+                        </button>
+                    </div>
 
-                {/* Clear Filter di paling kanan */}
-                <div className="col-span-1 xl:col-start-6">
-                    <button className="btn btn-accent btn-soft border-accent btn-sm w-full" onClick={resetFilter}>
+                    <div className="col-span-1 xl:col-start-6">
+                        <button className="btn btn-accent btn-soft border-accent btn-sm w-full" onClick={resetFilter}>
+                            Clear Filter
+                        </button>
+                    </div>
+                </div>
+            ) : (
+                <div className="flex justify-end">
+                    <button className="btn btn-accent btn-soft border-accent btn-sm" onClick={resetFilter}>
                         Clear Filter
                     </button>
                 </div>
-            </div>
+            )}
 
-            {/* Filters Row */}
+            {/* Filters */}
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-6 gap-3 text-xs items-end">
                 <Select
                     options={employeeOptions}
@@ -415,7 +447,7 @@ export default function DetailBatchPage() {
                 />
             </div>
 
-            {/* Participants Table */}
+            {/* Table */}
             <div className="card bg-base-100 shadow border border-gray-200">
                 <div className="card-body p-0 overflow-x-auto">
                     <table className="table table-zebra text-sm">
@@ -432,6 +464,7 @@ export default function DetailBatchPage() {
                                 <th className="text-center">Aksi</th>
                             </tr>
                         </thead>
+
                         <tbody>
                             {loading ? (
                                 <tr>
@@ -446,116 +479,176 @@ export default function DetailBatchPage() {
                                     </td>
                                 </tr>
                             ) : (
-                                participants.map((p, idx) => (
-                                    <tr key={p.id}>
-                                        <td>{startIdx + idx}</td>
-                                        <td>{p.employeeNip}</td>
-                                        <td>{p.employeeName}</td>
-                                        <td>{p.employeeRegionalName ?? "-"}</td>
-                                        <td>{p.employeeDivisionName ?? "-"}</td>
-                                        <td>{p.employeeUnitName ?? "-"}</td>
-                                        <td>{p.employeeJobName ?? "-"}</td>
-                                        <td>
-                                            <span
-                                                className={`badge badge-sm text-white ${
-                                                    p.status === "REGISTERED"
-                                                        ? "badge-info"
-                                                        : p.status === "ATTENDED"
-                                                        ? "badge-warning"
-                                                        : p.status === "PASSED"
-                                                        ? "badge-success"
-                                                        : p.status === "FAILED"
-                                                        ? "badge-error"
-                                                        : "badge-neutral"
-                                                }`}
-                                            >
-                                                {p.status}
-                                            </span>
-                                        </td>
-                                        <td className="flex justify-center gap-2">
-                                            {/* REGISTERED: Attend + Hapus */}
-                                            {p.status === "REGISTERED" && (
-                                                <>
-                                                    <button
-                                                        className={`btn btn-xs btn-warning btn-soft border-warning ${
-                                                            pendingRowId === p.id ? "btn-disabled" : ""
-                                                        }`}
-                                                        onClick={() => handleUpdateStatus(p.id, "ATTENDED")}
-                                                        disabled={pendingRowId === p.id}
-                                                    >
-                                                        {pendingRowId === p.id ? (
-                                                            <span className="loading loading-spinner loading-xs" />
-                                                        ) : null}
-                                                        Attend
-                                                    </button>
-                                                    <button
-                                                        className={`btn btn-xs btn-neutral btn-soft border-neutral ${
-                                                            pendingRowId === p.id ? "btn-disabled" : ""
-                                                        }`}
-                                                        onClick={() => setConfirmDelete({ open: true, id: p.id })}
-                                                        disabled={pendingRowId === p.id}
-                                                    >
-                                                        Hapus
-                                                    </button>
-                                                </>
-                                            )}
+                                participants.map((p, idx) => {
+                                    const own = isOwnRow(p);
 
-                                            {/* ATTENDED: Passed/Failed */}
-                                            {p.status === "ATTENDED" && (
-                                                <>
-                                                    <button
-                                                        className={`btn btn-xs btn-success btn-soft border-success ${
-                                                            pendingRowId === p.id ? "btn-disabled" : ""
-                                                        }`}
-                                                        onClick={() => handleUpdateStatus(p.id, "PASSED")}
-                                                        disabled={pendingRowId === p.id}
-                                                    >
-                                                        {pendingRowId === p.id ? (
-                                                            <span className="loading loading-spinner loading-xs" />
-                                                        ) : null}
-                                                        Passed
-                                                    </button>
-                                                    <button
-                                                        className={`btn btn-xs btn-error btn-soft border-error ${
-                                                            pendingRowId === p.id ? "btn-disabled" : ""
-                                                        }`}
-                                                        onClick={() => handleUpdateStatus(p.id, "FAILED")}
-                                                        disabled={pendingRowId === p.id}
-                                                    >
-                                                        {pendingRowId === p.id ? (
-                                                            <span className="loading loading-spinner loading-xs" />
-                                                        ) : null}
-                                                        Failed
-                                                    </button>
-                                                </>
-                                            )}
+                                    // RULE:
+                                    // - PIC/SUPERADMIN: full actions
+                                    // - PEGAWAI: only Attend (REGISTERED) and only for own row
+                                    const canEmployeeAttend = isEmployee && own && p.status === "REGISTERED";
+                                    const showAnyAction = canManageBatch || canEmployeeAttend;
 
-                                            {/* FAILED: Ulangi */}
-                                            {p.status === "FAILED" && (
-                                                <button
-                                                    className={`btn btn-xs btn-info btn-soft border-info flex items-center gap-1 ${
-                                                        pendingRowId === p.id ? "btn-disabled" : ""
+                                    return (
+                                        <tr key={p.id}>
+                                            <td>{startIdx + idx}</td>
+                                            <td>{p.employeeNip}</td>
+                                            <td>{p.employeeName}</td>
+                                            <td>{p.employeeRegionalName ?? "-"}</td>
+                                            <td>{p.employeeDivisionName ?? "-"}</td>
+                                            <td>{p.employeeUnitName ?? "-"}</td>
+                                            <td>{p.employeeJobName ?? "-"}</td>
+                                            <td>
+                                                <span
+                                                    className={`badge badge-sm text-white ${
+                                                        p.status === "REGISTERED"
+                                                            ? "badge-info"
+                                                            : p.status === "ATTENDED"
+                                                            ? "badge-warning"
+                                                            : p.status === "PASSED"
+                                                            ? "badge-success"
+                                                            : p.status === "FAILED"
+                                                            ? "badge-error"
+                                                            : "badge-neutral"
                                                     }`}
-                                                    onClick={() => handleRetry(p.id)}
-                                                    title="Ulang attempt (balik ke REGISTERED)"
-                                                    disabled={pendingRowId === p.id}
                                                 >
-                                                    {pendingRowId === p.id ? (
-                                                        <span className="loading loading-spinner loading-xs" />
-                                                    ) : (
-                                                        <RotateCcw className="w-3 h-3" />
-                                                    )}
-                                                    Ulang
-                                                </button>
-                                            )}
+                                                    {p.status}
+                                                </span>
+                                            </td>
 
-                                            {/* PASSED: read-only */}
-                                            {p.status === "PASSED" && (
-                                                <span className="text-xs text-gray-400 italic">Final</span>
-                                            )}
-                                        </td>
-                                    </tr>
-                                ))
+                                            <td className="flex justify-center gap-2">
+                                                {!showAnyAction ? (
+                                                    <span className="text-xs text-gray-400 italic">-</span>
+                                                ) : (
+                                                    <>
+                                                        {/* ====== PEGAWAI: ONLY ATTEND ====== */}
+                                                        {canEmployeeAttend && !canManageBatch && (
+                                                            <button
+                                                                className={`btn btn-xs btn-warning btn-soft border-warning ${
+                                                                    pendingRowId === p.id ? "btn-disabled" : ""
+                                                                }`}
+                                                                onClick={() => handleUpdateStatus(p.id, "ATTENDED")}
+                                                                disabled={pendingRowId === p.id}
+                                                                title="Hanya bisa Attend untuk peserta sendiri"
+                                                            >
+                                                                {pendingRowId === p.id ? (
+                                                                    <span className="loading loading-spinner loading-xs" />
+                                                                ) : null}
+                                                                Attend
+                                                            </button>
+                                                        )}
+
+                                                        {/* ====== PIC/SUPERADMIN: FULL ACTIONS ====== */}
+                                                        {canManageBatch && (
+                                                            <>
+                                                                {/* REGISTERED: Attend + Hapus */}
+                                                                {p.status === "REGISTERED" && (
+                                                                    <>
+                                                                        <button
+                                                                            className={`btn btn-xs btn-warning btn-soft border-warning ${
+                                                                                pendingRowId === p.id
+                                                                                    ? "btn-disabled"
+                                                                                    : ""
+                                                                            }`}
+                                                                            onClick={() =>
+                                                                                handleUpdateStatus(p.id, "ATTENDED")
+                                                                            }
+                                                                            disabled={pendingRowId === p.id}
+                                                                        >
+                                                                            {pendingRowId === p.id ? (
+                                                                                <span className="loading loading-spinner loading-xs" />
+                                                                            ) : null}
+                                                                            Attend
+                                                                        </button>
+                                                                        <button
+                                                                            className={`btn btn-xs btn-neutral btn-soft border-neutral ${
+                                                                                pendingRowId === p.id
+                                                                                    ? "btn-disabled"
+                                                                                    : ""
+                                                                            }`}
+                                                                            onClick={() =>
+                                                                                setConfirmDelete({
+                                                                                    open: true,
+                                                                                    id: p.id,
+                                                                                })
+                                                                            }
+                                                                            disabled={pendingRowId === p.id}
+                                                                        >
+                                                                            Hapus
+                                                                        </button>
+                                                                    </>
+                                                                )}
+
+                                                                {/* ATTENDED: Passed/Failed */}
+                                                                {p.status === "ATTENDED" && (
+                                                                    <>
+                                                                        <button
+                                                                            className={`btn btn-xs btn-success btn-soft border-success ${
+                                                                                pendingRowId === p.id
+                                                                                    ? "btn-disabled"
+                                                                                    : ""
+                                                                            }`}
+                                                                            onClick={() =>
+                                                                                handleUpdateStatus(p.id, "PASSED")
+                                                                            }
+                                                                            disabled={pendingRowId === p.id}
+                                                                        >
+                                                                            {pendingRowId === p.id ? (
+                                                                                <span className="loading loading-spinner loading-xs" />
+                                                                            ) : null}
+                                                                            Passed
+                                                                        </button>
+                                                                        <button
+                                                                            className={`btn btn-xs btn-error btn-soft border-error ${
+                                                                                pendingRowId === p.id
+                                                                                    ? "btn-disabled"
+                                                                                    : ""
+                                                                            }`}
+                                                                            onClick={() =>
+                                                                                handleUpdateStatus(p.id, "FAILED")
+                                                                            }
+                                                                            disabled={pendingRowId === p.id}
+                                                                        >
+                                                                            {pendingRowId === p.id ? (
+                                                                                <span className="loading loading-spinner loading-xs" />
+                                                                            ) : null}
+                                                                            Failed
+                                                                        </button>
+                                                                    </>
+                                                                )}
+
+                                                                {/* FAILED: Ulangi */}
+                                                                {p.status === "FAILED" && (
+                                                                    <button
+                                                                        className={`btn btn-xs btn-info btn-soft border-info flex items-center gap-1 ${
+                                                                            pendingRowId === p.id ? "btn-disabled" : ""
+                                                                        }`}
+                                                                        onClick={() => handleRetry(p.id)}
+                                                                        title="Ulang attempt (balik ke REGISTERED)"
+                                                                        disabled={pendingRowId === p.id}
+                                                                    >
+                                                                        {pendingRowId === p.id ? (
+                                                                            <span className="loading loading-spinner loading-xs" />
+                                                                        ) : (
+                                                                            <RotateCcw className="w-3 h-3" />
+                                                                        )}
+                                                                        Ulang
+                                                                    </button>
+                                                                )}
+
+                                                                {/* PASSED: read-only */}
+                                                                {p.status === "PASSED" && (
+                                                                    <span className="text-xs text-gray-400 italic">
+                                                                        Final
+                                                                    </span>
+                                                                )}
+                                                            </>
+                                                        )}
+                                                    </>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    );
+                                })
                             )}
                         </tbody>
                     </table>
@@ -575,75 +668,91 @@ export default function DetailBatchPage() {
                 }}
             />
 
-            {/* Modal Tambah Peserta */}
-            <AddEmployeeBatchModal open={openAdd} batchId={id} onClose={() => setOpenAdd(false)} onSaved={loadData} />
+            {/* Modals: only PIC/SUPERADMIN */}
+            {canManageBatch && (
+                <>
+                    <AddEmployeeBatchModal
+                        open={openAdd}
+                        batchId={id}
+                        onClose={() => setOpenAdd(false)}
+                        onSaved={loadData}
+                    />
+                    <EditBatchModal
+                        open={openEdit}
+                        data={batch}
+                        onClose={() => setOpenEdit(false)}
+                        onSaved={loadData}
+                    />
 
-            {/* Modal Edit Batch */}
-            <EditBatchModal open={openEdit} data={batch} onClose={() => setOpenEdit(false)} onSaved={loadData} />
+                    {/* Confirm Delete */}
+                    {confirmDelete.open && (
+                        <dialog className="modal" open>
+                            <div className="modal-box">
+                                <h3 className="font-bold text-lg">Hapus Peserta?</h3>
+                                <p className="py-2">Peserta ini akan dihapus dari batch.</p>
+                                <div className="modal-action">
+                                    <button className="btn" onClick={() => setConfirmDelete({ open: false, id: null })}>
+                                        Batal
+                                    </button>
+                                    <button className="btn btn-error" onClick={() => handleDelete(confirmDelete.id)}>
+                                        Hapus
+                                    </button>
+                                </div>
+                            </div>
+                            <form method="dialog" className="modal-backdrop">
+                                <button onClick={() => setConfirmDelete({ open: false, id: null })}>close</button>
+                            </form>
+                        </dialog>
+                    )}
 
-            {/* Confirm Delete Modal */}
-            {confirmDelete.open && (
-                <dialog className="modal" open>
-                    <div className="modal-box">
-                        <h3 className="font-bold text-lg">Hapus Peserta?</h3>
-                        <p className="py-2">Peserta ini akan dihapus dari batch.</p>
-                        <div className="modal-action">
-                            <button className="btn" onClick={() => setConfirmDelete({ open: false, id: null })}>
-                                Batal
-                            </button>
-                            <button className="btn btn-error" onClick={() => handleDelete(confirmDelete.id)}>
-                                Hapus
-                            </button>
-                        </div>
-                    </div>
-                    <form method="dialog" className="modal-backdrop">
-                        <button onClick={() => setConfirmDelete({ open: false, id: null })}>close</button>
-                    </form>
-                </dialog>
-            )}
-
-            {/* Confirm Send Emails Modal */}
-            {confirmSend && (
-                <dialog className="modal" open>
-                    <div className="modal-box">
-                        <h3 className="font-bold text-lg">Kirim Email ke Peserta?</h3>
-                        <p className="py-2">
-                            Sistem akan mengirim email ke <b>semua peserta</b> pada batch ini
-                            {filterStatus?.value ? (
-                                <>
-                                    {" "}
-                                    dengan status <b>{filterStatus.value}</b>
-                                </>
-                            ) : null}
-                            .
-                            {typeof totalElements === "number" && totalElements > 0 ? (
-                                <>
-                                    {" "}
-                                    Total peserta: <b>{totalElements}</b>.
-                                </>
-                            ) : null}
-                        </p>
-                        <div className="modal-action">
-                            <button className="btn" onClick={() => setConfirmSend(false)} disabled={sendingEmails}>
-                                Batal
-                            </button>
-                            <button
-                                className={`btn btn-info ${sendingEmails ? "btn-disabled" : ""}`}
-                                onClick={doSendEmails}
-                            >
-                                {sendingEmails ? (
-                                    <span className="loading loading-spinner loading-sm" />
-                                ) : (
-                                    <Send className="w-4 h-4 mr-1" />
-                                )}
-                                {sendingEmails ? "Mengirim..." : "Kirim Sekarang"}
-                            </button>
-                        </div>
-                    </div>
-                    <form method="dialog" className="modal-backdrop">
-                        <button onClick={() => !sendingEmails && setConfirmSend(false)}>close</button>
-                    </form>
-                </dialog>
+                    {/* Confirm Send Emails */}
+                    {confirmSend && (
+                        <dialog className="modal" open>
+                            <div className="modal-box">
+                                <h3 className="font-bold text-lg">Kirim Email ke Peserta?</h3>
+                                <p className="py-2">
+                                    Sistem akan mengirim email ke <b>semua peserta</b> pada batch ini
+                                    {filterStatus?.value ? (
+                                        <>
+                                            {" "}
+                                            dengan status <b>{filterStatus.value}</b>
+                                        </>
+                                    ) : null}
+                                    .
+                                    {typeof totalElements === "number" && totalElements > 0 ? (
+                                        <>
+                                            {" "}
+                                            Total peserta: <b>{totalElements}</b>.
+                                        </>
+                                    ) : null}
+                                </p>
+                                <div className="modal-action">
+                                    <button
+                                        className="btn"
+                                        onClick={() => setConfirmSend(false)}
+                                        disabled={sendingEmails}
+                                    >
+                                        Batal
+                                    </button>
+                                    <button
+                                        className={`btn btn-info ${sendingEmails ? "btn-disabled" : ""}`}
+                                        onClick={doSendEmails}
+                                    >
+                                        {sendingEmails ? (
+                                            <span className="loading loading-spinner loading-sm" />
+                                        ) : (
+                                            <Send className="w-4 h-4 mr-1" />
+                                        )}
+                                        {sendingEmails ? "Mengirim..." : "Kirim Sekarang"}
+                                    </button>
+                                </div>
+                            </div>
+                            <form method="dialog" className="modal-backdrop">
+                                <button onClick={() => !sendingEmails && setConfirmSend(false)}>close</button>
+                            </form>
+                        </dialog>
+                    )}
+                </>
             )}
         </div>
     );

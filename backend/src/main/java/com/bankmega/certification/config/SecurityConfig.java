@@ -1,7 +1,7 @@
 package com.bankmega.certification.config;
 
 import com.bankmega.certification.security.JwtAuthenticationFilter;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -21,20 +21,29 @@ import java.util.stream.Collectors;
 
 @Configuration
 @EnableMethodSecurity
+@RequiredArgsConstructor
 public class SecurityConfig {
 
-    @Autowired
-    private JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
+    /**
+     * Set di ENV Railway:
+     * APP_CORS_ALLOWED_ORIGINS=https://mega-certification-project-v2-1ogr.vercel.app,https://*.vercel.app,http://localhost:5173
+     */
     @Value("${app.cors.allowed-origins:http://localhost:5173}")
     private String allowedOrigins;
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
+                // CORS & CSRF
                 .csrf(csrf -> csrf.disable())
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+
+                // JWT stateless
+                .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+
+                // Authorization
                 .authorizeHttpRequests(auth -> auth
                         // preflight
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
@@ -81,15 +90,36 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration c = new CorsConfiguration();
 
-        List<String> origins = Arrays.stream(allowedOrigins.split("\\s*,\\s*"))
+        // Parse comma-separated origins/patterns
+        List<String> originPatterns = Arrays.stream(allowedOrigins.split("\\s*,\\s*"))
+                .map(String::trim)
                 .filter(s -> !s.isBlank())
                 .collect(Collectors.toList());
 
-        c.setAllowedOrigins(origins);
+        // IMPORTANT:
+        // - Pakai allowedOriginPatterns supaya bisa dukung https://*.vercel.app
+        // - Kalau lu pakai Bearer token (Authorization header) dan BUKAN cookie,
+        // lebih aman bikin allowCredentials(false).
+        c.setAllowedOriginPatterns(originPatterns);
+
         c.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
-        c.addAllowedHeader("*");
+
+        // allow headers yg umum dipakai FE
+        c.setAllowedHeaders(List.of(
+                "Authorization",
+                "Content-Type",
+                "Accept",
+                "Origin",
+                "X-Requested-With"));
+
+        // kalau FE butuh baca header tertentu dari response
         c.setExposedHeaders(List.of("Location"));
-        c.setAllowCredentials(true);
+
+        // Karena lu pakai Bearer token (localStorage) -> ga perlu cookie
+        c.setAllowCredentials(false);
+
+        // Optional: cache preflight (detik)
+        c.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", c);
