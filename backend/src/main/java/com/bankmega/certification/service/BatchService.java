@@ -1,4 +1,3 @@
-// src/main/java/com/bankmega/certification/service/BatchService.java
 package com.bankmega.certification.service;
 
 import com.bankmega.certification.dto.BatchRequest;
@@ -205,6 +204,19 @@ public class BatchService {
 
         List<Batch.Status> statuses = List.of(Batch.Status.ONGOING, Batch.Status.FINISHED);
 
+        LocalDate effectiveStart = startDate;
+        LocalDate effectiveEnd = endDate;
+
+        if (effectiveStart == null && effectiveEnd == null) {
+            int year = LocalDate.now().getYear();
+            effectiveStart = LocalDate.of(year, 1, 1);
+            effectiveEnd = LocalDate.of(year, 12, 31);
+        } else if (effectiveStart != null && effectiveEnd == null) {
+            effectiveEnd = LocalDate.of(effectiveStart.getYear(), 12, 31);
+        } else if (effectiveStart == null) {
+            effectiveStart = LocalDate.of(effectiveEnd.getYear(), 1, 1);
+        }
+
         Specification<Batch> spec = BatchSpecification.notDeleted()
                 .and(BatchSpecification.byStatuses(statuses))
                 .and(BatchSpecification.byType(type))
@@ -214,7 +226,7 @@ public class BatchService {
                 .and(BatchSpecification.bySubField(subFieldId))
                 .and(BatchSpecification.byAllowedCertifications(allowedCertificationIds))
                 .and(BatchSpecification.byEmployee(employeeId))
-                .and(BatchSpecification.byDateRange(startDate, endDate));
+                .and(BatchSpecification.byDateRange(effectiveStart, effectiveEnd));
 
         List<Batch> batches = batchRepository.findAll(spec);
 

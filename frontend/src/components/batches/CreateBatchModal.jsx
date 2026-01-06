@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import Select from "react-select";
 import { createBatch } from "../../services/batchService";
@@ -19,9 +19,19 @@ export default function CreateBatchModal({ open, onClose, onSaved }) {
             endDate: "",
             quota: "",
             status: "PLANNED",
-            type: "CERTIFICATION", // default
+            type: "CERTIFICATION",
         };
     }
+
+    const menuPortalTarget = useMemo(() => (typeof document !== "undefined" ? document.body : null), []);
+
+    const selectStyles = useMemo(
+        () => ({
+            menuPortal: (base) => ({ ...base, zIndex: 999999 }),
+            menu: (base) => ({ ...base, zIndex: 999999 }),
+        }),
+        []
+    );
 
     useEffect(() => {
         if (open) {
@@ -55,7 +65,6 @@ export default function CreateBatchModal({ open, onClose, onSaved }) {
         try {
             const payload = { ...form };
 
-            // pastikan quota number atau null
             if (payload.quota === "") {
                 delete payload.quota;
             } else {
@@ -82,7 +91,7 @@ export default function CreateBatchModal({ open, onClose, onSaved }) {
         { value: "CERTIFICATION", label: "Sertifikasi" },
         { value: "TRAINING", label: "Training" },
         { value: "REFRESHMENT", label: "Refreshment" },
-        { value: "EXTENSION", label: "Perpanjang" }, // 🔹 baru
+        { value: "EXTENSION", label: "Perpanjang" },
     ];
 
     return (
@@ -91,7 +100,6 @@ export default function CreateBatchModal({ open, onClose, onSaved }) {
                 <h3 className="font-bold text-lg mb-4">Tambah Batch</h3>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                    {/* Nama Batch */}
                     <div>
                         <label className="block mb-1">Nama Batch</label>
                         <input
@@ -103,10 +111,12 @@ export default function CreateBatchModal({ open, onClose, onSaved }) {
                         />
                     </div>
 
-                    {/* Jenis Batch */}
                     <div>
                         <label className="block mb-1">Jenis Batch</label>
                         <Select
+                            menuPortalTarget={menuPortalTarget}
+                            menuPosition="fixed"
+                            styles={selectStyles}
                             options={typeOptions}
                             value={typeOptions.find((t) => t.value === form.type) || null}
                             onChange={(opt) => setForm({ ...form, type: opt?.value || "CERTIFICATION" })}
@@ -115,10 +125,12 @@ export default function CreateBatchModal({ open, onClose, onSaved }) {
                         />
                     </div>
 
-                    {/* Aturan Sertifikasi */}
                     <div>
                         <label className="block mb-1">Aturan Sertifikasi</label>
                         <Select
+                            menuPortalTarget={menuPortalTarget}
+                            menuPosition="fixed"
+                            styles={selectStyles}
                             options={rules}
                             value={rules.find((r) => r.value === form.certificationRuleId) || null}
                             onChange={(opt) => setForm({ ...form, certificationRuleId: opt?.value || null })}
@@ -127,10 +139,12 @@ export default function CreateBatchModal({ open, onClose, onSaved }) {
                         />
                     </div>
 
-                    {/* Lembaga */}
                     <div>
                         <label className="block mb-1">Lembaga</label>
                         <Select
+                            menuPortalTarget={menuPortalTarget}
+                            menuPosition="fixed"
+                            styles={selectStyles}
                             options={institutions}
                             value={institutions.find((i) => i.value === form.institutionId) || null}
                             onChange={(opt) => setForm({ ...form, institutionId: opt?.value || null })}
@@ -139,7 +153,6 @@ export default function CreateBatchModal({ open, onClose, onSaved }) {
                         />
                     </div>
 
-                    {/* Quota */}
                     <div>
                         <label className="block mb-1">Quota</label>
                         <input
@@ -156,7 +169,6 @@ export default function CreateBatchModal({ open, onClose, onSaved }) {
                         </p>
                     </div>
 
-                    {/* Status */}
                     <div>
                         <label className="block mb-1">Status</label>
                         <select
@@ -171,7 +183,6 @@ export default function CreateBatchModal({ open, onClose, onSaved }) {
                         </select>
                     </div>
 
-                    {/* Tanggal Mulai */}
                     <div>
                         <label className="block mb-1">Tanggal Mulai</label>
                         <input
@@ -182,7 +193,6 @@ export default function CreateBatchModal({ open, onClose, onSaved }) {
                         />
                     </div>
 
-                    {/* Tanggal Selesai */}
                     <div>
                         <label className="block mb-1">Tanggal Selesai</label>
                         <input
@@ -194,7 +204,6 @@ export default function CreateBatchModal({ open, onClose, onSaved }) {
                     </div>
                 </div>
 
-                {/* Action Buttons */}
                 <div className="modal-action">
                     <button className="btn" onClick={onClose}>
                         Batal
@@ -205,7 +214,6 @@ export default function CreateBatchModal({ open, onClose, onSaved }) {
                 </div>
             </div>
 
-            {/* Background Click Close */}
             <form method="dialog" className="modal-backdrop">
                 <button onClick={onClose}>close</button>
             </form>

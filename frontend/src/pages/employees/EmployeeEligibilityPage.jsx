@@ -1,10 +1,8 @@
-// src/pages/employees/EmployeeEligibilityPage.jsx
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import toast from "react-hot-toast";
 import Select from "react-select";
 import AsyncSelect from "react-select/async";
-
 import Pagination from "../../components/common/Pagination";
 import {
     fetchEmployeeEligibilityPaged,
@@ -18,11 +16,8 @@ import { fetchCertificationLevels } from "../../services/certificationLevelServi
 import { fetchSubFields } from "../../services/subFieldService";
 import { searchEmployees } from "../../services/employeeService";
 import { fetchMyPicScope } from "../../services/picScopeService";
-
 import { Eye, RotateCw, Eraser, Download } from "lucide-react";
-
 const TABLE_COLS = 17;
-
 function getCurrentRole() {
     if (typeof window === "undefined") return "";
     try {
@@ -30,37 +25,30 @@ function getCurrentRole() {
         const fromUser = (user.role || "").toString().toUpperCase();
         if (fromUser) return fromUser;
     } catch {}
-
     return (localStorage.getItem("role") || "").toString().toUpperCase();
 }
-
 function formatDate(v) {
     if (!v) return "-";
     const d = new Date(v);
     if (Number.isNaN(d.getTime())) return "-";
     return d.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
 }
-
 export default function EmployeeEligibilityPage() {
     const [role] = useState(() => getCurrentRole());
     const isSuperadmin = role === "SUPERADMIN";
     const isPic = role === "PIC";
     const isEmployee = role === "EMPLOYEE" || role === "PEGAWAI";
-
     const canRefresh = isSuperadmin || isPic;
     const isSelfMode = isEmployee;
     const showRefreshButton = canRefresh && !isSelfMode;
-
     const [rows, setRows] = useState([]);
     const [loading, setLoading] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
     const [exporting, setExporting] = useState(false);
-
     const [page, setPage] = useState(1);
     const [rowsPerPage, setRowsPerPage] = useState(10);
     const [totalPages, setTotalPages] = useState(0);
     const [totalElements, setTotalElements] = useState(0);
-
     const [filterEmployee, setFilterEmployee] = useState(null);
     const [filterJob, setFilterJob] = useState(null);
     const [filterCert, setFilterCert] = useState(null);
@@ -68,12 +56,10 @@ export default function EmployeeEligibilityPage() {
     const [filterSub, setFilterSub] = useState(null);
     const [filterStatus, setFilterStatus] = useState(null);
     const [filterSource, setFilterSource] = useState(null);
-
     const [jobOptions, setJobOptions] = useState([]);
     const [certOptions, setCertOptions] = useState([]);
     const [levelOptions, setLevelOptions] = useState([]);
     const [subOptions, setSubOptions] = useState([]);
-
     const statusBadgeClass = useMemo(
         () => ({
             ACTIVE: "badge-success",
@@ -83,7 +69,6 @@ export default function EmployeeEligibilityPage() {
         }),
         []
     );
-
     function formatStatusLabel(s) {
         switch (s) {
             case "NOT_YET_CERTIFIED":
@@ -96,18 +81,15 @@ export default function EmployeeEligibilityPage() {
                 return s || "-";
         }
     }
-
     function formatSourceLabel(s) {
         if (s === "BY_JOB") return "By Job";
         if (s === "BY_NAME") return "By Name";
         return s ?? "-";
     }
-
     async function load() {
         setLoading(true);
         try {
             const employeeId = getCurrentEmployeeId();
-
             const employeeIdsParam = isSelfMode
                 ? employeeId
                     ? [employeeId]
@@ -115,7 +97,6 @@ export default function EmployeeEligibilityPage() {
                 : filterEmployee
                 ? [filterEmployee.value]
                 : [];
-
             const params = {
                 page: page - 1,
                 size: rowsPerPage,
@@ -127,16 +108,13 @@ export default function EmployeeEligibilityPage() {
                 statuses: filterStatus ? [filterStatus.value] : [],
                 sources: filterSource ? [filterSource.value] : [],
             };
-
             const res = await fetchEmployeeEligibilityPaged(params);
-
             if (isSelfMode) {
                 const uniqueCodes = Array.from(
                     new Set((res?.content || []).map((r) => r.certificationCode).filter(Boolean))
                 );
                 setCertOptions(uniqueCodes.map((code) => ({ value: code, label: code })));
             }
-
             setRows(res?.content || []);
             setTotalPages(res?.totalPages || 1);
             setTotalElements(res?.totalElements || 0);
@@ -146,10 +124,8 @@ export default function EmployeeEligibilityPage() {
             setLoading(false);
         }
     }
-
     async function onRefresh() {
         if (!canRefresh || isSelfMode) return;
-
         setRefreshing(true);
         try {
             await refreshEmployeeEligibility();
@@ -161,12 +137,10 @@ export default function EmployeeEligibilityPage() {
             setRefreshing(false);
         }
     }
-
     async function onExport() {
         setExporting(true);
         try {
             const employeeId = getCurrentEmployeeId();
-
             const employeeIdsParam = isSelfMode
                 ? employeeId
                     ? [employeeId]
@@ -174,7 +148,6 @@ export default function EmployeeEligibilityPage() {
                 : filterEmployee
                 ? [filterEmployee.value]
                 : [];
-
             await exportEmployeeEligibilityExcel({
                 employeeIds: employeeIdsParam,
                 jobIds: filterJob ? [filterJob.value] : [],
@@ -184,7 +157,6 @@ export default function EmployeeEligibilityPage() {
                 statuses: filterStatus ? [filterStatus.value] : [],
                 sources: filterSource ? [filterSource.value] : [],
             });
-
             toast.success("Export berhasil");
         } catch {
             toast.error("Gagal export excel");
@@ -192,7 +164,6 @@ export default function EmployeeEligibilityPage() {
             setExporting(false);
         }
     }
-
     async function loadFilters() {
         try {
             const [jobs, levels, subs] = await Promise.all([
@@ -200,11 +171,9 @@ export default function EmployeeEligibilityPage() {
                 fetchCertificationLevels(),
                 fetchSubFields(),
             ]);
-
             setJobOptions(jobs.map((j) => ({ value: j.id, label: j.name })));
             setLevelOptions(levels.map((l) => ({ value: l.level, label: String(l.level) })));
             setSubOptions(subs.map((s) => ({ value: s.code, label: s.code })));
-
             if (isPic) {
                 const scope = await fetchMyPicScope();
                 setCertOptions(
@@ -221,7 +190,6 @@ export default function EmployeeEligibilityPage() {
             toast.error("Gagal memuat filter");
         }
     }
-
     const loadEmployees = async (input) => {
         try {
             const res = await searchEmployees({ search: input, page: 0, size: 20 });
@@ -233,7 +201,6 @@ export default function EmployeeEligibilityPage() {
             return [];
         }
     };
-
     useEffect(() => {
         load();
     }, [
@@ -248,21 +215,17 @@ export default function EmployeeEligibilityPage() {
         filterSource,
         role,
     ]);
-
     useEffect(() => {
         setPage(1);
     }, [filterEmployee, filterJob, filterCert, filterLevel, filterSub, filterStatus, filterSource, role]);
-
     useEffect(() => {
         loadFilters();
     }, []);
-
     const startIdx = totalElements === 0 ? 0 : (page - 1) * rowsPerPage + 1;
-
     return (
         <div>
             <div className="mb-4 space-y-3">
-                <div className="grid grid-cols-1 sm:grid-cols-1 lg:grid-cols-6 gap-3 text-xs">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 text-xs">
                     {showRefreshButton && (
                         <div className="col-span-1 sm:col-span-1 lg:col-span-1">
                             <button
@@ -285,8 +248,7 @@ export default function EmployeeEligibilityPage() {
                             </button>
                         </div>
                     )}
-
-                    <div className="col-span-1 sm:col-span-2 lg:col-span-1">
+                    <div className="col-span-1 sm:col-span-1 lg:col-span-1">
                         <button
                             type="button"
                             className={`btn btn-neutral btn-sm w-full ${exporting ? "btn-disabled" : ""}`}
@@ -306,10 +268,8 @@ export default function EmployeeEligibilityPage() {
                             )}
                         </button>
                     </div>
-
-                    <div className="col-span-3"></div>
-
-                    <div className="col-span-1 sm:col-span-2 lg:col-span-1">
+                    <div className="col-span-3 hidden lg:block"></div>
+                    <div className="col-span-1 sm:col-span-1 lg:col-span-1">
                         <button
                             type="button"
                             className="btn btn-accent btn-soft border-accent btn-sm w-full"
@@ -330,8 +290,7 @@ export default function EmployeeEligibilityPage() {
                         </button>
                     </div>
                 </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-3 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3 text-xs">
                     {!isSelfMode ? (
                         <AsyncSelect
                             cacheOptions
@@ -345,7 +304,6 @@ export default function EmployeeEligibilityPage() {
                     ) : (
                         <div />
                     )}
-
                     <Select
                         options={jobOptions}
                         value={filterJob}
@@ -398,17 +356,16 @@ export default function EmployeeEligibilityPage() {
                     />
                 </div>
             </div>
-
             <div className="overflow-x-auto rounded-xl border border-gray-200 shadow bg-base-100">
                 <table className="table table-zebra">
-                    <thead className="bg-base-200 text-xs">
+                    <thead className="bg-base-200 text-xs whitespace-nowrap">
                         <tr>
                             <th>No</th>
                             <th>Aksi</th>
                             <th>NIP</th>
                             <th>Nama Pegawai</th>
                             <th>Jabatan</th>
-                            <th>Kode Sertifikat</th>
+                            <th>Sertifikat</th>
                             <th>No Sertifikat</th>
                             <th>Tgl Sertifikasi</th>
                             <th>Jenjang</th>
@@ -422,8 +379,7 @@ export default function EmployeeEligibilityPage() {
                             <th>Perpanjang</th>
                         </tr>
                     </thead>
-
-                    <tbody className="text-xs">
+                    <tbody className="text-xs whitespace-nowrap">
                         {loading ? (
                             <tr>
                                 <td colSpan={TABLE_COLS} className="text-center py-10">
@@ -440,7 +396,6 @@ export default function EmployeeEligibilityPage() {
                             rows.map((r, idx) => (
                                 <tr key={r.id ?? `${r.employeeId}-${r.certificationRuleId}`}>
                                     <td>{startIdx + idx}</td>
-
                                     <td>
                                         <Link
                                             to={`/employee/${r.employeeId}`}
@@ -449,7 +404,6 @@ export default function EmployeeEligibilityPage() {
                                             <Eye className="w-3 h-3" />
                                         </Link>
                                     </td>
-
                                     <td>{r.nip}</td>
                                     <td>{r.employeeName}</td>
                                     <td>{r.jobPositionTitle}</td>
@@ -459,7 +413,6 @@ export default function EmployeeEligibilityPage() {
                                     <td>{r.certificationLevelLevel ?? "-"}</td>
                                     <td>{r.subFieldCode ?? "-"}</td>
                                     <td>{formatDate(r.effectiveDate)}</td>
-
                                     <td>
                                         <span
                                             className={`badge badge-sm text-white whitespace-nowrap ${
@@ -470,9 +423,7 @@ export default function EmployeeEligibilityPage() {
                                             {formatStatusLabel(r.status)}
                                         </span>
                                     </td>
-
                                     <td>{formatDate(r.dueDate)}</td>
-
                                     <td>
                                         <span
                                             className={`badge badge-sm text-white whitespace-nowrap ${
@@ -482,7 +433,6 @@ export default function EmployeeEligibilityPage() {
                                             {formatSourceLabel(r.source)}
                                         </span>
                                     </td>
-
                                     <td className="text-center">{r.trainingCount ?? 0}</td>
                                     <td className="text-center">{r.refreshmentCount ?? 0}</td>
                                     <td className="text-center">{r.extensionCount ?? 0}</td>
@@ -492,7 +442,6 @@ export default function EmployeeEligibilityPage() {
                     </tbody>
                 </table>
             </div>
-
             <Pagination
                 page={page}
                 totalPages={totalPages}
