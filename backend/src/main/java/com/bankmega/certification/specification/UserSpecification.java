@@ -9,9 +9,20 @@ import java.util.List;
 
 public class UserSpecification {
 
-    // 🔹 Filter hanya user yang belum dihapus (soft delete)
+    // Filter hanya user yang belum dihapus (soft delete)
     public static Specification<User> notDeleted() {
         return (root, query, cb) -> cb.isNull(root.get("deletedAt"));
+    }
+
+    // Eager fetch role dan employee untuk menghindari N+1
+    public static Specification<User> withFetchJoins() {
+        return (root, query, cb) -> {
+            if (query != null && query.getResultType() != Long.class && query.getResultType() != long.class) {
+                root.fetch("role", JoinType.LEFT);
+                root.fetch("employee", JoinType.LEFT);
+            }
+            return cb.conjunction();
+        };
     }
 
     // 🔹 Filter berdasarkan roleId

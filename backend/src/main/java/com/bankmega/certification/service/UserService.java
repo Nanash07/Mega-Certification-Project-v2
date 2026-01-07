@@ -93,7 +93,7 @@ public class UserService {
                 .and(UserSpecification.byIsActive(isActive))
                 .and(UserSpecification.bySearch(q));
 
-        // 🔐 PIC tidak boleh lihat user SUPERADMIN / PIC
+        // PIC tidak boleh lihat user SUPERADMIN / PIC
         if (callerIsPic) {
             spec = spec.and(UserSpecification.excludeRoles(List.of("SUPERADMIN", "PIC", "ROLE_PIC")));
         }

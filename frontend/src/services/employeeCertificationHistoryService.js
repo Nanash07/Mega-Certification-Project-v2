@@ -1,10 +1,9 @@
-// src/services/employeeCertificationHistoryService.js
 import api from "./api";
 
-const BASE_URL = "/api/employee-certification-histories";
-// 🔹 pastikan prefix /api sesuai backend lo
+const BASE_URL = "/employee-certification-histories";
 
-// Ambil histori pegawai dengan paging + filter
+// ================== FETCH DATA ==================
+
 export async function fetchEmployeeCertificationHistories(params = {}) {
     try {
         const { data } = await api.get(BASE_URL, { params });
@@ -17,6 +16,6 @@ export async function fetchEmployeeCertificationHistories(params = {}) {
         };
     } catch (err) {
         console.error("fetchEmployeeCertificationHistories error:", err);
-        return { content: [], totalPages: 0, totalElements: 0 };
+        return { content: [], totalPages: 0, totalElements: 0, number: 0, size: 0 };
     }
 }

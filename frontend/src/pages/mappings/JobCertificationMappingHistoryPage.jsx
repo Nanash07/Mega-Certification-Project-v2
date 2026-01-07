@@ -4,24 +4,12 @@ import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import Select from "react-select";
 import Pagination from "../../components/common/Pagination";
+import { getCurrentRole } from "../../utils/helpers";
 import { fetchJobCertMappingHistories } from "../../services/jobCertificationMappingHistoryService";
 import { fetchMyPicScope } from "../../services/picScopeService";
 import { ArrowLeft } from "lucide-react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
-
-// ===== helper role dari localStorage (sama pattern dengan page lain) =====
-function getCurrentRole() {
-    if (typeof window === "undefined") return "";
-    try {
-        const user = JSON.parse(localStorage.getItem("user") || "{}");
-        const fromUser = (user.role || "").toString().toUpperCase();
-        if (fromUser) return fromUser;
-    } catch {
-        // ignore
-    }
-    return (localStorage.getItem("role") || "").toString().toUpperCase();
-}
 
 const TABLE_COLS = 8;
 

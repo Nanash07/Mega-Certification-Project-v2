@@ -2,6 +2,7 @@ package com.bankmega.certification.repository;
 
 import com.bankmega.certification.entity.Batch;
 import com.bankmega.certification.entity.EmployeeBatch;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
@@ -12,6 +13,9 @@ public interface EmployeeBatchRepository
         extends JpaRepository<EmployeeBatch, Long>, JpaSpecificationExecutor<EmployeeBatch> {
 
     List<EmployeeBatch> findByBatch_IdAndDeletedAtIsNull(Long batchId);
+
+    @EntityGraph(attributePaths = { "employee" })
+    List<EmployeeBatch> findWithEmployeeByBatch_IdAndDeletedAtIsNull(Long batchId);
 
     Optional<EmployeeBatch> findByIdAndDeletedAtIsNull(Long id);
 

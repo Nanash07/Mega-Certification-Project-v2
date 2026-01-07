@@ -1,27 +1,49 @@
 import api from "./api";
 
-// Ambil semua regional
-export async function fetchRegionals(params) {
-    const res = await api.get("/regionals", { params });
-    return res.data; // ambil array dari content
+const BASE_URL = "/regionals";
+
+// ================== FETCH DATA ==================
+
+export async function fetchRegionals(params = {}) {
+    try {
+        const { data } = await api.get(BASE_URL, { params });
+        return data || { content: [], totalPages: 0, totalElements: 0 };
+    } catch (err) {
+        console.error("fetchRegionals error:", err);
+        return { content: [], totalPages: 0, totalElements: 0 };
+    }
 }
 
-// Ambil detail regional by id
 export async function fetchRegionalById(id) {
-    const res = await api.get(`/regionals/${id}`);
-    return res.data;
+    try {
+        const { data } = await api.get(`${BASE_URL}/${id}`);
+        return data || null;
+    } catch (err) {
+        console.error("fetchRegionalById error:", err);
+        return null;
+    }
 }
 
-// Create regional baru (?name=xxx)
+// ================== CREATE ==================
+
 export async function createRegional(name) {
-    const res = await api.post("/regionals", null, {
-        params: { name },
-    });
-    return res.data;
+    try {
+        const { data } = await api.post(BASE_URL, null, { params: { name } });
+        return data;
+    } catch (err) {
+        console.error("createRegional error:", err);
+        throw err;
+    }
 }
 
-// Toggle aktif/nonaktif regional
+// ================== TOGGLE ==================
+
 export async function toggleRegional(id) {
-    const res = await api.put(`/regionals/${id}/toggle`);
-    return res.data;
+    try {
+        const { data } = await api.put(`${BASE_URL}/${id}/toggle`);
+        return data;
+    } catch (err) {
+        console.error("toggleRegional error:", err);
+        throw err;
+    }
 }

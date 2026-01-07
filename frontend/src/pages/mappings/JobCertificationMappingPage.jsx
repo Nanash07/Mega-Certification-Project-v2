@@ -6,6 +6,8 @@ import Select from "react-select";
 import { Download, Upload, History as HistoryIcon, Pencil, Trash2, Eraser, ChevronDown } from "lucide-react";
 
 import Pagination from "../../components/common/Pagination";
+import ConfirmDialog from "../../components/common/ConfirmDialog";
+import { getCurrentRole, formatDateTime } from "../../utils/helpers";
 import {
     fetchJobCertificationMappingsPaged,
     deleteJobCertificationMapping,
@@ -21,19 +23,6 @@ import { downloadJobCertTemplate } from "../../services/jobCertificationImportSe
 import ImportJobCertificationMappingModal from "../../components/job-certification-mapping/ImportJobCertificationMappingModal";
 
 const TABLE_COLS = 8;
-
-// ===== helper role dari localStorage =====
-function getCurrentRole() {
-    if (typeof window === "undefined") return "";
-    try {
-        const user = JSON.parse(localStorage.getItem("user") || "{}");
-        const fromUser = (user.role || "").toString().toUpperCase();
-        if (fromUser) return fromUser;
-    } catch {
-        // ignore
-    }
-    return (localStorage.getItem("role") || "").toString().toUpperCase();
-}
 
 export default function JobCertificationMappingPage() {
     const navigate = useNavigate();
@@ -77,19 +66,7 @@ export default function JobCertificationMappingPage() {
     // Floating status menu: { row, x, y } | null
     const [statusMenu, setStatusMenu] = useState(null);
 
-    // 🔹 Helper tanggal + jam
-    function formatDateTime(value) {
-        if (!value) return "-";
-        const d = new Date(value);
-        if (Number.isNaN(d.getTime())) return "-";
-        return d.toLocaleString("id-ID", {
-            day: "2-digit",
-            month: "short",
-            year: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-        });
-    }
+
 
     // 🔹 Style status untuk ACTIVE / INACTIVE (isActive boolean)
     function getStatusStyle(isActive) {
@@ -456,38 +433,21 @@ export default function JobCertificationMappingPage() {
                 onImported={load}
             />
 
-            {/* Confirm Delete */}
-            <dialog className="modal" open={confirm.open}>
-                <div className="modal-box">
-                    <h3 className="font-bold text-lg">Hapus Mapping?</h3>
-                    <p className="py-2">Mapping ini akan dinonaktifkan dari sistem.</p>
-                    <div className="modal-action">
-                        <button type="button" className="btn" onClick={() => setConfirm({ open: false, id: null })}>
-                            Batal
-                        </button>
-                        <button
-                            type="button"
-                            className="btn btn-error"
-                            onClick={() => {
-                                deleteJobCertificationMapping(confirm.id)
-                                    .then(() => {
-                                        toast.success("Mapping dihapus");
-                                        load();
-                                    })
-                                    .catch(() => toast.error("Gagal menghapus mapping"))
-                                    .finally(() => setConfirm({ open: false, id: null }));
-                            }}
-                        >
-                            Hapus
-                        </button>
-                    </div>
-                </div>
-                <form method="dialog" className="modal-backdrop">
-                    <button type="button" onClick={() => setConfirm({ open: false, id: null })}>
-                        close
-                    </button>
-                </form>
-            </dialog>
+            <ConfirmDialog
+                open={confirm.open}
+                title="Hapus Mapping?"
+                message="Mapping ini akan dinonaktifkan dari sistem."
+                onConfirm={() => {
+                    deleteJobCertificationMapping(confirm.id)
+                        .then(() => {
+                            toast.success("Mapping dihapus");
+                            load();
+                        })
+                        .catch(() => toast.error("Gagal menghapus mapping"))
+                        .finally(() => setConfirm({ open: false, id: null }));
+                }}
+                onCancel={() => setConfirm({ open: false, id: null })}
+            />
 
             {/* Floating status menu: Aktif / Nonaktif */}
             {statusMenu && (

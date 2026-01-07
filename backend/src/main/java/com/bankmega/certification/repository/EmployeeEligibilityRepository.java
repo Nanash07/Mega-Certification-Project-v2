@@ -3,6 +3,11 @@ package com.bankmega.certification.repository;
 import com.bankmega.certification.entity.EmployeeEligibility;
 import com.bankmega.certification.entity.Employee;
 import com.bankmega.certification.entity.CertificationRule;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
@@ -17,6 +22,11 @@ public interface EmployeeEligibilityRepository
                         Employee employee, CertificationRule rule, EmployeeEligibility.EligibilitySource source);
 
         List<EmployeeEligibility> findByCertificationRule_IdAndIsActiveTrueAndDeletedAtIsNull(Long certRuleId);
+
+        @EntityGraph(attributePaths = { "employee", "employee.jobPosition", "certificationRule",
+                        "certificationRule.certification" })
+        List<EmployeeEligibility> findWithRelationsByCertificationRule_IdAndIsActiveTrueAndDeletedAtIsNull(
+                        Long certRuleId);
 
         List<EmployeeEligibility> findByEmployeeAndDeletedAtIsNull(Employee employee);
 
@@ -44,5 +54,37 @@ public interface EmployeeEligibilityRepository
 
         List<EmployeeEligibility> findByEmployeeIdIn(Set<Long> employeeIds);
 
+        @EntityGraph(attributePaths = { "employee", "certificationRule" })
+        List<EmployeeEligibility> findWithRelationsByEmployeeIdIn(Set<Long> employeeIds);
+
         List<EmployeeEligibility> findByEmployeeId(Long employeeId);
+
+        // EntityGraph overrides for paging and export
+        @Override
+        @EntityGraph(attributePaths = {
+                        "employee",
+                        "employee.jobPosition",
+                        "employee.regional",
+                        "employee.division",
+                        "employee.unit",
+                        "certificationRule",
+                        "certificationRule.certification",
+                        "certificationRule.certificationLevel",
+                        "certificationRule.subField"
+        })
+        Page<EmployeeEligibility> findAll(Specification<EmployeeEligibility> spec, Pageable pageable);
+
+        @Override
+        @EntityGraph(attributePaths = {
+                        "employee",
+                        "employee.jobPosition",
+                        "employee.regional",
+                        "employee.division",
+                        "employee.unit",
+                        "certificationRule",
+                        "certificationRule.certification",
+                        "certificationRule.certificationLevel",
+                        "certificationRule.subField"
+        })
+        List<EmployeeEligibility> findAll(Specification<EmployeeEligibility> spec, Sort sort);
 }

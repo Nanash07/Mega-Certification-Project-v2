@@ -4,24 +4,13 @@ import toast from "react-hot-toast";
 import Select from "react-select";
 import AsyncSelect from "react-select/async";
 import Pagination from "../../components/common/Pagination";
+import ConfirmDialog from "../../components/common/ConfirmDialog";
+import { getCurrentRole } from "../../utils/helpers";
 import { fetchUsers, deleteUser, toggleUser, fetchActiveUsers } from "../../services/userService";
 import { fetchRoles } from "../../services/roleService";
 import CreateUserModal from "../../components/users/CreateUserModal";
 import EditUserModal from "../../components/users/EditUserModal";
 import { Pencil, Trash2, ChevronDown, Plus, Eraser, Target } from "lucide-react";
-
-// ==================== Role Helper ====================
-function getCurrentRole() {
-    if (typeof window === "undefined") return "";
-    try {
-        const user = JSON.parse(localStorage.getItem("user") || "{}");
-        const fromUser = (user.role || "").toString().toUpperCase();
-        if (fromUser) return fromUser;
-    } catch (e) {
-        // ignore
-    }
-    return (localStorage.getItem("role") || "").toString().toUpperCase();
-}
 
 export default function UserPage() {
     const navigate = useNavigate();
@@ -380,31 +369,16 @@ export default function UserPage() {
             )}
 
             {/* Modal Delete */}
-            {confirm.open && (
-                <dialog className="modal" open={confirm.open}>
-                    <div className="modal-box">
-                        <h3 className="font-bold text-lg">Hapus User?</h3>
-                        <p className="py-2">User ini akan dihapus dari sistem.</p>
-                        <div className="modal-action">
-                            <button className="btn" onClick={() => setConfirm({ open: false, id: null })}>
-                                Batal
-                            </button>
-                            <button
-                                className="btn btn-error"
-                                onClick={async () => {
-                                    await onDelete(confirm.id);
-                                    setConfirm({ open: false, id: null });
-                                }}
-                            >
-                                Hapus
-                            </button>
-                        </div>
-                    </div>
-                    <form method="dialog" className="modal-backdrop">
-                        <button onClick={() => setConfirm({ open: false, id: null })}>close</button>
-                    </form>
-                </dialog>
-            )}
+            <ConfirmDialog
+                open={confirm.open}
+                title="Hapus User?"
+                message="User ini akan dihapus dari sistem."
+                onConfirm={async () => {
+                    await onDelete(confirm.id);
+                    setConfirm({ open: false, id: null });
+                }}
+                onCancel={() => setConfirm({ open: false, id: null })}
+            />
 
             {/* Floating status menu */}
             {statusMenu && (

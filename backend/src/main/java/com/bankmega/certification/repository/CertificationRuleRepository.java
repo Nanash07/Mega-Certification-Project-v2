@@ -4,43 +4,49 @@ import com.bankmega.certification.entity.CertificationRule;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
 import java.util.List;
 import java.util.Optional;
 
-public interface CertificationRuleRepository extends JpaRepository<CertificationRule, Long>, JpaSpecificationExecutor<CertificationRule> {
+public interface CertificationRuleRepository
+                extends JpaRepository<CertificationRule, Long>, JpaSpecificationExecutor<CertificationRule> {
 
-    // 🔹 Ambil semua rule yang belum soft-delete
-    List<CertificationRule> findByDeletedAtIsNull();
+        @EntityGraph(attributePaths = { "certification", "certificationLevel", "subField", "refreshmentType" })
+        List<CertificationRule> findWithRelationsByDeletedAtIsNull();
 
-    // 🔹 Cari rule by ID tapi exclude yang deleted
-    Optional<CertificationRule> findByIdAndDeletedAtIsNull(Long id);
+        @EntityGraph(attributePaths = { "certification", "certificationLevel", "subField", "refreshmentType" })
+        List<CertificationRule> findWithRelationsByIsActiveTrueAndDeletedAtIsNull();
 
-    // 🔹 Cek kombinasi unik (Certification + Level + SubField) by ID
-    Optional<CertificationRule> findByCertification_IdAndCertificationLevel_IdAndSubField_Id(
-            Long certificationId,
-            Long certificationLevelId,
-            Long subFieldId
-    );
+        // 🔹 Ambil semua rule yang belum soft-delete
+        List<CertificationRule> findByDeletedAtIsNull();
 
-    // 🔹 Ambil rule aktif (isActive = true dan belum soft-delete)
-    List<CertificationRule> findByIsActiveTrueAndDeletedAtIsNull();
+        // 🔹 Cari rule by ID tapi exclude yang deleted
+        Optional<CertificationRule> findByIdAndDeletedAtIsNull(Long id);
 
-    // 🔹 Paging semua rule aktif
-    Page<CertificationRule> findByIsActiveTrueAndDeletedAtIsNull(Pageable pageable);
+        // 🔹 Cek kombinasi unik (Certification + Level + SubField) by ID
+        Optional<CertificationRule> findByCertification_IdAndCertificationLevel_IdAndSubField_Id(
+                        Long certificationId,
+                        Long certificationLevelId,
+                        Long subFieldId);
 
-    // 🔹 Paging semua rule (soft-delete aware)
-    Page<CertificationRule> findByDeletedAtIsNull(Pageable pageable);
+        // 🔹 Ambil rule aktif (isActive = true dan belum soft-delete)
+        List<CertificationRule> findByIsActiveTrueAndDeletedAtIsNull();
 
-    // 🔹 Cari rule by Certification Code (case-insensitive)
-    List<CertificationRule> findByCertification_CodeIgnoreCaseAndDeletedAtIsNull(String code);
+        // 🔹 Paging semua rule aktif
+        Page<CertificationRule> findByIsActiveTrueAndDeletedAtIsNull(Pageable pageable);
 
-    // 🔹 Cari rule by Certification Code + Level (numeric) + SubField Code
-    Optional<CertificationRule> findByCertification_CodeIgnoreCaseAndCertificationLevel_LevelAndSubField_CodeIgnoreCaseAndDeletedAtIsNull(
-            String code,
-            Integer level,
-            String subFieldCode
-    );
+        // 🔹 Paging semua rule (soft-delete aware)
+        Page<CertificationRule> findByDeletedAtIsNull(Pageable pageable);
+
+        // 🔹 Cari rule by Certification Code (case-insensitive)
+        List<CertificationRule> findByCertification_CodeIgnoreCaseAndDeletedAtIsNull(String code);
+
+        // 🔹 Cari rule by Certification Code + Level (numeric) + SubField Code
+        Optional<CertificationRule> findByCertification_CodeIgnoreCaseAndCertificationLevel_LevelAndSubField_CodeIgnoreCaseAndDeletedAtIsNull(
+                        String code,
+                        Integer level,
+                        String subFieldCode);
 }

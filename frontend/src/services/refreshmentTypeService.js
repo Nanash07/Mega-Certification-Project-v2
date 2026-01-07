@@ -1,24 +1,49 @@
-import api from "./api"; // axios instance lo, biasanya udah ada di project
+import api from "./api";
 
-// Ambil semua refreshment type
+const BASE_URL = "/refreshment-types";
+
+// ================== FETCH DATA ==================
+
 export async function fetchRefreshmentTypes() {
-    const res = await api.get("/refreshment-types");
-    return res.data;
+    try {
+        const { data } = await api.get(BASE_URL);
+        return Array.isArray(data) ? data : [];
+    } catch (err) {
+        console.error("fetchRefreshmentTypes error:", err);
+        return [];
+    }
 }
 
-// Tambah refreshment type
-export async function createRefreshmentType(data) {
-    const res = await api.post("/refreshment-types", data);
-    return res.data;
+// ================== CREATE / UPDATE ==================
+
+export async function createRefreshmentType(payload) {
+    try {
+        const { data } = await api.post(BASE_URL, payload);
+        return data;
+    } catch (err) {
+        console.error("createRefreshmentType error:", err);
+        throw err;
+    }
 }
 
-// Update refreshment type
-export async function updateRefreshmentType(id, data) {
-    const res = await api.put(`/refreshment-types/${id}`, data);
-    return res.data;
+export async function updateRefreshmentType(id, payload) {
+    try {
+        const { data } = await api.put(`${BASE_URL}/${id}`, payload);
+        return data;
+    } catch (err) {
+        console.error("updateRefreshmentType error:", err);
+        throw err;
+    }
 }
 
-// Hapus refreshment type
+// ================== DELETE ==================
+
 export async function deleteRefreshmentType(id) {
-    await api.delete(`/refreshment-types/${id}`);
+    try {
+        await api.delete(`${BASE_URL}/${id}`);
+        return true;
+    } catch (err) {
+        console.error("deleteRefreshmentType error:", err);
+        throw err;
+    }
 }

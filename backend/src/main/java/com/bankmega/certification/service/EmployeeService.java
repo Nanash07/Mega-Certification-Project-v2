@@ -31,7 +31,7 @@ public class EmployeeService {
 
         @Transactional(readOnly = true)
         public List<EmployeeResponse> getAllActive() {
-                return repo.findByStatusIgnoreCaseNotAndDeletedAtIsNull("RESIGN").stream()
+                return repo.findWithRelationsByStatusIgnoreCaseNotAndDeletedAtIsNull("RESIGN").stream()
                                 .map(this::toResponse)
                                 .toList();
         }

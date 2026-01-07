@@ -179,6 +179,7 @@ public class EmployeeEligibilityService {
             List<Long> allowedCertificationIds) {
 
         Specification<EmployeeEligibility> spec = EmployeeEligibilitySpecification.notDeleted()
+                .and(EmployeeEligibilitySpecification.withFetchJoins())
                 .and(EmployeeEligibilitySpecification.byEmployeeIds(employeeIds))
                 .and(EmployeeEligibilitySpecification.byJobIds(jobIds))
                 .and(EmployeeEligibilitySpecification.byCertCodes(certCodes))
@@ -318,17 +319,16 @@ public class EmployeeEligibilityService {
         Set<Long> allEmployeeIds = employees.stream().map(Employee::getId).collect(Collectors.toSet());
 
         Map<Long, List<EmployeeEligibility>> eligByEmployeeId = eligibilityRepo
-                .findByEmployeeIdIn(allEmployeeIds).stream()
+                .findWithRelationsByEmployeeIdIn(allEmployeeIds).stream()
                 .collect(Collectors.groupingBy(ee -> ee.getEmployee().getId()));
 
-        Map<Long, List<CertificationRule>> jobRuleMap = jobCertMappingRepo.findAll().stream()
-                .filter(j -> j.getDeletedAt() == null)
+        Map<Long, List<CertificationRule>> jobRuleMap = jobCertMappingRepo.findWithRelationsByDeletedAtIsNull().stream()
                 .collect(Collectors.groupingBy(
                         j -> j.getJobPosition().getId(),
                         Collectors.mapping(JobCertificationMapping::getCertificationRule, Collectors.toList())));
 
-        Map<Long, List<CertificationRule>> exceptionRuleMap = exceptionRepo.findAll().stream()
-                .filter(e -> e.getDeletedAt() == null && Boolean.TRUE.equals(e.getIsActive()))
+        Map<Long, List<CertificationRule>> exceptionRuleMap = exceptionRepo
+                .findWithRelationsByDeletedAtIsNullAndIsActiveTrue().stream()
                 .collect(Collectors.groupingBy(
                         e -> e.getEmployee().getId(),
                         Collectors.mapping(EmployeeEligibilityException::getCertificationRule, Collectors.toList())));
@@ -368,14 +368,13 @@ public class EmployeeEligibilityService {
             return;
         }
 
-        Map<Long, List<CertificationRule>> jobRuleMap = jobCertMappingRepo.findAll().stream()
-                .filter(j -> j.getDeletedAt() == null)
+        Map<Long, List<CertificationRule>> jobRuleMap = jobCertMappingRepo.findWithRelationsByDeletedAtIsNull().stream()
                 .collect(Collectors.groupingBy(
                         j -> j.getJobPosition().getId(),
                         Collectors.mapping(JobCertificationMapping::getCertificationRule, Collectors.toList())));
 
-        Map<Long, List<CertificationRule>> exceptionRuleMap = exceptionRepo.findAll().stream()
-                .filter(e -> e.getDeletedAt() == null && Boolean.TRUE.equals(e.getIsActive()))
+        Map<Long, List<CertificationRule>> exceptionRuleMap = exceptionRepo
+                .findWithRelationsByDeletedAtIsNullAndIsActiveTrue().stream()
                 .collect(Collectors.groupingBy(
                         e -> e.getEmployee().getId(),
                         Collectors.mapping(EmployeeEligibilityException::getCertificationRule, Collectors.toList())));

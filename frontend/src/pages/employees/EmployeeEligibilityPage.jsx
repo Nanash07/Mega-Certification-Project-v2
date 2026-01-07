@@ -4,6 +4,7 @@ import toast from "react-hot-toast";
 import Select from "react-select";
 import AsyncSelect from "react-select/async";
 import Pagination from "../../components/common/Pagination";
+import { getCurrentRole, formatDate } from "../../utils/helpers";
 import {
     fetchEmployeeEligibilityPaged,
     refreshEmployeeEligibility,
@@ -18,21 +19,6 @@ import { searchEmployees } from "../../services/employeeService";
 import { fetchMyPicScope } from "../../services/picScopeService";
 import { Eye, RotateCw, Eraser, Download } from "lucide-react";
 const TABLE_COLS = 17;
-function getCurrentRole() {
-    if (typeof window === "undefined") return "";
-    try {
-        const user = JSON.parse(localStorage.getItem("user") || "{}");
-        const fromUser = (user.role || "").toString().toUpperCase();
-        if (fromUser) return fromUser;
-    } catch {}
-    return (localStorage.getItem("role") || "").toString().toUpperCase();
-}
-function formatDate(v) {
-    if (!v) return "-";
-    const d = new Date(v);
-    if (Number.isNaN(d.getTime())) return "-";
-    return d.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
-}
 export default function EmployeeEligibilityPage() {
     const [role] = useState(() => getCurrentRole());
     const isSuperadmin = role === "SUPERADMIN";

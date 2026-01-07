@@ -2,26 +2,7 @@
 import SuperadminDashboard from "./SuperadminDashboard";
 import PICDashboard from "./PICDashboard";
 import EmployeeDashboard from "./EmployeeDashboard";
-
-function getStoredUser() {
-    try {
-        return JSON.parse(localStorage.getItem("user") || "{}");
-    } catch {
-        return {};
-    }
-}
-
-function getCurrentRole() {
-    const storedUser = getStoredUser();
-
-    return (
-        storedUser.role ||
-        localStorage.getItem("role") || // backward compatibility
-        ""
-    )
-        .toString()
-        .toUpperCase();
-}
+import { getCurrentRole } from "../../utils/helpers";
 
 export default function Dashboard() {
     const role = getCurrentRole();

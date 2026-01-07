@@ -3,23 +3,11 @@ import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import Select from "react-select";
 import Pagination from "../../components/common/Pagination";
+import { getCurrentRole, formatDateTime } from "../../utils/helpers";
 import { fetchCertificationRuleHistories } from "../../services/certificationRuleHistoryService";
 import { fetchCertificationRules } from "../../services/certificationRuleService";
 import { fetchMyPicScope } from "../../services/picScopeService";
 import { ArrowLeft } from "lucide-react";
-
-// (optional) helper role kalau tetap mau blok PEGAWAI
-function getCurrentRole() {
-    if (typeof window === "undefined") return "";
-    try {
-        const user = JSON.parse(localStorage.getItem("user") || "{}");
-        const fromUser = (user.role || "").toString().toUpperCase();
-        if (fromUser) return fromUser;
-    } catch {
-        // ignore
-    }
-    return (localStorage.getItem("role") || "").toString().toUpperCase();
-}
 
 export default function CertificationRuleHistoryPage() {
     const navigate = useNavigate();
@@ -60,19 +48,7 @@ export default function CertificationRuleHistoryPage() {
     const [ruleOptions, setRuleOptions] = useState([]);
     const [picCertCodes, setPicCertCodes] = useState(null);
 
-    // ==== UTILS ====
-    const formatDateTime = (val) => {
-        if (!val) return "-";
-        const d = new Date(val);
-        if (Number.isNaN(d.getTime())) return "-";
-        return d.toLocaleString("id-ID", {
-            day: "2-digit",
-            month: "short",
-            year: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-        });
-    };
+
 
     const startIdx = totalElements === 0 ? 0 : (page - 1) * rowsPerPage + 1;
 

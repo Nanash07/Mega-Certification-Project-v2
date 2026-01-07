@@ -1,27 +1,49 @@
 import api from "./api";
 
-// Ambil semua division (paged)
-export async function fetchDivisions(params) {
-    const res = await api.get("/divisions", { params });
-    return res.data; // { content, totalPages, totalElements, ... }
+const BASE_URL = "/divisions";
+
+// ================== FETCH DATA ==================
+
+export async function fetchDivisions(params = {}) {
+    try {
+        const { data } = await api.get(BASE_URL, { params });
+        return data || { content: [], totalPages: 0, totalElements: 0 };
+    } catch (err) {
+        console.error("fetchDivisions error:", err);
+        return { content: [], totalPages: 0, totalElements: 0 };
+    }
 }
 
-// Ambil detail division by id
 export async function fetchDivisionById(id) {
-    const res = await api.get(`/divisions/${id}`);
-    return res.data;
+    try {
+        const { data } = await api.get(`${BASE_URL}/${id}`);
+        return data || null;
+    } catch (err) {
+        console.error("fetchDivisionById error:", err);
+        return null;
+    }
 }
 
-// Create division baru
+// ================== CREATE ==================
+
 export async function createDivision(name) {
-    const res = await api.post("/divisions", null, {
-        params: { name },
-    });
-    return res.data;
+    try {
+        const { data } = await api.post(BASE_URL, null, { params: { name } });
+        return data;
+    } catch (err) {
+        console.error("createDivision error:", err);
+        throw err;
+    }
 }
 
-// Toggle aktif/nonaktif division
+// ================== TOGGLE ==================
+
 export async function toggleDivision(id) {
-    const res = await api.put(`/divisions/${id}/toggle`);
-    return res.data;
+    try {
+        const { data } = await api.put(`${BASE_URL}/${id}/toggle`);
+        return data;
+    } catch (err) {
+        console.error("toggleDivision error:", err);
+        throw err;
+    }
 }

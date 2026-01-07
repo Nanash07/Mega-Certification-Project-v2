@@ -1,10 +1,9 @@
-// src/services/jobCertificationMappingHistoryService.js
 import api from "./api";
 
 const BASE_URL = "/job-certification-mapping-histories";
-// pastiin backend lo punya endpoint: GET /api/job-certification-mapping-histories
 
-// 🔹 Ambil histori Job Certification Mapping (paging + filter)
+// ================== FETCH DATA ==================
+
 export async function fetchJobCertMappingHistories(params = {}) {
     try {
         const { data } = await api.get(BASE_URL, { params });
@@ -17,6 +16,6 @@ export async function fetchJobCertMappingHistories(params = {}) {
         };
     } catch (err) {
         console.error("fetchJobCertMappingHistories error:", err);
-        return { content: [], totalPages: 0, totalElements: 0 };
+        return { content: [], totalPages: 0, totalElements: 0, number: 0, size: 0 };
     }
 }

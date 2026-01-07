@@ -5,6 +5,8 @@ import Select from "react-select";
 import AsyncSelect from "react-select/async";
 
 import Pagination from "../../components/common/Pagination";
+import ConfirmDialog from "../../components/common/ConfirmDialog";
+import { getCurrentRole, formatDate } from "../../utils/helpers";
 import { Plus, Pencil, Trash2, Eye, ChevronDown, Eraser, Download } from "lucide-react";
 
 import { fetchBatches, deleteBatch, searchBatches, updateBatch, exportBatchesExcel } from "../../services/batchService";
@@ -12,16 +14,6 @@ import { fetchCertificationRules } from "../../services/certificationRuleService
 import { fetchMyPicScope } from "../../services/picScopeService";
 import CreateBatchModal from "../../components/batches/CreateBatchModal";
 import EditBatchModal from "../../components/batches/EditBatchModal";
-
-function getCurrentRole() {
-    if (typeof window === "undefined") return "";
-    try {
-        const user = JSON.parse(localStorage.getItem("user") || "{}");
-        const fromUser = (user.role || "").toString().toUpperCase();
-        if (fromUser) return fromUser;
-    } catch {}
-    return (localStorage.getItem("role") || "").toString().toUpperCase();
-}
 
 function formatDateId(dateLike) {
     if (!dateLike) return "-";
@@ -587,30 +579,13 @@ export default function BatchPage() {
             <CreateBatchModal open={openCreate} onClose={() => setOpenCreate(false)} onSaved={load} />
             <EditBatchModal open={!!editItem} data={editItem} onClose={() => setEditItem(null)} onSaved={load} />
 
-            <dialog className="modal" open={confirmDelete.open}>
-                <div className="modal-box">
-                    <h3 className="font-bold text-lg">Hapus Batch?</h3>
-                    <p className="py-2">Batch ini akan dihapus dari sistem.</p>
-                    <div className="modal-action">
-                        <button
-                            type="button"
-                            className="btn"
-                            onClick={() => setConfirmDelete({ open: false, id: null })}
-                        >
-                            Batal
-                        </button>
-                        <button type="button" className="btn btn-error" onClick={() => handleDelete(confirmDelete.id)}>
-                            Hapus
-                        </button>
-                    </div>
-                </div>
-
-                <form method="dialog" className="modal-backdrop">
-                    <button type="button" onClick={() => setConfirmDelete({ open: false, id: null })}>
-                        close
-                    </button>
-                </form>
-            </dialog>
+            <ConfirmDialog
+                open={confirmDelete.open}
+                title="Hapus Batch?"
+                message="Batch ini akan dihapus dari sistem."
+                onConfirm={() => handleDelete(confirmDelete.id)}
+                onCancel={() => setConfirmDelete({ open: false, id: null })}
+            />
 
             {statusMenu && !isEmployee && (
                 <div className="fixed inset-0 z-[999]" onClick={() => setStatusMenu(null)}>

@@ -4,6 +4,8 @@ import toast from "react-hot-toast";
 import Select from "react-select";
 import AsyncSelect from "react-select/async";
 import Pagination from "../../components/common/Pagination";
+import ConfirmDialog from "../../components/common/ConfirmDialog";
+import { getCurrentRole } from "../../utils/helpers";
 import {
     fetchExceptions,
     deleteException,
@@ -24,16 +26,6 @@ import ImportExceptionModal from "../../components/exceptions/ImportExceptionMod
 import { Plus, Upload, Download, Eraser, Eye, Pencil, Trash2, ChevronDown } from "lucide-react";
 
 const TABLE_COLS = 11;
-
-function getCurrentRole() {
-    if (typeof window === "undefined") return "";
-    try {
-        const user = JSON.parse(localStorage.getItem("user") || "{}");
-        const fromUser = (user.role || "").toString().toUpperCase();
-        if (fromUser) return fromUser;
-    } catch {}
-    return (localStorage.getItem("role") || "").toString().toUpperCase();
-}
 
 export default function EmployeeExceptionPage() {
     const navigate = useNavigate();
@@ -556,31 +548,16 @@ export default function EmployeeExceptionPage() {
                 />
             )}
 
-            {confirm.open && (
-                <dialog className="modal" open={confirm.open}>
-                    <div className="modal-box">
-                        <h3 className="font-bold text-lg">Hapus Exception?</h3>
-                        <p className="py-2">Exception ini akan dihapus dari sistem.</p>
-                        <div className="modal-action">
-                            <button className="btn" onClick={() => setConfirm({ open: false, id: null })}>
-                                Batal
-                            </button>
-                            <button
-                                className="btn btn-error"
-                                onClick={async () => {
-                                    await onDelete(confirm.id);
-                                    setConfirm({ open: false, id: null });
-                                }}
-                            >
-                                Hapus
-                            </button>
-                        </div>
-                    </div>
-                    <form method="dialog" className="modal-backdrop">
-                        <button onClick={() => setConfirm({ open: false, id: null })}>close</button>
-                    </form>
-                </dialog>
-            )}
+            <ConfirmDialog
+                open={confirm.open}
+                title="Hapus Exception?"
+                message="Exception ini akan dihapus dari sistem."
+                onConfirm={async () => {
+                    await onDelete(confirm.id);
+                    setConfirm({ open: false, id: null });
+                }}
+                onCancel={() => setConfirm({ open: false, id: null })}
+            />
 
             {statusMenu && (
                 <div className="fixed inset-0 z-[999] flex" onClick={() => setStatusMenu(null)}>

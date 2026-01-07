@@ -23,7 +23,7 @@ public class SubFieldService {
     private final CertificationRepository certRepo;
 
     public List<SubFieldResponse> getAll() {
-        return repo.findByDeletedAtIsNull().stream()
+        return repo.findWithCertificationByDeletedAtIsNull().stream()
                 .sorted(Comparator.comparing(SubField::getCode, String.CASE_INSENSITIVE_ORDER))
                 .map(this::toResponse)
                 .toList();

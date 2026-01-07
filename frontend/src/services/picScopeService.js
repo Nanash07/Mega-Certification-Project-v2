@@ -1,23 +1,47 @@
-// src/services/picScopeService.js
 import api from "./api";
 
+const BASE_URL = "/pic-scope";
+
+// ================== FETCH DATA ==================
+
 export async function fetchPicScopes() {
-    const { data } = await api.get("/pic-scope");
-    return Array.isArray(data) ? data : [];
+    try {
+        const { data } = await api.get(BASE_URL);
+        return Array.isArray(data) ? data : [];
+    } catch (err) {
+        console.error("fetchPicScopes error:", err);
+        return [];
+    }
 }
 
 export async function fetchPicScopesByUser(userId) {
-    const { data } = await api.get(`/pic-scope/${userId}`);
-    return data;
+    try {
+        const { data } = await api.get(`${BASE_URL}/${userId}`);
+        return data || null;
+    } catch (err) {
+        console.error("fetchPicScopesByUser error:", err);
+        return null;
+    }
 }
 
-// BARU — scope milik PIC yang login
 export async function fetchMyPicScope() {
-    const { data } = await api.get("/pic-scope/me");
-    return data; // { userId, certifications: [{ certificationId, certificationCode }, ...] }
+    try {
+        const { data } = await api.get(`${BASE_URL}/me`);
+        return data || null;
+    } catch (err) {
+        console.error("fetchMyPicScope error:", err);
+        return null;
+    }
 }
+
+// ================== UPDATE ==================
 
 export async function assignPicScope(userId, certificationIds) {
-    const { data } = await api.put(`/pic-scope/${userId}`, { certificationIds });
-    return data;
+    try {
+        const { data } = await api.put(`${BASE_URL}/${userId}`, { certificationIds });
+        return data;
+    } catch (err) {
+        console.error("assignPicScope error:", err);
+        throw err;
+    }
 }

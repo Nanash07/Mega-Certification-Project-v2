@@ -1,42 +1,49 @@
 import api from "./api";
 
-const BASE_URL = "/email-config"; // backend prefix
+const BASE_URL = "/email-config";
+
+// ================== FETCH DATA ==================
 
 export async function fetchActiveEmailConfig() {
     try {
         const { data } = await api.get(`${BASE_URL}/active`);
-        return data;
-    } catch (error) {
-        console.error("[EmailConfig] gagal ambil config aktif:", error.response?.data || error.message);
-        throw new Error(error.response?.data || "Gagal mengambil konfigurasi email aktif");
+        return data || null;
+    } catch (err) {
+        console.error("fetchActiveEmailConfig error:", err);
+        throw err;
     }
 }
 
 export async function fetchAllEmailConfigs() {
     try {
         const { data } = await api.get(BASE_URL);
-        return data;
-    } catch (error) {
-        console.error("[EmailConfig] gagal ambil semua config:", error.response?.data || error.message);
-        throw new Error(error.response?.data || "Gagal mengambil daftar konfigurasi email");
+        return Array.isArray(data) ? data : [];
+    } catch (err) {
+        console.error("fetchAllEmailConfigs error:", err);
+        return [];
     }
 }
+
+// ================== CREATE ==================
 
 export async function createEmailConfig(payload) {
     try {
         const { data } = await api.post(BASE_URL, payload);
         return data;
-    } catch (error) {
-        console.error("[EmailConfig] gagal simpan config:", error.response?.data || error.message);
-        throw new Error(error.response?.data || "Gagal menyimpan konfigurasi email");
+    } catch (err) {
+        console.error("createEmailConfig error:", err);
+        throw err;
     }
 }
 
+// ================== TEST ==================
+
 export async function testEmailConnection(email, subject, message) {
     try {
-        const { data } = await api.post("/email-config/test", { email, subject, message });
+        const { data } = await api.post(`${BASE_URL}/test`, { email, subject, message });
         return data;
-    } catch (error) {
-        throw new Error(error.response?.data || "Gagal mengirim test email");
+    } catch (err) {
+        console.error("testEmailConnection error:", err);
+        throw err;
     }
 }

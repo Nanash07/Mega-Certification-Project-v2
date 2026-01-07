@@ -602,13 +602,13 @@ public class EmployeeBatchService {
         Long ruleId = batch.getCertificationRule().getId();
 
         List<EmployeeEligibility> eligibles = eligibilityRepo
-                .findByCertificationRule_IdAndIsActiveTrueAndDeletedAtIsNull(ruleId);
+                .findWithRelationsByCertificationRule_IdAndIsActiveTrueAndDeletedAtIsNull(ruleId);
 
-        Set<Long> existingIds = repo.findByBatch_IdAndDeletedAtIsNull(batchId).stream()
+        Set<Long> existingIds = repo.findWithEmployeeByBatch_IdAndDeletedAtIsNull(batchId).stream()
                 .map(eb -> eb.getEmployee().getId()).collect(Collectors.toSet());
 
         List<Long> empIds = eligibles.stream().map(e -> e.getEmployee().getId()).toList();
-        Set<Long> hasCertEmpIds = certificationRepo.findByEmployeeIdInAndDeletedAtIsNull(empIds).stream()
+        Set<Long> hasCertEmpIds = certificationRepo.findWithRelationsByEmployeeIdInAndDeletedAtIsNull(empIds).stream()
                 .filter(c -> c.getCertificationRule() != null
                         && Objects.equals(c.getCertificationRule().getId(), ruleId))
                 .map(c -> c.getEmployee().getId())
@@ -699,4 +699,3 @@ public class EmployeeBatchService {
         return out;
     }
 }
-    

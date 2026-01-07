@@ -1,6 +1,7 @@
 package com.bankmega.certification.repository;
 
 import com.bankmega.certification.entity.EmployeeEligibilityException;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
@@ -19,6 +20,9 @@ public interface EmployeeEligibilityExceptionRepository
         List<EmployeeEligibilityException> findByCertificationRuleIdAndDeletedAtIsNull(Long ruleId);
 
         List<EmployeeEligibilityException> findByDeletedAtIsNull();
+
+        @EntityGraph(attributePaths = { "employee", "certificationRule" })
+        List<EmployeeEligibilityException> findWithRelationsByDeletedAtIsNullAndIsActiveTrue();
 
         Optional<EmployeeEligibilityException> findFirstByEmployeeIdAndCertificationRuleId(
                         Long employeeId, Long certificationRuleId);

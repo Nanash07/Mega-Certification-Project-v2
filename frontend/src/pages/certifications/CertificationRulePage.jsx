@@ -5,6 +5,8 @@ import Select from "react-select";
 import { Plus, History as HistoryIcon, Pencil, Trash2, ChevronDown, Eraser } from "lucide-react";
 
 import Pagination from "../../components/common/Pagination";
+import ConfirmDialog from "../../components/common/ConfirmDialog";
+import { getCurrentRole, formatDateTime } from "../../utils/helpers";
 import {
     fetchCertificationRulesPaged,
     deleteCertificationRule,
@@ -18,19 +20,6 @@ import CreateCertificationRuleModal from "../../components/certification-rules/C
 import EditCertificationRuleModal from "../../components/certification-rules/EditCertificationRuleModal";
 
 const TABLE_COLS = 11;
-
-// ===== helper role dari localStorage =====
-function getCurrentRole() {
-    if (typeof window === "undefined") return "";
-    try {
-        const user = JSON.parse(localStorage.getItem("user") || "{}");
-        const fromUser = (user.role || "").toString().toUpperCase();
-        if (fromUser) return fromUser;
-    } catch {
-        // ignore
-    }
-    return (localStorage.getItem("role") || "").toString().toUpperCase();
-}
 
 export default function CertificationRulePage() {
     const navigate = useNavigate();
@@ -71,19 +60,7 @@ export default function CertificationRulePage() {
     // Scope PIC (kode sertifikasi yang boleh di-manage PIC)
     const [picCertCodes, setPicCertCodes] = useState(null);
 
-    // 🔹 Helper tanggal + jam
-    function formatDateTime(value) {
-        if (!value) return "-";
-        const d = new Date(value);
-        if (Number.isNaN(d.getTime())) return "-";
-        return d.toLocaleString("id-ID", {
-            day: "2-digit",
-            month: "short",
-            year: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-        });
-    }
+
 
     // 🔹 Style status (Aktif / Nonaktif)
     function getStatusStyle(isActive) {
@@ -486,34 +463,17 @@ export default function CertificationRulePage() {
                 }}
             />
 
-            {/* Confirm Delete */}
-            <dialog className="modal" open={confirm.open}>
-                <div className="modal-box">
-                    <h3 className="font-bold text-lg">Hapus Aturan Sertifikasi?</h3>
-                    <p className="py-2">Data ini akan dinonaktifkan dari sistem.</p>
-                    <div className="modal-action">
-                        <button type="button" className="btn" onClick={() => setConfirm({ open: false, id: null })}>
-                            Batal
-                        </button>
-                        <button
-                            type="button"
-                            className="btn btn-error"
-                            onClick={() => {
-                                if (!confirm.id) return;
-                                onDelete(confirm.id);
-                                setConfirm({ open: false, id: null });
-                            }}
-                        >
-                            Hapus
-                        </button>
-                    </div>
-                </div>
-                <form method="dialog" className="modal-backdrop">
-                    <button type="button" onClick={() => setConfirm({ open: false, id: null })}>
-                        close
-                    </button>
-                </form>
-            </dialog>
+            <ConfirmDialog
+                open={confirm.open}
+                title="Hapus Aturan Sertifikasi?"
+                message="Data ini akan dinonaktifkan dari sistem."
+                onConfirm={() => {
+                    if (!confirm.id) return;
+                    onDelete(confirm.id);
+                    setConfirm({ open: false, id: null });
+                }}
+                onCancel={() => setConfirm({ open: false, id: null })}
+            />
 
             {/* Floating status menu: Aktif / Nonaktif */}
             {statusMenu && (

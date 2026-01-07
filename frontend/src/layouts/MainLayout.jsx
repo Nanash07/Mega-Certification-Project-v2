@@ -3,26 +3,7 @@ import { useState } from "react";
 import { Toaster } from "react-hot-toast";
 import Sidebar from "./Sidebar";
 import Navbar from "./Navbar";
-
-function getStoredUser() {
-    try {
-        return JSON.parse(localStorage.getItem("user") || "{}");
-    } catch {
-        return {};
-    }
-}
-
-function getCurrentRole() {
-    const storedUser = getStoredUser();
-
-    return (
-        storedUser.role ||
-        localStorage.getItem("role") || // fallback lama kalau masih kepake
-        ""
-    )
-        .toString()
-        .toUpperCase();
-}
+import { getCurrentRole } from "../utils/helpers";
 
 export default function MainLayout({ children }) {
     const [sidebarOpen, setSidebarOpen] = useState(false);

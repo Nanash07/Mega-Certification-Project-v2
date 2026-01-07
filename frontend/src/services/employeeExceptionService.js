@@ -3,6 +3,8 @@ import api from "./api";
 const BASE_URL = "/exceptions";
 const IMPORT_BASE = `${BASE_URL}/import`;
 
+// ================== FETCH DATA ==================
+
 export async function fetchExceptions(params = {}) {
     try {
         const { data } = await api.get(BASE_URL, { params });
@@ -13,53 +15,98 @@ export async function fetchExceptions(params = {}) {
     }
 }
 
+// ================== CREATE / UPDATE ==================
+
 export async function createException(payload) {
-    const { data } = await api.post(BASE_URL, payload);
-    return data;
+    try {
+        const { data } = await api.post(BASE_URL, payload);
+        return data;
+    } catch (err) {
+        console.error("createException error:", err);
+        throw err;
+    }
 }
 
 export async function updateException(id, notes) {
-    const { data } = await api.put(`${BASE_URL}/${id}/notes`, null, { params: { notes } });
-    return data;
+    try {
+        const { data } = await api.put(`${BASE_URL}/${id}/notes`, null, { params: { notes } });
+        return data;
+    } catch (err) {
+        console.error("updateException error:", err);
+        throw err;
+    }
 }
 
+// ================== TOGGLE / DELETE ==================
+
 export async function toggleException(id) {
-    const { data } = await api.put(`${BASE_URL}/${id}/toggle`);
-    return data;
+    try {
+        const { data } = await api.put(`${BASE_URL}/${id}/toggle`);
+        return data;
+    } catch (err) {
+        console.error("toggleException error:", err);
+        throw err;
+    }
 }
 
 export async function deleteException(id) {
-    await api.delete(`${BASE_URL}/${id}`);
-    return true;
+    try {
+        await api.delete(`${BASE_URL}/${id}`);
+        return true;
+    } catch (err) {
+        console.error("deleteException error:", err);
+        throw err;
+    }
 }
 
+// ================== IMPORT ==================
+
 export async function dryRunImportExceptions(file) {
-    const formData = new FormData();
-    formData.append("file", file);
-    const { data } = await api.post(`${IMPORT_BASE}/dry-run`, formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-    });
-    return data;
+    try {
+        const formData = new FormData();
+        formData.append("file", file);
+        const { data } = await api.post(`${IMPORT_BASE}/dry-run`, formData, {
+            headers: { "Content-Type": "multipart/form-data" },
+        });
+        return data;
+    } catch (err) {
+        console.error("dryRunImportExceptions error:", err);
+        throw err;
+    }
 }
 
 export async function confirmImportExceptions(file) {
-    const formData = new FormData();
-    formData.append("file", file);
-    const { data } = await api.post(`${IMPORT_BASE}/confirm`, formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-    });
-    return data;
+    try {
+        const formData = new FormData();
+        formData.append("file", file);
+        const { data } = await api.post(`${IMPORT_BASE}/confirm`, formData, {
+            headers: { "Content-Type": "multipart/form-data" },
+        });
+        return data;
+    } catch (err) {
+        console.error("confirmImportExceptions error:", err);
+        throw err;
+    }
 }
 
 export async function downloadExceptionTemplate() {
-    const res = await api.get(`${IMPORT_BASE}/template`, { responseType: "blob" });
-    return res.data;
+    try {
+        const res = await api.get(`${IMPORT_BASE}/template`, { responseType: "blob" });
+        return res.data;
+    } catch (err) {
+        console.error("downloadExceptionTemplate error:", err);
+        throw err;
+    }
 }
 
+// ================== EXPORT ==================
+
 export async function exportExceptions(params = {}) {
-    const res = await api.get(`${BASE_URL}/export`, {
-        params,
-        responseType: "blob",
-    });
-    return res.data;
+    try {
+        const res = await api.get(`${BASE_URL}/export`, { params, responseType: "blob" });
+        return res.data;
+    } catch (err) {
+        console.error("exportExceptions error:", err);
+        throw err;
+    }
 }

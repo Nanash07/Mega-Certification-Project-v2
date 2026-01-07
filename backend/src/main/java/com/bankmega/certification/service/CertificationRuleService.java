@@ -85,19 +85,19 @@ public class CertificationRuleService {
                 return ruleRepo.findAll(spec, pageable).map(this::toResponse);
         }
 
-        // 🔹 All active rules
+        // All active rules
         @Transactional(readOnly = true)
         public List<CertificationRuleResponse> getAllActive() {
-                return ruleRepo.findByIsActiveTrueAndDeletedAtIsNull()
+                return ruleRepo.findWithRelationsByIsActiveTrueAndDeletedAtIsNull()
                                 .stream()
                                 .map(this::toResponse)
                                 .toList();
         }
 
-        // 🔹 All non-deleted rules
+        // All non-deleted rules
         @Transactional(readOnly = true)
         public List<CertificationRuleResponse> getAll() {
-                return ruleRepo.findByDeletedAtIsNull().stream()
+                return ruleRepo.findWithRelationsByDeletedAtIsNull().stream()
                                 .sorted((a, b) -> {
                                         String keyA = (a.getCertification().getCode() != null
                                                         ? a.getCertification().getCode()

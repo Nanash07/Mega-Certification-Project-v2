@@ -4,6 +4,8 @@ package com.bankmega.certification.repository;
 import com.bankmega.certification.entity.*;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
@@ -13,6 +15,9 @@ import java.util.Optional;
 import java.util.Set;
 
 public interface EmployeeRepository extends JpaRepository<Employee, Long>, JpaSpecificationExecutor<Employee> {
+
+    @EntityGraph(attributePaths = { "regional", "division", "unit", "jobPosition" })
+    List<Employee> findWithRelationsByStatusIgnoreCaseNotAndDeletedAtIsNull(String status);
 
     interface NipOnly {
         String getNip();
@@ -63,4 +68,8 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long>, JpaSp
     boolean existsByUnit(Unit unit);
 
     boolean existsByJobPosition(JobPosition jobPosition);
+
+    @Override
+    @EntityGraph(attributePaths = { "regional", "division", "unit", "jobPosition" })
+    Page<Employee> findAll(Specification<Employee> spec, Pageable pageable);
 }

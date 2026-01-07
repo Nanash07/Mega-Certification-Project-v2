@@ -1,27 +1,49 @@
 import api from "./api";
 
-// Ambil semua unit (paged)
-export async function fetchUnits(params) {
-    const res = await api.get("/units", { params });
-    return res.data; // { content, totalPages, totalElements, ... }
+const BASE_URL = "/units";
+
+// ================== FETCH DATA ==================
+
+export async function fetchUnits(params = {}) {
+    try {
+        const { data } = await api.get(BASE_URL, { params });
+        return data || { content: [], totalPages: 0, totalElements: 0 };
+    } catch (err) {
+        console.error("fetchUnits error:", err);
+        return { content: [], totalPages: 0, totalElements: 0 };
+    }
 }
 
-// Ambil detail unit by id
 export async function fetchUnitById(id) {
-    const res = await api.get(`/units/${id}`);
-    return res.data;
+    try {
+        const { data } = await api.get(`${BASE_URL}/${id}`);
+        return data || null;
+    } catch (err) {
+        console.error("fetchUnitById error:", err);
+        return null;
+    }
 }
 
-// Create unit baru
+// ================== CREATE ==================
+
 export async function createUnit(name) {
-    const res = await api.post("/units", null, {
-        params: { name },
-    });
-    return res.data;
+    try {
+        const { data } = await api.post(BASE_URL, null, { params: { name } });
+        return data;
+    } catch (err) {
+        console.error("createUnit error:", err);
+        throw err;
+    }
 }
 
-// Toggle aktif/nonaktif unit
+// ================== TOGGLE ==================
+
 export async function toggleUnit(id) {
-    const res = await api.put(`/units/${id}/toggle`);
-    return res.data;
+    try {
+        const { data } = await api.put(`${BASE_URL}/${id}/toggle`);
+        return data;
+    } catch (err) {
+        console.error("toggleUnit error:", err);
+        throw err;
+    }
 }

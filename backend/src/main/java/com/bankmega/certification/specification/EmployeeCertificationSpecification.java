@@ -2,6 +2,7 @@
 package com.bankmega.certification.specification;
 
 import com.bankmega.certification.entity.EmployeeCertification;
+import jakarta.persistence.criteria.JoinType;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.time.LocalDate;
@@ -11,6 +12,26 @@ public class EmployeeCertificationSpecification {
 
     public static Specification<EmployeeCertification> notDeleted() {
         return (root, query, cb) -> cb.isNull(root.get("deletedAt"));
+    }
+
+    public static Specification<EmployeeCertification> withFetchJoins() {
+        return (root, query, cb) -> {
+            if (query != null && query.getResultType() != Long.class && query.getResultType() != long.class) {
+                var empFetch = root.fetch("employee", JoinType.LEFT);
+                empFetch.fetch("jobPosition", JoinType.LEFT);
+                empFetch.fetch("regional", JoinType.LEFT);
+                empFetch.fetch("division", JoinType.LEFT);
+                empFetch.fetch("unit", JoinType.LEFT);
+
+                var ruleFetch = root.fetch("certificationRule", JoinType.LEFT);
+                ruleFetch.fetch("certification", JoinType.LEFT);
+                ruleFetch.fetch("certificationLevel", JoinType.LEFT);
+                ruleFetch.fetch("subField", JoinType.LEFT);
+
+                root.fetch("institution", JoinType.LEFT);
+            }
+            return cb.conjunction();
+        };
     }
 
     public static Specification<EmployeeCertification> byEmployeeIds(List<Long> ids) {

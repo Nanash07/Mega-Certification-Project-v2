@@ -12,6 +12,8 @@ import { fetchBatchById, sendBatchNotifications } from "../../services/batchServ
 import AddEmployeeBatchModal from "../../components/batches/AddEmployeeBatchModal";
 import EditBatchModal from "../../components/batches/EditBatchModal";
 import Pagination from "../../components/common/Pagination";
+import ConfirmDialog from "../../components/common/ConfirmDialog";
+import { getCurrentRole } from "../../utils/helpers";
 import { ArrowLeft, Plus, Send, RotateCcw, Pencil } from "lucide-react";
 import Select from "react-select";
 
@@ -21,11 +23,6 @@ function getStoredUser() {
     } catch {
         return {};
     }
-}
-
-function getCurrentRole() {
-    const storedUser = getStoredUser();
-    return (storedUser.role || localStorage.getItem("role") || "").toString().toUpperCase();
 }
 
 export default function DetailBatchPage() {
@@ -684,26 +681,13 @@ export default function DetailBatchPage() {
                         onSaved={loadData}
                     />
 
-                    {/* Confirm Delete */}
-                    {confirmDelete.open && (
-                        <dialog className="modal" open>
-                            <div className="modal-box">
-                                <h3 className="font-bold text-lg">Hapus Peserta?</h3>
-                                <p className="py-2">Peserta ini akan dihapus dari batch.</p>
-                                <div className="modal-action">
-                                    <button className="btn" onClick={() => setConfirmDelete({ open: false, id: null })}>
-                                        Batal
-                                    </button>
-                                    <button className="btn btn-error" onClick={() => handleDelete(confirmDelete.id)}>
-                                        Hapus
-                                    </button>
-                                </div>
-                            </div>
-                            <form method="dialog" className="modal-backdrop">
-                                <button onClick={() => setConfirmDelete({ open: false, id: null })}>close</button>
-                            </form>
-                        </dialog>
-                    )}
+                    <ConfirmDialog
+                        open={confirmDelete.open}
+                        title="Hapus Peserta?"
+                        message="Peserta ini akan dihapus dari batch."
+                        onConfirm={() => handleDelete(confirmDelete.id)}
+                        onCancel={() => setConfirmDelete({ open: false, id: null })}
+                    />
 
                     {/* Confirm Send Emails */}
                     {confirmSend && (

@@ -6,6 +6,8 @@ import AsyncSelect from "react-select/async";
 import { Plus, History as HistoryIcon, Eraser, Pencil, Trash2, Upload, Eye, Download } from "lucide-react";
 
 import Pagination from "../../components/common/Pagination";
+import ConfirmDialog from "../../components/common/ConfirmDialog";
+import { getCurrentRole, formatDate, formatDateTime } from "../../utils/helpers";
 
 import {
     fetchCertifications,
@@ -23,16 +25,6 @@ import UploadEmployeeCertificationModal from "../../components/employee-certific
 import ViewEmployeeCertificationModal from "../../components/employee-certifications/ViewEmployeeCertificationModal";
 
 const TABLE_COLS = 15;
-
-function getCurrentRole() {
-    if (typeof window === "undefined") return "";
-    try {
-        const user = JSON.parse(localStorage.getItem("user") || "{}");
-        const fromUser = (user.role || "").toString().toUpperCase();
-        if (fromUser) return fromUser;
-    } catch {}
-    return (localStorage.getItem("role") || "").toString().toUpperCase();
-}
 
 export default function EmployeeCertificationPage() {
     const [role] = useState(() => getCurrentRole());
@@ -99,25 +91,7 @@ export default function EmployeeCertificationPage() {
         }
     }
 
-    function formatDate(value) {
-        if (!value) return "-";
-        const d = new Date(value);
-        if (isNaN(d.getTime())) return "-";
-        return d.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
-    }
 
-    function formatDateTime(value) {
-        if (!value) return "-";
-        const d = new Date(value);
-        if (isNaN(d.getTime())) return "-";
-        return d.toLocaleString("id-ID", {
-            day: "2-digit",
-            month: "short",
-            year: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-        });
-    }
 
     function buildParams() {
         return {
@@ -545,31 +519,16 @@ export default function EmployeeCertificationPage() {
                 />
             )}
 
-            {confirm.open && (
-                <dialog className="modal" open={confirm.open}>
-                    <div className="modal-box">
-                        <h3 className="font-bold text-lg">Hapus Sertifikasi Pegawai?</h3>
-                        <p className="py-2">Data sertifikat ini akan dihapus dari sistem.</p>
-                        <div className="modal-action">
-                            <button className="btn" onClick={() => setConfirm({ open: false, id: null })}>
-                                Batal
-                            </button>
-                            <button
-                                className="btn btn-error"
-                                onClick={async () => {
-                                    await onDelete(confirm.id);
-                                    setConfirm({ open: false, id: null });
-                                }}
-                            >
-                                Hapus
-                            </button>
-                        </div>
-                    </div>
-                    <form method="dialog" className="modal-backdrop">
-                        <button onClick={() => setConfirm({ open: false, id: null })}>close</button>
-                    </form>
-                </dialog>
-            )}
+            <ConfirmDialog
+                open={confirm.open}
+                title="Hapus Sertifikasi Pegawai?"
+                message="Data sertifikat ini akan dihapus dari sistem."
+                onConfirm={async () => {
+                    await onDelete(confirm.id);
+                    setConfirm({ open: false, id: null });
+                }}
+                onCancel={() => setConfirm({ open: false, id: null })}
+            />
         </div>
     );
 }

@@ -2,8 +2,9 @@ import api from "./api";
 
 const BASE_URL = "/job-certification-mappings";
 
-// 🔹 Ambil data mapping dengan paging + filter
-export async function fetchJobCertificationMappingsPaged(params) {
+// ================== FETCH DATA ==================
+
+export async function fetchJobCertificationMappingsPaged(params = {}) {
     try {
         const { data } = await api.get(`${BASE_URL}/paged`, { params });
         return data || { content: [], totalPages: 0, totalElements: 0 };
@@ -13,7 +14,6 @@ export async function fetchJobCertificationMappingsPaged(params) {
     }
 }
 
-// 🔹 Ambil detail mapping
 export async function fetchJobCertificationMappingById(id) {
     try {
         const { data } = await api.get(`${BASE_URL}/${id}`);
@@ -24,7 +24,8 @@ export async function fetchJobCertificationMappingById(id) {
     }
 }
 
-// 🔹 Create mapping
+// ================== CREATE / UPDATE ==================
+
 export async function createJobCertificationMapping(payload) {
     try {
         const { data } = await api.post(BASE_URL, payload);
@@ -35,7 +36,6 @@ export async function createJobCertificationMapping(payload) {
     }
 }
 
-// 🔹 Update mapping
 export async function updateJobCertificationMapping(id, payload) {
     try {
         const { data } = await api.put(`${BASE_URL}/${id}`, payload);
@@ -46,7 +46,8 @@ export async function updateJobCertificationMapping(id, payload) {
     }
 }
 
-// 🔹 Toggle aktif/nonaktif
+// ================== TOGGLE / DELETE ==================
+
 export async function toggleJobCertificationMapping(id) {
     try {
         const { data } = await api.put(`${BASE_URL}/${id}/toggle`);
@@ -57,7 +58,6 @@ export async function toggleJobCertificationMapping(id) {
     }
 }
 
-// 🔹 Soft delete
 export async function deleteJobCertificationMapping(id) {
     try {
         await api.delete(`${BASE_URL}/${id}`);
