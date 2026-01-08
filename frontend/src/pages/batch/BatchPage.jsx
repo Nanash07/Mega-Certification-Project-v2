@@ -7,7 +7,7 @@ import AsyncSelect from "react-select/async";
 import Pagination from "../../components/common/Pagination";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
 import { getCurrentRole, formatDate } from "../../utils/helpers";
-import { Plus, Pencil, Trash2, Eye, ChevronDown, Eraser, Download } from "lucide-react";
+import { Plus, Pencil, Trash2, Eye, ChevronDown, Eraser, Download, Package } from "lucide-react";
 
 import { fetchBatches, deleteBatch, searchBatches, updateBatch, exportBatchesExcel } from "../../services/batchService";
 import { fetchCertificationRules } from "../../services/certificationRuleService";
@@ -319,62 +319,45 @@ export default function BatchPage() {
     const startIdx = totalElements === 0 ? 0 : (page - 1) * rowsPerPage + 1;
 
     return (
-        <div>
-            <div className="space-y-4 w-full mb-6">
-                <div className="grid grid-cols-1 sm:grid-cols-1 lg:grid-cols-6 gap-3 text-xs">
+        <div className="space-y-4 w-full">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                    <h1 className="text-lg sm:text-xl font-bold">Kelola Batch</h1>
+                    <p className="text-xs text-gray-500">{totalElements} batch terdaftar</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
                     {!isEmployee && (
-                        <div className="col-span-1 sm:col-span-1 lg:col-span-1">
+                        <>
                             <button
-                                type="button"
-                                className="btn btn-primary btn-sm w-full"
+                                className="btn btn-sm btn-primary rounded-lg"
                                 onClick={() => setOpenCreate(true)}
                             >
                                 <Plus className="w-4 h-4" />
                                 Tambah Batch
                             </button>
-                        </div>
-                    )}
-
-                    {!isEmployee && (
-                        <div className="col-span-1 sm:col-span-2 lg:col-span-1">
                             <button
-                                type="button"
-                                className={`btn btn-neutral btn-sm w-full ${exporting ? "btn-disabled" : ""}`}
+                                className={`btn btn-sm btn-neutral rounded-lg ${exporting ? "btn-disabled" : ""}`}
                                 onClick={handleExport}
                                 disabled={exporting}
                             >
                                 {exporting ? (
-                                    <>
-                                        <span className="loading loading-spinner loading-xs" />
-                                        Exporting...
-                                    </>
+                                    <span className="loading loading-spinner loading-xs" />
                                 ) : (
-                                    <>
-                                        <Download className="w-4 h-4" />
-                                        Export Excel
-                                    </>
+                                    <Download className="w-4 h-4" />
                                 )}
+                                {exporting ? "Exporting..." : "Export Excel"}
                             </button>
-                        </div>
+                        </>
                     )}
-
-                    <div className="col-span-3" />
-
-                    <div className="col-span-1 sm:col-span-2 lg:col-span-1">
-                        <button
-                            type="button"
-                            className="btn btn-accent btn-soft border-accent btn-sm w-full"
-                            onClick={resetFilter}
-                        >
-                            <Eraser className="w-4 h-4" />
-                            Clear Filter
-                        </button>
-                    </div>
                 </div>
+            </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4 text-xs">
+            {/* Filter Card */}
+            <div className="card bg-base-100 shadow-sm border border-gray-100 p-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 text-xs">
                     <div className="flex flex-col gap-1">
-                        <label className="font-normal text-base-content/70">Search</label>
+                        <label className="font-medium text-gray-600">Search Batch</label>
                         <AsyncSelect
                             cacheOptions
                             defaultOptions
@@ -386,12 +369,12 @@ export default function BatchPage() {
                             }}
                             placeholder="Cari batch"
                             isClearable
-                            styles={{ control: (base) => ({ ...base, minHeight: 36 }) }}
+                            className="text-xs"
+                            classNamePrefix="react-select"
                         />
                     </div>
-
                     <div className="flex flex-col gap-1">
-                        <label className="font-normal text-base-content/70">Status</label>
+                        <label className="font-medium text-gray-600">Status</label>
                         <Select
                             options={statusOptions}
                             value={status}
@@ -401,12 +384,12 @@ export default function BatchPage() {
                             }}
                             placeholder="Pilih status"
                             isClearable
-                            styles={{ control: (base) => ({ ...base, minHeight: 36 }) }}
+                            className="text-xs"
+                            classNamePrefix="react-select"
                         />
                     </div>
-
                     <div className="flex flex-col gap-1">
-                        <label className="font-normal text-base-content/70">Jenis</label>
+                        <label className="font-medium text-gray-600">Jenis</label>
                         <Select
                             options={typeOptions}
                             value={type}
@@ -416,12 +399,12 @@ export default function BatchPage() {
                             }}
                             placeholder="Pilih jenis"
                             isClearable
-                            styles={{ control: (base) => ({ ...base, minHeight: 36 }) }}
+                            className="text-xs"
+                            classNamePrefix="react-select"
                         />
                     </div>
-
                     <div className="flex flex-col gap-1">
-                        <label className="font-normal text-base-content/70">Rule</label>
+                        <label className="font-medium text-gray-600">Rule Sertifikasi</label>
                         <Select
                             options={ruleOptions}
                             value={certRule}
@@ -431,15 +414,15 @@ export default function BatchPage() {
                             }}
                             placeholder="Pilih rule"
                             isClearable
-                            styles={{ control: (base) => ({ ...base, minHeight: 36 }) }}
+                            className="text-xs"
+                            classNamePrefix="react-select"
                         />
                     </div>
-
                     <div className="flex flex-col gap-1">
-                        <label className="font-normal text-base-content/70">Tanggal Mulai</label>
+                        <label className="font-medium text-gray-600">Tanggal Mulai</label>
                         <input
                             type="date"
-                            className="input input-sm input-bordered w-full"
+                            className="input input-sm input-bordered w-full rounded-lg"
                             value={startDate}
                             onChange={(e) => {
                                 setStartDate(e.target.value);
@@ -447,12 +430,11 @@ export default function BatchPage() {
                             }}
                         />
                     </div>
-
                     <div className="flex flex-col gap-1">
-                        <label className="font-normal text-base-content/70">Tanggal Selesai</label>
+                        <label className="font-medium text-gray-600">Tanggal Selesai</label>
                         <input
                             type="date"
-                            className="input input-sm input-bordered w-full"
+                            className="input input-sm input-bordered w-full rounded-lg"
                             value={endDate}
                             onChange={(e) => {
                                 setEndDate(e.target.value);
@@ -461,120 +443,127 @@ export default function BatchPage() {
                         />
                     </div>
                 </div>
+                <div className="flex justify-end mt-3">
+                    <button
+                        className="btn btn-sm btn-accent btn-soft rounded-lg flex gap-2"
+                        onClick={resetFilter}
+                    >
+                        <Eraser className="w-4 h-4" />
+                        Clear Filter
+                    </button>
+                </div>
             </div>
 
-            <div className="overflow-x-auto rounded-xl border border-gray-200 shadow bg-base-100">
-                <table className="table table-zebra">
-                    <thead className="bg-base-200 text-xs">
-                        <tr>
-                            <th>No</th>
-                            <th>Aksi</th>
-                            <th>Nama Batch</th>
-                            <th>Jenis</th>
-                            <th>Sertifikasi</th>
-                            <th>Lembaga</th>
-                            <th>Tanggal Mulai</th>
-                            <th>Tanggal Selesai</th>
-                            <th>Quota</th>
-                            <th>Total Peserta</th>
-                            <th>Total Lulus</th>
-                            <th>Status</th>
-                        </tr>
-                    </thead>
-
-                    <tbody className="text-xs">
-                        {loading ? (
+            {/* Table Card */}
+            <div className="card bg-base-100 shadow-sm border border-gray-100 overflow-hidden">
+                <div className="overflow-x-auto">
+                    <table className="table table-zebra w-full">
+                        <thead className="bg-base-200 text-xs">
                             <tr>
-                                <td colSpan={TABLE_COLS} className="text-center py-10">
-                                    <span className="loading loading-dots loading-md" />
-                                </td>
+                                <th className="w-12">No</th>
+                                <th className="w-28">Aksi</th>
+                                <th>Nama Batch</th>
+                                <th>Jenis</th>
+                                <th>Sertifikasi</th>
+                                <th>Lembaga</th>
+                                <th>Tanggal Mulai</th>
+                                <th>Tanggal Selesai</th>
+                                <th>Quota</th>
+                                <th>Peserta</th>
+                                <th>Lulus</th>
+                                <th className="w-28">Status</th>
                             </tr>
-                        ) : rows.length === 0 ? (
-                            <tr>
-                                <td colSpan={TABLE_COLS} className="text-center text-gray-400 py-10">
-                                    Tidak ada data
-                                </td>
-                            </tr>
-                        ) : (
-                            rows.map((b, idx) => (
-                                <tr key={b.id}>
-                                    <td>{startIdx + idx}</td>
-
-                                    <td>
-                                        <div className="flex gap-2">
-                                            <div className="tooltip" data-tip="Lihat detail batch">
-                                                <Link
-                                                    to={`/batch/${b.id}`}
-                                                    className="btn btn-xs btn-info border btn-soft border-info"
-                                                >
-                                                    <Eye className="w-3 h-3" />
-                                                </Link>
-                                            </div>
-
-                                            {!isEmployee && (
-                                                <>
-                                                    <div className="tooltip" data-tip="Edit batch">
-                                                        <button
-                                                            type="button"
-                                                            className="btn btn-xs btn-warning btn-soft border-warning"
-                                                            onClick={() => setEditItem(b)}
-                                                        >
-                                                            <Pencil className="w-3 h-3" />
-                                                        </button>
-                                                    </div>
-
-                                                    <div className="tooltip" data-tip="Hapus batch">
-                                                        <button
-                                                            type="button"
-                                                            className="btn btn-xs btn-error btn-soft border-error"
-                                                            onClick={() => setConfirmDelete({ open: true, id: b.id })}
-                                                        >
-                                                            <Trash2 className="w-3 h-3" />
-                                                        </button>
-                                                    </div>
-                                                </>
-                                            )}
+                        </thead>
+                        <tbody className="text-xs">
+                            {loading ? (
+                                <tr>
+                                    <td colSpan={TABLE_COLS} className="text-center py-16">
+                                        <span className="loading loading-dots loading-lg text-primary" />
+                                    </td>
+                                </tr>
+                            ) : rows.length === 0 ? (
+                                <tr>
+                                    <td colSpan={TABLE_COLS} className="text-center py-16">
+                                        <div className="flex flex-col items-center text-gray-400">
+                                            <Package size={48} className="mb-3 opacity-30" />
+                                            <p className="text-sm">Tidak ada data batch</p>
                                         </div>
                                     </td>
-
-                                    <td>{b.batchName}</td>
-                                    <td>{renderTypeBadge(b.type)}</td>
-
-                                    <td>
-                                        {[
-                                            b.certificationCode,
-                                            b.certificationLevelName,
-                                            b.subFieldCode ?? b.subBidangCode,
-                                        ]
-                                            .filter((x) => x && String(x).trim() !== "")
-                                            .join(" - ") || "-"}
-                                    </td>
-
-                                    <td>{b.institutionName || "-"}</td>
-                                    <td>{formatDateId(b.startDate)}</td>
-                                    <td>{formatDateId(b.endDate)}</td>
-                                    <td>{b.quota ?? "-"}</td>
-                                    <td>{b.totalParticipants ?? 0}</td>
-                                    <td>{b.totalPassed ?? 0}</td>
-                                    <td>{renderStatusBadge(b)}</td>
                                 </tr>
-                            ))
-                        )}
-                    </tbody>
-                </table>
-            </div>
+                            ) : (
+                                rows.map((b, idx) => (
+                                    <tr key={b.id} className="hover">
+                                        <td>{startIdx + idx}</td>
+                                        <td>
+                                            <div className="flex gap-1">
+                                                <div className="tooltip" data-tip="Lihat detail batch">
+                                                    <Link
+                                                        to={`/batch/${b.id}`}
+                                                        className="btn btn-xs btn-info btn-soft border border-info rounded-lg"
+                                                    >
+                                                        <Eye className="w-3 h-3" />
+                                                    </Link>
+                                                </div>
+                                                {!isEmployee && (
+                                                    <>
+                                                        <div className="tooltip" data-tip="Edit batch">
+                                                            <button
+                                                                className="btn btn-xs btn-warning btn-soft border border-warning rounded-lg"
+                                                                onClick={() => setEditItem(b)}
+                                                            >
+                                                                <Pencil className="w-3 h-3" />
+                                                            </button>
+                                                        </div>
+                                                        <div className="tooltip" data-tip="Hapus batch">
+                                                            <button
+                                                                className="btn btn-xs btn-error btn-soft border border-error rounded-lg"
+                                                                onClick={() => setConfirmDelete({ open: true, id: b.id })}
+                                                            >
+                                                                <Trash2 className="w-3 h-3" />
+                                                            </button>
+                                                        </div>
+                                                    </>
+                                                )}
+                                            </div>
+                                        </td>
+                                        <td className="font-medium">{b.batchName}</td>
+                                        <td>{renderTypeBadge(b.type)}</td>
+                                        <td>
+                                            {[b.certificationCode, b.certificationLevelName, b.subFieldCode ?? b.subBidangCode]
+                                                .filter((x) => x && String(x).trim() !== "")
+                                                .join(" - ") || "-"}
+                                        </td>
+                                        <td>{b.institutionName || "-"}</td>
+                                        <td>{formatDateId(b.startDate)}</td>
+                                        <td>{formatDateId(b.endDate)}</td>
+                                        <td>{b.quota ?? "-"}</td>
+                                        <td>{b.totalParticipants ?? 0}</td>
+                                        <td>{b.totalPassed ?? 0}</td>
+                                        <td>{renderStatusBadge(b)}</td>
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                </div>
 
-            <Pagination
-                page={page}
-                totalPages={totalPages}
-                totalElements={totalElements}
-                rowsPerPage={rowsPerPage}
-                onPageChange={setPage}
-                onRowsPerPageChange={(val) => {
-                    setRowsPerPage(val);
-                    setPage(1);
-                }}
-            />
+                {/* Pagination inside card */}
+                {rows.length > 0 && (
+                    <div className="border-t border-gray-100 p-3">
+                        <Pagination
+                            page={page}
+                            totalPages={totalPages}
+                            totalElements={totalElements}
+                            rowsPerPage={rowsPerPage}
+                            onPageChange={setPage}
+                            onRowsPerPageChange={(val) => {
+                                setRowsPerPage(val);
+                                setPage(1);
+                            }}
+                        />
+                    </div>
+                )}
+            </div>
 
             <CreateBatchModal open={openCreate} onClose={() => setOpenCreate(false)} onSaved={load} />
             <EditBatchModal open={!!editItem} data={editItem} onClose={() => setEditItem(null)} onSaved={load} />

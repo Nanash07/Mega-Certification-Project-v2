@@ -17,8 +17,10 @@ import { fetchCertificationLevels } from "../../services/certificationLevelServi
 import { fetchSubFields } from "../../services/subFieldService";
 import { searchEmployees } from "../../services/employeeService";
 import { fetchMyPicScope } from "../../services/picScopeService";
-import { Eye, RotateCw, Eraser, Download } from "lucide-react";
+import { Eye, RotateCw, Eraser, Download, ClipboardList, Search, Briefcase, Award, Layers, Grid3X3, Filter, FileSpreadsheet } from "lucide-react";
+
 const TABLE_COLS = 17;
+
 export default function EmployeeEligibilityPage() {
     const [role] = useState(() => getCurrentRole());
     const isSuperadmin = role === "SUPERADMIN";
@@ -27,14 +29,17 @@ export default function EmployeeEligibilityPage() {
     const canRefresh = isSuperadmin || isPic;
     const isSelfMode = isEmployee;
     const showRefreshButton = canRefresh && !isSelfMode;
+
     const [rows, setRows] = useState([]);
     const [loading, setLoading] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
     const [exporting, setExporting] = useState(false);
+
     const [page, setPage] = useState(1);
     const [rowsPerPage, setRowsPerPage] = useState(10);
     const [totalPages, setTotalPages] = useState(0);
     const [totalElements, setTotalElements] = useState(0);
+
     const [filterEmployee, setFilterEmployee] = useState(null);
     const [filterJob, setFilterJob] = useState(null);
     const [filterCert, setFilterCert] = useState(null);
@@ -42,10 +47,12 @@ export default function EmployeeEligibilityPage() {
     const [filterSub, setFilterSub] = useState(null);
     const [filterStatus, setFilterStatus] = useState(null);
     const [filterSource, setFilterSource] = useState(null);
+
     const [jobOptions, setJobOptions] = useState([]);
     const [certOptions, setCertOptions] = useState([]);
     const [levelOptions, setLevelOptions] = useState([]);
     const [subOptions, setSubOptions] = useState([]);
+
     const statusBadgeClass = useMemo(
         () => ({
             ACTIVE: "badge-success",
@@ -55,6 +62,7 @@ export default function EmployeeEligibilityPage() {
         }),
         []
     );
+
     function formatStatusLabel(s) {
         switch (s) {
             case "NOT_YET_CERTIFIED":
@@ -67,11 +75,13 @@ export default function EmployeeEligibilityPage() {
                 return s || "-";
         }
     }
+
     function formatSourceLabel(s) {
         if (s === "BY_JOB") return "By Job";
         if (s === "BY_NAME") return "By Name";
         return s ?? "-";
     }
+
     async function load() {
         setLoading(true);
         try {
@@ -110,6 +120,7 @@ export default function EmployeeEligibilityPage() {
             setLoading(false);
         }
     }
+
     async function onRefresh() {
         if (!canRefresh || isSelfMode) return;
         setRefreshing(true);
@@ -123,6 +134,7 @@ export default function EmployeeEligibilityPage() {
             setRefreshing(false);
         }
     }
+
     async function onExport() {
         setExporting(true);
         try {
@@ -150,6 +162,7 @@ export default function EmployeeEligibilityPage() {
             setExporting(false);
         }
     }
+
     async function loadFilters() {
         try {
             const [jobs, levels, subs] = await Promise.all([
@@ -176,6 +189,7 @@ export default function EmployeeEligibilityPage() {
             toast.error("Gagal memuat filter");
         }
     }
+
     const loadEmployees = async (input) => {
         try {
             const res = await searchEmployees({ search: input, page: 0, size: 20 });
@@ -187,6 +201,19 @@ export default function EmployeeEligibilityPage() {
             return [];
         }
     };
+
+    const clearFilter = () => {
+        if (!isSelfMode) setFilterEmployee(null);
+        setFilterJob(null);
+        setFilterCert(null);
+        setFilterLevel(null);
+        setFilterSub(null);
+        setFilterStatus(null);
+        setFilterSource(null);
+        setPage(1);
+        toast.success("Filter dibersihkan");
+    };
+
     useEffect(() => {
         load();
     }, [
@@ -201,244 +228,313 @@ export default function EmployeeEligibilityPage() {
         filterSource,
         role,
     ]);
+
     useEffect(() => {
         setPage(1);
     }, [filterEmployee, filterJob, filterCert, filterLevel, filterSub, filterStatus, filterSource, role]);
+
     useEffect(() => {
         loadFilters();
     }, []);
+
     const startIdx = totalElements === 0 ? 0 : (page - 1) * rowsPerPage + 1;
+
     return (
-        <div>
-            <div className="mb-4 space-y-3">
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 text-xs">
+        <div className="space-y-4 w-full">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                    <h1 className="text-lg sm:text-xl font-bold">Eligibility Pegawai</h1>
+                    <p className="text-xs text-gray-500">{totalElements} data eligibility</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
                     {showRefreshButton && (
-                        <div className="col-span-1 sm:col-span-1 lg:col-span-1">
-                            <button
-                                type="button"
-                                className={`btn btn-primary btn-sm w-full ${refreshing ? "btn-disabled" : ""}`}
-                                onClick={onRefresh}
-                                disabled={refreshing}
-                            >
-                                {refreshing ? (
-                                    <>
-                                        <span className="loading loading-spinner loading-xs" />
-                                        Refreshing...
-                                    </>
-                                ) : (
-                                    <>
-                                        <RotateCw className="w-4 h-4" />
-                                        Refresh Eligibility
-                                    </>
-                                )}
-                            </button>
-                        </div>
-                    )}
-                    <div className="col-span-1 sm:col-span-1 lg:col-span-1">
                         <button
                             type="button"
-                            className={`btn btn-neutral btn-sm w-full ${exporting ? "btn-disabled" : ""}`}
-                            onClick={onExport}
-                            disabled={exporting}
+                            className={`btn btn-sm btn-primary rounded-lg ${refreshing ? "btn-disabled" : ""}`}
+                            onClick={onRefresh}
+                            disabled={refreshing}
                         >
-                            {exporting ? (
+                            {refreshing ? (
                                 <>
                                     <span className="loading loading-spinner loading-xs" />
-                                    Exporting...
+                                    Refreshing...
                                 </>
                             ) : (
                                 <>
-                                    <Download className="w-4 h-4" />
-                                    Export Excel
+                                    <RotateCw size={14} />
+                                    Refresh Eligibility
                                 </>
                             )}
                         </button>
+                    )}
+                    <button
+                        type="button"
+                        className={`btn btn-sm btn-neutral rounded-lg ${exporting ? "btn-disabled" : ""}`}
+                        onClick={onExport}
+                        disabled={exporting}
+                    >
+                        {exporting ? (
+                            <>
+                                <span className="loading loading-spinner loading-xs" />
+                                Exporting...
+                            </>
+                        ) : (
+                            <>
+                                <Download size={14} />
+                                Export Excel
+                            </>
+                        )}
+                    </button>
+                </div>
+            </div>
+
+            {/* Filter Card */}
+            <div className="card bg-base-100 shadow-sm border border-gray-100 p-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+                    {!isSelfMode && (
+                        <div className="flex flex-col gap-1">
+                            <label className="font-medium text-gray-600 flex items-center gap-1">
+                                <Search size={12} /> Cari Pegawai
+                            </label>
+                            <AsyncSelect
+                                cacheOptions
+                                defaultOptions
+                                loadOptions={loadEmployees}
+                                value={filterEmployee}
+                                onChange={setFilterEmployee}
+                                placeholder="Ketik NIP/nama..."
+                                isClearable
+                                className="text-xs"
+                                classNamePrefix="react-select"
+                            />
+                        </div>
+                    )}
+
+                    <div className="flex flex-col gap-1">
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <Briefcase size={12} /> Jabatan
+                        </label>
+                        <Select
+                            options={jobOptions}
+                            value={filterJob}
+                            onChange={setFilterJob}
+                            placeholder="Semua Jabatan"
+                            isClearable
+                            className="text-xs"
+                            classNamePrefix="react-select"
+                        />
                     </div>
-                    <div className="col-span-3 hidden lg:block"></div>
-                    <div className="col-span-1 sm:col-span-1 lg:col-span-1">
+
+                    <div className="flex flex-col gap-1">
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <Award size={12} /> Sertifikasi
+                        </label>
+                        <Select
+                            options={certOptions}
+                            value={filterCert}
+                            onChange={setFilterCert}
+                            placeholder="Semua Sertifikasi"
+                            isClearable
+                            className="text-xs"
+                            classNamePrefix="react-select"
+                        />
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <Layers size={12} /> Level
+                        </label>
+                        <Select
+                            options={levelOptions}
+                            value={filterLevel}
+                            onChange={setFilterLevel}
+                            placeholder="Semua Level"
+                            isClearable
+                            className="text-xs"
+                            classNamePrefix="react-select"
+                        />
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <Grid3X3 size={12} /> Sub Bidang
+                        </label>
+                        <Select
+                            options={subOptions}
+                            value={filterSub}
+                            onChange={setFilterSub}
+                            placeholder="Semua Sub Bidang"
+                            isClearable
+                            className="text-xs"
+                            classNamePrefix="react-select"
+                        />
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <Filter size={12} /> Status
+                        </label>
+                        <Select
+                            options={[
+                                { value: "NOT_YET_CERTIFIED", label: "Belum Sertifikasi" },
+                                { value: "ACTIVE", label: "Active" },
+                                { value: "DUE", label: "Due" },
+                                { value: "EXPIRED", label: "Expired" },
+                            ]}
+                            value={filterStatus}
+                            onChange={setFilterStatus}
+                            placeholder="Semua Status"
+                            isClearable
+                            className="text-xs"
+                            classNamePrefix="react-select"
+                        />
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <FileSpreadsheet size={12} /> Source
+                        </label>
+                        <Select
+                            options={[
+                                { value: "BY_JOB", label: "By Job" },
+                                { value: "BY_NAME", label: "By Name" },
+                            ]}
+                            value={filterSource}
+                            onChange={setFilterSource}
+                            placeholder="Semua Source"
+                            isClearable
+                            className="text-xs"
+                            classNamePrefix="react-select"
+                        />
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                        <label className="font-medium text-gray-600 invisible">.</label>
                         <button
+                            className="btn btn-sm btn-accent btn-soft w-full flex gap-2 rounded-lg"
                             type="button"
-                            className="btn btn-accent btn-soft border-accent btn-sm w-full"
-                            onClick={() => {
-                                if (!isSelfMode) setFilterEmployee(null);
-                                setFilterJob(null);
-                                setFilterCert(null);
-                                setFilterLevel(null);
-                                setFilterSub(null);
-                                setFilterStatus(null);
-                                setFilterSource(null);
-                                setPage(1);
-                                toast.success("Clear filter berhasil");
-                            }}
+                            onClick={clearFilter}
                         >
-                            <Eraser className="w-4 h-4" />
+                            <Eraser size={14} />
                             Clear Filter
                         </button>
                     </div>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3 text-xs">
-                    {!isSelfMode ? (
-                        <AsyncSelect
-                            cacheOptions
-                            defaultOptions
-                            loadOptions={loadEmployees}
-                            value={filterEmployee}
-                            onChange={setFilterEmployee}
-                            placeholder="Filter Pegawai"
-                            isClearable
-                        />
-                    ) : (
-                        <div />
-                    )}
-                    <Select
-                        options={jobOptions}
-                        value={filterJob}
-                        onChange={setFilterJob}
-                        placeholder="Filter Jabatan"
-                        isClearable
-                    />
-                    <Select
-                        options={certOptions}
-                        value={filterCert}
-                        onChange={setFilterCert}
-                        placeholder="Filter Sertifikasi"
-                        isClearable
-                    />
-                    <Select
-                        options={levelOptions}
-                        value={filterLevel}
-                        onChange={setFilterLevel}
-                        placeholder="Filter Level"
-                        isClearable
-                    />
-                    <Select
-                        options={subOptions}
-                        value={filterSub}
-                        onChange={setFilterSub}
-                        placeholder="Filter Sub Bidang"
-                        isClearable
-                    />
-                    <Select
-                        options={[
-                            { value: "NOT_YET_CERTIFIED", label: "Belum Sertifikasi" },
-                            { value: "ACTIVE", label: "Active" },
-                            { value: "DUE", label: "Due" },
-                            { value: "EXPIRED", label: "Expired" },
-                        ]}
-                        value={filterStatus}
-                        onChange={setFilterStatus}
-                        placeholder="Filter Status"
-                        isClearable
-                    />
-                    <Select
-                        options={[
-                            { value: "BY_JOB", label: "By Job" },
-                            { value: "BY_NAME", label: "By Name" },
-                        ]}
-                        value={filterSource}
-                        onChange={setFilterSource}
-                        placeholder="Filter Source"
-                        isClearable
-                    />
-                </div>
             </div>
-            <div className="overflow-x-auto rounded-xl border border-gray-200 shadow bg-base-100">
-                <table className="table table-zebra">
-                    <thead className="bg-base-200 text-xs whitespace-nowrap">
-                        <tr>
-                            <th>No</th>
-                            <th>Aksi</th>
-                            <th>NIP</th>
-                            <th>Nama Pegawai</th>
-                            <th>Jabatan</th>
-                            <th>Sertifikat</th>
-                            <th>No Sertifikat</th>
-                            <th>Tgl Sertifikasi</th>
-                            <th>Jenjang</th>
-                            <th>Sub Bidang</th>
-                            <th>SK Efektif</th>
-                            <th>Status</th>
-                            <th>Due Date</th>
-                            <th>Sumber</th>
-                            <th>Training</th>
-                            <th>Refreshment</th>
-                            <th>Perpanjang</th>
-                        </tr>
-                    </thead>
-                    <tbody className="text-xs whitespace-nowrap">
-                        {loading ? (
+
+            {/* Table Card */}
+            <div className="card bg-base-100 shadow-sm border border-gray-100 overflow-hidden">
+                <div className="overflow-x-auto">
+                    <table className="table table-zebra w-full">
+                        <thead className="bg-base-200 text-xs">
                             <tr>
-                                <td colSpan={TABLE_COLS} className="text-center py-10">
-                                    <span className="loading loading-dots loading-md" />
-                                </td>
+                                <th className="w-12">No</th>
+                                <th className="w-16">Aksi</th>
+                                <th>NIP</th>
+                                <th>Nama Pegawai</th>
+                                <th>Jabatan</th>
+                                <th>Sertifikat</th>
+                                <th>No Sertifikat</th>
+                                <th>Tgl Sertifikasi</th>
+                                <th>Jenjang</th>
+                                <th>Sub Bidang</th>
+                                <th>SK Efektif</th>
+                                <th>Status</th>
+                                <th>Due Date</th>
+                                <th>Sumber</th>
+                                <th>Training</th>
+                                <th>Refreshment</th>
+                                <th>Perpanjang</th>
                             </tr>
-                        ) : rows.length === 0 ? (
-                            <tr>
-                                <td colSpan={TABLE_COLS} className="text-center text-gray-400 py-10">
-                                    Tidak ada data
-                                </td>
-                            </tr>
-                        ) : (
-                            rows.map((r, idx) => (
-                                <tr key={r.id ?? `${r.employeeId}-${r.certificationRuleId}`}>
-                                    <td>{startIdx + idx}</td>
-                                    <td>
-                                        <Link
-                                            to={`/employee/${r.employeeId}`}
-                                            className="btn btn-xs btn-info btn-soft border-info"
-                                        >
-                                            <Eye className="w-3 h-3" />
-                                        </Link>
+                        </thead>
+                        <tbody className="text-xs">
+                            {loading ? (
+                                <tr>
+                                    <td colSpan={TABLE_COLS} className="text-center py-16">
+                                        <span className="loading loading-dots loading-lg text-primary" />
                                     </td>
-                                    <td>{r.nip}</td>
-                                    <td>{r.employeeName}</td>
-                                    <td>{r.jobPositionTitle}</td>
-                                    <td>{r.certificationCode}</td>
-                                    <td>{r.certNumber || "-"}</td>
-                                    <td>{formatDate(r.certDate)}</td>
-                                    <td>{r.certificationLevelLevel ?? "-"}</td>
-                                    <td>{r.subFieldCode ?? "-"}</td>
-                                    <td>{formatDate(r.effectiveDate)}</td>
-                                    <td>
-                                        <span
-                                            className={`badge badge-sm text-white whitespace-nowrap ${
-                                                statusBadgeClass[r.status] ?? "badge-secondary"
-                                            }`}
-                                            title={r.sisaWaktu || ""}
-                                        >
-                                            {formatStatusLabel(r.status)}
-                                        </span>
-                                    </td>
-                                    <td>{formatDate(r.dueDate)}</td>
-                                    <td>
-                                        <span
-                                            className={`badge badge-sm text-white whitespace-nowrap ${
-                                                r.source === "BY_JOB" ? "badge-neutral" : "badge-info"
-                                            }`}
-                                        >
-                                            {formatSourceLabel(r.source)}
-                                        </span>
-                                    </td>
-                                    <td className="text-center">{r.trainingCount ?? 0}</td>
-                                    <td className="text-center">{r.refreshmentCount ?? 0}</td>
-                                    <td className="text-center">{r.extensionCount ?? 0}</td>
                                 </tr>
-                            ))
-                        )}
-                    </tbody>
-                </table>
+                            ) : rows.length === 0 ? (
+                                <tr>
+                                    <td colSpan={TABLE_COLS} className="text-center py-16">
+                                        <div className="flex flex-col items-center text-gray-400">
+                                            <ClipboardList size={48} className="mb-3 opacity-30" />
+                                            <p className="text-sm">Tidak ada data eligibility</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ) : (
+                                rows.map((r, idx) => (
+                                    <tr key={r.id ?? `${r.employeeId}-${r.certificationRuleId}`} className="hover">
+                                        <td>{startIdx + idx}</td>
+                                        <td>
+                                            <div className="tooltip" data-tip="Lihat detail pegawai">
+                                                <Link
+                                                    to={`/employee/${r.employeeId}`}
+                                                    className="btn btn-xs btn-info btn-soft border border-info rounded-lg"
+                                                >
+                                                    <Eye size={12} />
+                                                </Link>
+                                            </div>
+                                        </td>
+                                        <td>{r.nip}</td>
+                                        <td className="font-medium">{r.employeeName}</td>
+                                        <td>{r.jobPositionTitle}</td>
+                                        <td>{r.certificationCode}</td>
+                                        <td>{r.certNumber || "-"}</td>
+                                        <td>{formatDate(r.certDate)}</td>
+                                        <td>{r.certificationLevelLevel ?? "-"}</td>
+                                        <td>{r.subFieldCode ?? "-"}</td>
+                                        <td>{formatDate(r.effectiveDate)}</td>
+                                        <td>
+                                            <span
+                                                className={`badge badge-sm text-white whitespace-nowrap ${
+                                                    statusBadgeClass[r.status] ?? "badge-secondary"
+                                                }`}
+                                                title={r.sisaWaktu || ""}
+                                            >
+                                                {formatStatusLabel(r.status)}
+                                            </span>
+                                        </td>
+                                        <td>{formatDate(r.dueDate)}</td>
+                                        <td>
+                                            <span
+                                                className={`badge badge-sm text-white whitespace-nowrap ${
+                                                    r.source === "BY_JOB" ? "badge-neutral" : "badge-info"
+                                                }`}
+                                            >
+                                                {formatSourceLabel(r.source)}
+                                            </span>
+                                        </td>
+                                        <td className="text-center">{r.trainingCount ?? 0}</td>
+                                        <td className="text-center">{r.refreshmentCount ?? 0}</td>
+                                        <td className="text-center">{r.extensionCount ?? 0}</td>
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+
+                {/* Pagination inside card */}
+                {rows.length > 0 && (
+                    <div className="border-t border-gray-100 p-3">
+                        <Pagination
+                            page={page}
+                            totalPages={totalPages}
+                            totalElements={totalElements}
+                            rowsPerPage={rowsPerPage}
+                            onPageChange={setPage}
+                            onRowsPerPageChange={(val) => {
+                                setRowsPerPage(val);
+                                setPage(1);
+                            }}
+                        />
+                    </div>
+                )}
             </div>
-            <Pagination
-                page={page}
-                totalPages={totalPages}
-                totalElements={totalElements}
-                rowsPerPage={rowsPerPage}
-                onPageChange={setPage}
-                onRowsPerPageChange={(val) => {
-                    setRowsPerPage(val);
-                    setPage(1);
-                }}
-            />
         </div>
     );
 }
+

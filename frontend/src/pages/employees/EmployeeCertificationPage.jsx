@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import Select from "react-select";
 import AsyncSelect from "react-select/async";
-import { Plus, History as HistoryIcon, Eraser, Pencil, Trash2, Upload, Eye, Download } from "lucide-react";
+import { Plus, History as HistoryIcon, Eraser, Pencil, Trash2, Upload, Eye, Download, Filter, Award } from "lucide-react";
 
 import Pagination from "../../components/common/Pagination";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
@@ -90,8 +90,6 @@ export default function EmployeeCertificationPage() {
             }
         }
     }
-
-
 
     function buildParams() {
         return {
@@ -203,6 +201,17 @@ export default function EmployeeCertificationPage() {
         }
     }
 
+    function resetFilter() {
+        setFilterEmployee(null);
+        setFilterCertCode([]);
+        setFilterLevel([]);
+        setFilterSubField([]);
+        setFilterInstitution([]);
+        setFilterStatus([]);
+        setPage(1);
+        toast.success("Filter dibersihkan");
+    }
+
     useEffect(() => {
         load();
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -229,215 +238,234 @@ export default function EmployeeCertificationPage() {
     const startIdx = totalElements === 0 ? 0 : (page - 1) * rowsPerPage + 1;
 
     return (
-        <div>
-            <div className="mb-4 space-y-3">
-                <div className="grid grid-cols-1 lg:grid-cols-6 gap-3">
-                    <div className="col-span-1">
-                        <button
-                            type="button"
-                            className="btn btn-sm btn-primary w-full"
-                            onClick={() => setShowCreateModal(true)}
-                        >
-                            <Plus className="w-4 h-4" />
-                            <span>Tambah Sertifikat</span>
-                        </button>
-                    </div>
-
-                    <div className="col-span-1">
-                        <button type="button" className="btn btn-sm btn-neutral w-full" onClick={handleExport}>
-                            <Download className="w-4 h-4" />
-                            <span>Export Excel</span>
-                        </button>
-                    </div>
-
-                    <div className="col-span-2" />
-
-                    <div className="col-span-1">
-                        <button
-                            type="button"
-                            className="btn btn-sm btn-accent w-full"
-                            onClick={() => (window.location.href = "/employee/certification/histories")}
-                        >
-                            <HistoryIcon className="w-4 h-4" />
-                            <span>Histori</span>
-                        </button>
-                    </div>
-
-                    <div className="col-span-1">
-                        <button
-                            type="button"
-                            className="btn btn-sm btn-accent btn-soft border-accent w-full"
-                            onClick={() => {
-                                setFilterEmployee(null);
-                                setFilterCertCode([]);
-                                setFilterLevel([]);
-                                setFilterSubField([]);
-                                setFilterInstitution([]);
-                                setFilterStatus([]);
-                                setPage(1);
-                                toast.success("Clear filter berhasil");
-                            }}
-                        >
-                            <Eraser className="w-4 h-4" />
-                            <span>Clear Filter</span>
-                        </button>
-                    </div>
+        <div className="space-y-4 w-full">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                    <h1 className="text-lg sm:text-xl font-bold">Sertifikasi Pegawai</h1>
+                    <p className="text-xs text-gray-500">{totalElements} sertifikat terdaftar</p>
                 </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 text-xs">
-                    <AsyncSelect
-                        cacheOptions
-                        defaultOptions
-                        loadOptions={loadEmployees}
-                        value={filterEmployee}
-                        onChange={setFilterEmployee}
-                        placeholder="Filter Pegawai"
-                        isClearable
-                    />
-
-                    <Select
-                        isMulti
-                        options={certCodeOptions}
-                        value={filterCertCode}
-                        onChange={setFilterCertCode}
-                        placeholder="Filter Cert Code"
-                    />
-
-                    <Select
-                        isMulti
-                        options={levelOptions}
-                        value={filterLevel}
-                        onChange={setFilterLevel}
-                        placeholder="Filter Jenjang"
-                    />
-
-                    <Select
-                        isMulti
-                        options={subFieldOptions}
-                        value={filterSubField}
-                        onChange={setFilterSubField}
-                        placeholder="Filter Sub Field"
-                    />
-
-                    <Select
-                        isMulti
-                        options={institutionOptions}
-                        value={filterInstitution}
-                        onChange={setFilterInstitution}
-                        placeholder="Filter Lembaga"
-                    />
-
-                    <Select
-                        isMulti
-                        options={[
-                            { value: "PENDING", label: "Pending" },
-                            { value: "ACTIVE", label: "Active" },
-                            { value: "DUE", label: "Due" },
-                            { value: "EXPIRED", label: "Expired" },
-                            { value: "INVALID", label: "Invalid" },
-                            { value: "NOT_YET_CERTIFIED", label: "Belum Sertifikasi" },
-                        ]}
-                        value={filterStatus}
-                        onChange={setFilterStatus}
-                        placeholder="Filter Status"
-                    />
+                <div className="flex flex-wrap gap-2">
+                    <button
+                        className="btn btn-sm btn-primary rounded-lg"
+                        onClick={() => setShowCreateModal(true)}
+                    >
+                        <Plus size={14} />
+                        Tambah Sertifikat
+                    </button>
+                    <button className="btn btn-sm btn-neutral rounded-lg" onClick={handleExport}>
+                        <Download size={14} />
+                        Export Excel
+                    </button>
+                    <button
+                        className="btn btn-sm btn-accent rounded-lg"
+                        onClick={() => (window.location.href = "/employee/certification/histories")}
+                    >
+                        <HistoryIcon size={14} />
+                        Histori
+                    </button>
                 </div>
             </div>
 
-            <div className="overflow-x-auto rounded-xl border border-gray-200 shadow bg-base-100">
-                <table className="table table-zebra">
-                    <thead className="bg-base-200 text-xs">
-                        <tr>
-                            <th>No</th>
-                            <th>Aksi</th>
-                            <th>NIP</th>
-                            <th>Nama Pegawai</th>
-                            <th>Jabatan</th>
-                            <th>Status</th>
-                            <th>Cert Code</th>
-                            <th>Jenjang</th>
-                            <th>Sub Bidang</th>
-                            <th>No Sertifikat</th>
-                            <th>Tanggal Sertifikat</th>
-                            <th>Tanggal Kadaluarsa</th>
-                            <th>Reminder</th>
-                            <th>Lembaga</th>
-                            <th>Updated At</th>
-                        </tr>
-                    </thead>
-                    <tbody className="text-xs">
-                        {loading ? (
+            {/* Filter Card */}
+            <div className="card bg-base-100 shadow-sm border border-gray-100 p-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 text-xs">
+                    <div className="flex flex-col gap-1">
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <Filter size={12} /> Pegawai
+                        </label>
+                        <AsyncSelect
+                            cacheOptions
+                            defaultOptions
+                            loadOptions={loadEmployees}
+                            value={filterEmployee}
+                            onChange={setFilterEmployee}
+                            placeholder="Filter Pegawai"
+                            isClearable
+                            className="text-xs"
+                            classNamePrefix="react-select"
+                        />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <Filter size={12} /> Cert Code
+                        </label>
+                        <Select
+                            isMulti
+                            options={certCodeOptions}
+                            value={filterCertCode}
+                            onChange={setFilterCertCode}
+                            placeholder="Filter Cert Code"
+                            className="text-xs"
+                            classNamePrefix="react-select"
+                        />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <Filter size={12} /> Jenjang
+                        </label>
+                        <Select
+                            isMulti
+                            options={levelOptions}
+                            value={filterLevel}
+                            onChange={setFilterLevel}
+                            placeholder="Filter Jenjang"
+                            className="text-xs"
+                            classNamePrefix="react-select"
+                        />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <Filter size={12} /> Sub Field
+                        </label>
+                        <Select
+                            isMulti
+                            options={subFieldOptions}
+                            value={filterSubField}
+                            onChange={setFilterSubField}
+                            placeholder="Filter Sub Field"
+                            className="text-xs"
+                            classNamePrefix="react-select"
+                        />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <Filter size={12} /> Lembaga
+                        </label>
+                        <Select
+                            isMulti
+                            options={institutionOptions}
+                            value={filterInstitution}
+                            onChange={setFilterInstitution}
+                            placeholder="Filter Lembaga"
+                            className="text-xs"
+                            classNamePrefix="react-select"
+                        />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <Filter size={12} /> Status
+                        </label>
+                        <Select
+                            isMulti
+                            options={[
+                                { value: "PENDING", label: "Pending" },
+                                { value: "ACTIVE", label: "Active" },
+                                { value: "DUE", label: "Due" },
+                                { value: "EXPIRED", label: "Expired" },
+                                { value: "INVALID", label: "Invalid" },
+                                { value: "NOT_YET_CERTIFIED", label: "Belum Sertifikasi" },
+                            ]}
+                            value={filterStatus}
+                            onChange={setFilterStatus}
+                            placeholder="Filter Status"
+                            className="text-xs"
+                            classNamePrefix="react-select"
+                        />
+                    </div>
+                </div>
+                <div className="flex justify-end mt-3">
+                    <button className="btn btn-sm btn-accent btn-soft rounded-lg flex gap-2" onClick={resetFilter}>
+                        <Eraser size={14} />
+                        Clear Filter
+                    </button>
+                </div>
+            </div>
+
+            {/* Table Card */}
+            <div className="card bg-base-100 shadow-sm border border-gray-100 overflow-hidden">
+                <div className="overflow-x-auto">
+                    <table className="table table-zebra text-xs w-full">
+                        <thead className="bg-base-200">
                             <tr>
-                                <td colSpan={TABLE_COLS} className="text-center py-10">
-                                    <span className="loading loading-dots loading-md" />
-                                </td>
+                                <th className="w-12">No</th>
+                                <th className="w-32">Aksi</th>
+                                <th>NIP</th>
+                                <th>Nama Pegawai</th>
+                                <th>Jabatan</th>
+                                <th className="w-28">Status</th>
+                                <th>Cert Code</th>
+                                <th>Jenjang</th>
+                                <th>Sub Bidang</th>
+                                <th>No Sertifikat</th>
+                                <th>Tanggal Sertifikat</th>
+                                <th>Tanggal Kadaluarsa</th>
+                                <th>Reminder</th>
+                                <th>Lembaga</th>
+                                <th>Updated At</th>
                             </tr>
-                        ) : rows.length === 0 ? (
-                            <tr>
-                                <td colSpan={TABLE_COLS} className="text-center text-gray-400 py-10">
-                                    Tidak ada data
-                                </td>
-                            </tr>
-                        ) : (
-                            rows.map((r, idx) => (
-                                <tr key={r.id}>
-                                    <td>{startIdx + idx}</td>
-                                    <td>
-                                        <div className="flex gap-2">
-                                            <div className="tooltip" data-tip="Lihat detail sertifikat">
-                                                <button
-                                                    className="btn btn-xs btn-info btn-soft border-info"
-                                                    type="button"
-                                                    onClick={() => setViewData(r)}
-                                                    title="Lihat sertifikat"
-                                                >
-                                                    <Eye className="w-4 h-4" />
-                                                </button>
-                                            </div>
-
-                                            <div className="tooltip" data-tip="Edit data sertifikat">
-                                                <button
-                                                    type="button"
-                                                    className="btn btn-xs btn-warning btn-soft border-warning"
-                                                    onClick={() => setEditData(r)}
-                                                    title="Edit sertifikat"
-                                                >
-                                                    <Pencil className="w-4 h-4" />
-                                                </button>
-                                            </div>
-
-                                            <div className="tooltip" data-tip="Hapus sertifikat">
-                                                <button
-                                                    type="button"
-                                                    className="btn btn-xs btn-error btn-soft border-error"
-                                                    onClick={() => setConfirm({ open: true, id: r.id })}
-                                                    title="Hapus sertifikat"
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                </button>
-                                            </div>
-
-                                            {r.status === "PENDING" && (
-                                                <div className="tooltip" data-tip="Upload file sertifikat">
-                                                    <button
-                                                        type="button"
-                                                        className="btn btn-xs btn-success btn-soft border-success"
-                                                        onClick={() => setUploadData(r)}
-                                                        title="Upload sertifikat"
-                                                    >
-                                                        <Upload className="w-4 h-4" />
-                                                    </button>
-                                                </div>
-                                            )}
+                        </thead>
+                        <tbody>
+                            {loading ? (
+                                <tr>
+                                    <td colSpan={TABLE_COLS} className="text-center py-16">
+                                        <span className="loading loading-dots loading-lg text-primary" />
+                                    </td>
+                                </tr>
+                            ) : rows.length === 0 ? (
+                                <tr>
+                                    <td colSpan={TABLE_COLS} className="text-center py-16">
+                                        <div className="flex flex-col items-center text-gray-400">
+                                            <Award size={48} className="mb-3 opacity-30" />
+                                            <p className="text-sm">Tidak ada data sertifikasi</p>
                                         </div>
                                     </td>
+                                </tr>
+                            ) : (
+                                rows.map((r, idx) => (
+                                    <tr key={r.id} className="hover">
+                                        <td>{startIdx + idx}</td>
+                                        <td>
+                                            <div className="flex gap-1">
+                                                <div className="tooltip" data-tip="Lihat detail sertifikat">
+                                                    <button
+                                                        className="btn btn-xs btn-info btn-soft border border-info rounded-lg"
+                                                        type="button"
+                                                        onClick={() => setViewData(r)}
+                                                    >
+                                                        <Eye size={12} />
+                                                    </button>
+                                                </div>
 
-                                    <td>{r.nip}</td>
-                                    <td>{r.employeeName}</td>
-                                    <td>{r.jobPositionTitle || "-"}</td>
+                                                <div className="tooltip" data-tip="Edit data sertifikat">
+                                                    <button
+                                                        type="button"
+                                                        className="btn btn-xs btn-warning btn-soft border border-warning rounded-lg"
+                                                        onClick={() => setEditData(r)}
+                                                    >
+                                                        <Pencil size={12} />
+                                                    </button>
+                                                </div>
 
-                                    <td>
-                                        <div className="tooltip" data-tip={formatStatusLabel(r.status)}>
+                                                <div className="tooltip" data-tip="Hapus sertifikat">
+                                                    <button
+                                                        type="button"
+                                                        className="btn btn-xs btn-error btn-soft border border-error rounded-lg"
+                                                        onClick={() => setConfirm({ open: true, id: r.id })}
+                                                    >
+                                                        <Trash2 size={12} />
+                                                    </button>
+                                                </div>
+
+                                                {r.status === "PENDING" && (
+                                                    <div className="tooltip" data-tip="Upload file sertifikat">
+                                                        <button
+                                                            type="button"
+                                                            className="btn btn-xs btn-success btn-soft border border-success rounded-lg"
+                                                            onClick={() => setUploadData(r)}
+                                                        >
+                                                            <Upload size={12} />
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </td>
+
+                                        <td>{r.nip}</td>
+                                        <td className="font-medium">{r.employeeName}</td>
+                                        <td>{r.jobPositionTitle || "-"}</td>
+
+                                        <td>
                                             <span
                                                 className={`badge badge-sm text-white whitespace-nowrap ${
                                                     statusBadgeClass[r.status] || "badge-secondary"
@@ -445,36 +473,41 @@ export default function EmployeeCertificationPage() {
                                             >
                                                 {formatStatusLabel(r.status)}
                                             </span>
-                                        </div>
-                                    </td>
+                                        </td>
 
-                                    <td>{r.certificationCode}</td>
-                                    <td>{r.certificationLevelLevel || "-"}</td>
-                                    <td>{r.subFieldCode || "-"}</td>
-                                    <td>{r.certNumber || "-"}</td>
-                                    <td>{formatDate(r.certDate)}</td>
-                                    <td>{formatDate(r.validUntil)}</td>
-                                    <td>{formatDate(r.reminderDate)}</td>
-                                    <td>{r.institutionName || "-"}</td>
-                                    <td>{formatDateTime(r.updatedAt)}</td>
-                                </tr>
-                            ))
-                        )}
-                    </tbody>
-                </table>
+                                        <td>{r.certificationCode}</td>
+                                        <td>{r.certificationLevelLevel || "-"}</td>
+                                        <td>{r.subFieldCode || "-"}</td>
+                                        <td>{r.certNumber || "-"}</td>
+                                        <td>{formatDate(r.certDate)}</td>
+                                        <td>{formatDate(r.validUntil)}</td>
+                                        <td>{formatDate(r.reminderDate)}</td>
+                                        <td>{r.institutionName || "-"}</td>
+                                        <td>{formatDateTime(r.updatedAt)}</td>
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+
+                {/* Pagination inside card */}
+                {rows.length > 0 && (
+                    <div className="border-t border-gray-100 p-3">
+                        <Pagination
+                            page={page}
+                            totalPages={totalPages}
+                            totalElements={totalElements}
+                            rowsPerPage={rowsPerPage}
+                            onPageChange={setPage}
+                            onRowsPerPageChange={(val) => {
+                                setRowsPerPage(val);
+                                setPage(1);
+                            }}
+                        />
+                    </div>
+                )}
             </div>
-
-            <Pagination
-                page={page}
-                totalPages={totalPages}
-                totalElements={totalElements}
-                rowsPerPage={rowsPerPage}
-                onPageChange={setPage}
-                onRowsPerPageChange={(val) => {
-                    setRowsPerPage(val);
-                    setPage(1);
-                }}
-            />
 
             {showCreateModal && (
                 <CreateEmployeeCertificationModal

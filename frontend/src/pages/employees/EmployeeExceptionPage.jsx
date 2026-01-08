@@ -23,7 +23,7 @@ import { fetchMyPicScope } from "../../services/picScopeService";
 import CreateExceptionModal from "../../components/exceptions/CreateExceptionModal";
 import EditExceptionModal from "../../components/exceptions/EditExceptionModal";
 import ImportExceptionModal from "../../components/exceptions/ImportExceptionModal";
-import { Plus, Upload, Download, Eraser, Eye, Pencil, Trash2, ChevronDown } from "lucide-react";
+import { Plus, Upload, Download, Eraser, Eye, Pencil, Trash2, ChevronDown, UserCog, Search, Briefcase, Award, Layers, Grid3X3, Filter } from "lucide-react";
 
 const TABLE_COLS = 11;
 
@@ -218,6 +218,18 @@ export default function EmployeeExceptionPage() {
         }
     };
 
+    const clearFilter = () => {
+        setFilterEmployee(null);
+        setFilterJob([]);
+        setFilterCert([]);
+        setFilterLevel([]);
+        setFilterSub([]);
+        setFilterStatus([]);
+        setPage(1);
+        load();
+        toast.success("Filter dibersihkan");
+    };
+
     useEffect(() => {
         if (!isRoleLoaded) return;
         if (isEmployee) {
@@ -255,7 +267,7 @@ export default function EmployeeExceptionPage() {
     const renderStatusBadge = (row) => {
         const isActive = row.isActive;
         const label = isActive ? "Active" : "Nonactive";
-        const cls = isActive ? "badge-success border-success" : "badge-secondary border-secondary";
+        const cls = isActive ? "badge-success" : "badge-secondary";
 
         return (
             <button
@@ -275,130 +287,129 @@ export default function EmployeeExceptionPage() {
     if (!isRoleLoaded || isEmployee) return null;
 
     return (
-        <div>
-            <div className="space-y-3 mb-4">
-                <div className="grid grid-cols-6 gap-3">
-                    <div>
-                        <button
-                            className="btn btn-primary btn-sm w-full flex items-center gap-1"
-                            onClick={() => setShowCreateModal(true)}
-                        >
-                            <Plus className="w-4 h-4" />
-                            Tambah
-                        </button>
-                    </div>
-
-                    <div>
-                        <button
-                            className="btn btn-success btn-sm w-full flex items-center gap-1"
-                            onClick={() => setShowImportModal(true)}
-                        >
-                            <Upload className="w-4 h-4" />
-                            Import Excel
-                        </button>
-                    </div>
-
-                    <div>
-                        <button
-                            className="btn btn-secondary btn-sm w-full flex items-center gap-1"
-                            onClick={handleDownloadTemplate}
-                        >
-                            <Download className="w-4 h-4" />
-                            Download Template
-                        </button>
-                    </div>
-
-                    <div>
-                        <button
-                            className="btn btn-neutral btn-sm w-full flex items-center gap-1"
-                            onClick={handleExportExcel}
-                        >
-                            <Download className="w-4 h-4" />
-                            Export Data
-                        </button>
-                    </div>
-
-                    <div className="lg:col-span-1" />
-
-                    <div>
-                        <button
-                            className="btn btn-accent btn-soft border-accent btn-sm w-full flex items-center gap-1"
-                            onClick={() => {
-                                setFilterEmployee(null);
-                                setFilterJob([]);
-                                setFilterCert([]);
-                                setFilterLevel([]);
-                                setFilterSub([]);
-                                setFilterStatus([]);
-                                setPage(1);
-                                load();
-                                toast.success("Filter dibersihkan");
-                            }}
-                        >
-                            <Eraser className="w-4 h-4" />
-                            Clear Filter
-                        </button>
-                    </div>
+        <div className="space-y-4 w-full">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                    <h1 className="text-lg sm:text-xl font-bold">Eligibility Manual</h1>
+                    <p className="text-xs text-gray-500">{totalElements} data eligibility manual</p>
                 </div>
+                <div className="flex flex-wrap gap-2">
+                    <button
+                        className="btn btn-sm btn-primary rounded-lg"
+                        onClick={() => setShowCreateModal(true)}
+                    >
+                        <Plus size={14} />
+                        Tambah
+                    </button>
+                    <button
+                        className="btn btn-sm btn-success rounded-lg"
+                        onClick={() => setShowImportModal(true)}
+                    >
+                        <Upload size={14} />
+                        Import Excel
+                    </button>
+                    <button
+                        className="btn btn-sm btn-secondary rounded-lg"
+                        onClick={handleDownloadTemplate}
+                    >
+                        <Download size={14} />
+                        Template
+                    </button>
+                    <button
+                        className="btn btn-sm btn-neutral rounded-lg"
+                        onClick={handleExportExcel}
+                    >
+                        <Download size={14} />
+                        Export
+                    </button>
+                </div>
+            </div>
 
-                <div className="grid grid-cols-6 gap-3 items-end text-xs">
-                    <div className="col-span-1">
+            {/* Filter Card */}
+            <div className="card bg-base-100 shadow-sm border border-gray-100 p-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 text-xs">
+                    <div className="flex flex-col gap-1">
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <Search size={12} /> Cari Pegawai
+                        </label>
                         <AsyncSelect
                             cacheOptions
                             defaultOptions
                             loadOptions={loadEmployees}
                             value={filterEmployee}
                             onChange={setFilterEmployee}
-                            placeholder="Cari pegawai..."
+                            placeholder="Ketik NIP/nama..."
+                            isClearable
                             className="text-xs"
+                            classNamePrefix="react-select"
                         />
                     </div>
 
-                    <div className="col-span-1">
+                    <div className="flex flex-col gap-1">
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <Briefcase size={12} /> Jabatan
+                        </label>
                         <Select
                             isMulti
                             options={jobOptions}
                             value={filterJob}
                             onChange={setFilterJob}
-                            placeholder="Pilih jabatan..."
+                            placeholder="Semua Jabatan"
                             className="text-xs"
+                            classNamePrefix="react-select"
                         />
                     </div>
 
-                    <div className="col-span-1">
+                    <div className="flex flex-col gap-1">
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <Award size={12} /> Sertifikasi
+                        </label>
                         <Select
                             isMulti
                             options={certOptions}
                             value={filterCert}
                             onChange={setFilterCert}
-                            placeholder="Pilih sertifikasi..."
+                            placeholder="Semua Sertifikasi"
                             className="text-xs"
+                            classNamePrefix="react-select"
                         />
                     </div>
 
-                    <div className="col-span-1">
+                    <div className="flex flex-col gap-1">
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <Layers size={12} /> Level
+                        </label>
                         <Select
                             isMulti
                             options={levelOptions}
                             value={filterLevel}
                             onChange={setFilterLevel}
-                            placeholder="Pilih level..."
+                            placeholder="Semua Level"
                             className="text-xs"
+                            classNamePrefix="react-select"
                         />
                     </div>
 
-                    <div className="col-span-1">
+                    <div className="flex flex-col gap-1">
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <Grid3X3 size={12} /> Sub Bidang
+                        </label>
                         <Select
                             isMulti
                             options={subOptions}
                             value={filterSub}
                             onChange={setFilterSub}
-                            placeholder="Pilih sub bidang..."
+                            placeholder="Semua Sub Bidang"
                             className="text-xs"
+                            classNamePrefix="react-select"
                         />
                     </div>
 
-                    <div className="col-span-1">
+                    <div className="flex flex-col gap-1">
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <Filter size={12} /> Status
+                        </label>
                         <Select
                             isMulti
                             options={[
@@ -407,115 +418,137 @@ export default function EmployeeExceptionPage() {
                             ]}
                             value={filterStatus}
                             onChange={setFilterStatus}
-                            placeholder="Pilih status..."
+                            placeholder="Semua Status"
                             className="text-xs"
+                            classNamePrefix="react-select"
                         />
                     </div>
                 </div>
+                <div className="flex justify-end mt-3">
+                    <button
+                        className="btn btn-sm btn-accent btn-soft flex gap-2 rounded-lg"
+                        type="button"
+                        onClick={clearFilter}
+                    >
+                        <Eraser size={14} />
+                        Clear Filter
+                    </button>
+                </div>
             </div>
 
-            <div className="overflow-x-auto rounded-xl border border-gray-200 shadow bg-base-100">
-                <table className="table table-zebra">
-                    <thead className="bg-base-200 text-xs">
-                        <tr>
-                            <th>No</th>
-                            <th>Aksi</th>
-                            <th>NIP</th>
-                            <th>Nama Pegawai</th>
-                            <th>Jabatan</th>
-                            <th>Kode Sertifikasi</th>
-                            <th>Level</th>
-                            <th>Sub Bidang</th>
-                            <th>Notes</th>
-                            <th>Status</th>
-                            <th>Updated At</th>
-                        </tr>
-                    </thead>
-                    <tbody className="text-xs">
-                        {loading ? (
+            {/* Table Card */}
+            <div className="card bg-base-100 shadow-sm border border-gray-100 overflow-hidden">
+                <div className="overflow-x-auto">
+                    <table className="table table-zebra w-full">
+                        <thead className="bg-base-200 text-xs">
                             <tr>
-                                <td colSpan={TABLE_COLS} className="text-center py-10">
-                                    <span className="loading loading-dots loading-md" />
-                                </td>
+                                <th className="w-12">No</th>
+                                <th className="w-24">Aksi</th>
+                                <th>NIP</th>
+                                <th>Nama Pegawai</th>
+                                <th>Jabatan</th>
+                                <th>Kode Sertifikasi</th>
+                                <th>Level</th>
+                                <th>Sub Bidang</th>
+                                <th>Notes</th>
+                                <th>Status</th>
+                                <th>Updated At</th>
                             </tr>
-                        ) : rows.length === 0 ? (
-                            <tr>
-                                <td colSpan={TABLE_COLS} className="text-center text-gray-400 py-10">
-                                    Tidak ada data
-                                </td>
-                            </tr>
-                        ) : (
-                            rows.map((r, idx) => (
-                                <tr key={r.id}>
-                                    <td>{startIdx + idx}</td>
-                                    <td>
-                                        <div className="flex gap-1">
-                                            <div className="tooltip" data-tip="Lihat detail pegawai">
-                                                <Link
-                                                    to={`/employee/${r.employeeId}`}
-                                                    className="btn btn-xs btn-info btn-soft border-info"
-                                                >
-                                                    <Eye className="w-3 h-3" />
-                                                </Link>
-                                            </div>
-
-                                            <div className="tooltip" data-tip="Edit eligibility manual">
-                                                <button
-                                                    className="btn btn-xs btn-warning btn-soft border-warning"
-                                                    onClick={() => {
-                                                        setSelectedRow(r);
-                                                        setShowEditModal(true);
-                                                    }}
-                                                >
-                                                    <Pencil className="w-3 h-3" />
-                                                </button>
-                                            </div>
-
-                                            <div className="tooltip" data-tip="Hapus eligibility manual">
-                                                <button
-                                                    className="btn btn-xs btn-error btn-soft border-error"
-                                                    onClick={() => setConfirm({ open: true, id: r.id })}
-                                                >
-                                                    <Trash2 className="w-3 h-3" />
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td>{r.nip}</td>
-                                    <td>{r.employeeName}</td>
-                                    <td>{r.jobPositionTitle}</td>
-                                    <td>{r.certificationCode}</td>
-                                    <td>{r.certificationLevelName || "-"}</td>
-                                    <td>{r.subFieldCode || "-"}</td>
-                                    <td>{r.notes || "-"}</td>
-                                    <td>{renderStatusBadge(r)}</td>
-                                    <td className="whitespace-nowrap">
-                                        {r.updatedAt
-                                            ? new Date(r.updatedAt).toLocaleDateString("id-ID", {
-                                                  day: "2-digit",
-                                                  month: "short",
-                                                  year: "numeric",
-                                              })
-                                            : "-"}
+                        </thead>
+                        <tbody className="text-xs">
+                            {loading ? (
+                                <tr>
+                                    <td colSpan={TABLE_COLS} className="text-center py-16">
+                                        <span className="loading loading-dots loading-lg text-primary" />
                                     </td>
                                 </tr>
-                            ))
-                        )}
-                    </tbody>
-                </table>
-            </div>
+                            ) : rows.length === 0 ? (
+                                <tr>
+                                    <td colSpan={TABLE_COLS} className="text-center py-16">
+                                        <div className="flex flex-col items-center text-gray-400">
+                                            <UserCog size={48} className="mb-3 opacity-30" />
+                                            <p className="text-sm">Tidak ada data eligibility manual</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ) : (
+                                rows.map((r, idx) => (
+                                    <tr key={r.id} className="hover">
+                                        <td>{startIdx + idx}</td>
+                                        <td>
+                                            <div className="flex gap-1">
+                                                <div className="tooltip" data-tip="Lihat detail pegawai">
+                                                    <Link
+                                                        to={`/employee/${r.employeeId}`}
+                                                        className="btn btn-xs btn-info btn-soft border border-info rounded-lg"
+                                                    >
+                                                        <Eye size={12} />
+                                                    </Link>
+                                                </div>
 
-            <Pagination
-                page={page}
-                totalPages={totalPages}
-                totalElements={totalElements}
-                rowsPerPage={rowsPerPage}
-                onPageChange={setPage}
-                onRowsPerPageChange={(val) => {
-                    setRowsPerPage(val);
-                    setPage(1);
-                }}
-            />
+                                                <div className="tooltip" data-tip="Edit eligibility manual">
+                                                    <button
+                                                        className="btn btn-xs btn-warning btn-soft border border-warning rounded-lg"
+                                                        onClick={() => {
+                                                            setSelectedRow(r);
+                                                            setShowEditModal(true);
+                                                        }}
+                                                    >
+                                                        <Pencil size={12} />
+                                                    </button>
+                                                </div>
+
+                                                <div className="tooltip" data-tip="Hapus eligibility manual">
+                                                    <button
+                                                        className="btn btn-xs btn-error btn-soft border border-error rounded-lg"
+                                                        onClick={() => setConfirm({ open: true, id: r.id })}
+                                                    >
+                                                        <Trash2 size={12} />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td>{r.nip}</td>
+                                        <td className="font-medium">{r.employeeName}</td>
+                                        <td>{r.jobPositionTitle}</td>
+                                        <td>{r.certificationCode}</td>
+                                        <td>{r.certificationLevelName || "-"}</td>
+                                        <td>{r.subFieldCode || "-"}</td>
+                                        <td>{r.notes || "-"}</td>
+                                        <td>{renderStatusBadge(r)}</td>
+                                        <td className="text-gray-500 whitespace-nowrap">
+                                            {r.updatedAt
+                                                ? new Date(r.updatedAt).toLocaleDateString("id-ID", {
+                                                      day: "2-digit",
+                                                      month: "short",
+                                                      year: "numeric",
+                                                  })
+                                                : "-"}
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+
+                {/* Pagination inside card */}
+                {rows.length > 0 && (
+                    <div className="border-t border-gray-100 p-3">
+                        <Pagination
+                            page={page}
+                            totalPages={totalPages}
+                            totalElements={totalElements}
+                            rowsPerPage={rowsPerPage}
+                            onPageChange={setPage}
+                            onRowsPerPageChange={(val) => {
+                                setRowsPerPage(val);
+                                setPage(1);
+                            }}
+                        />
+                    </div>
+                )}
+            </div>
 
             {showCreateModal && (
                 <CreateExceptionModal
@@ -560,31 +593,29 @@ export default function EmployeeExceptionPage() {
             />
 
             {statusMenu && (
-                <div className="fixed inset-0 z-[999] flex" onClick={() => setStatusMenu(null)}>
+                <div className="fixed inset-0 z-[999]" onClick={() => setStatusMenu(null)}>
                     <div
                         className="absolute"
                         style={{ top: statusMenu.y, left: statusMenu.x }}
                         onClick={(e) => e.stopPropagation()}
                     >
-                        <div className="bg-base-100 shadow-xl rounded-2xl p-3 text-xs flex flex-col gap-2">
-                            <button
-                                className="w-full px-4 py-1 rounded-full bg-success text-white hover:brightness-95"
-                                onClick={async () => {
-                                    await handleChangeStatus(statusMenu.row, true);
-                                    setStatusMenu(null);
-                                }}
-                            >
-                                Active
-                            </button>
-                            <button
-                                className="w-full px-4 py-1 rounded-full bg-secondary text-white hover:brightness-95"
-                                onClick={async () => {
-                                    await handleChangeStatus(statusMenu.row, false);
-                                    setStatusMenu(null);
-                                }}
-                            >
-                                Nonactive
-                            </button>
+                        <div className="bg-base-100 shadow-xl rounded-xl border border-gray-200 p-2 text-xs flex flex-col gap-1.5">
+                            {[true, false].map((val) => {
+                                const label = val ? "Active" : "Nonactive";
+                                const btnCls = val ? "btn-success" : "btn-secondary";
+                                return (
+                                    <button
+                                        key={String(val)}
+                                        className={`btn btn-xs ${btnCls} text-white rounded-lg w-full justify-center`}
+                                        onClick={async () => {
+                                            await handleChangeStatus(statusMenu.row, val);
+                                            setStatusMenu(null);
+                                        }}
+                                    >
+                                        {label}
+                                    </button>
+                                );
+                            })}
                         </div>
                     </div>
                 </div>
@@ -592,3 +623,4 @@ export default function EmployeeExceptionPage() {
         </div>
     );
 }
+

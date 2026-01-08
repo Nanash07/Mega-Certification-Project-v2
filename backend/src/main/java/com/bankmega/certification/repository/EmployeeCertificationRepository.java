@@ -10,6 +10,8 @@ import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.stereotype.Repository;
+import org.springframework.lang.NonNull;
+import org.springframework.lang.Nullable;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -69,7 +71,9 @@ public interface EmployeeCertificationRepository extends
                         "certificationRule.subField",
                         "institution"
         })
-        Page<EmployeeCertification> findAll(Specification<EmployeeCertification> spec, Pageable pageable);
+        @NonNull
+        Page<EmployeeCertification> findAll(@Nullable Specification<EmployeeCertification> spec,
+                        @NonNull Pageable pageable);
 
         @Override
         @EntityGraph(attributePaths = {
@@ -81,5 +85,6 @@ public interface EmployeeCertificationRepository extends
                         "certificationRule.subField",
                         "institution"
         })
-        List<EmployeeCertification> findAll(Specification<EmployeeCertification> spec, Sort sort);
+        @NonNull
+        List<EmployeeCertification> findAll(@Nullable Specification<EmployeeCertification> spec, @NonNull Sort sort);
 }

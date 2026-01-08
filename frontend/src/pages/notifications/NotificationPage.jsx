@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import toast from "react-hot-toast";
 import Select from "react-select";
-import { ArrowLeft, Eraser } from "lucide-react";
+import { ArrowLeft, Eraser, Bell, Calendar, Filter } from "lucide-react";
 
 import { fetchNotificationsPaged, markNotificationAsRead } from "../../services/notificationService";
 import Pagination from "../../components/common/Pagination";
@@ -130,11 +130,19 @@ export default function NotificationPage() {
     };
 
     return (
-        <div className="space-y-6 w-full">
-            <button className="btn btn-sm btn-accent mb-2 flex items-center gap-2" onClick={() => navigate(-1)}>
-                <ArrowLeft size={16} /> Kembali
-            </button>
+        <div className="space-y-4 w-full">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                    <h1 className="text-lg sm:text-xl font-bold">Notifikasi</h1>
+                    <p className="text-xs text-gray-500">{totalElements} notifikasi</p>
+                </div>
+                <button className="btn btn-sm btn-accent rounded-lg flex items-center gap-2" onClick={() => navigate(-1)}>
+                    <ArrowLeft size={14} /> Kembali
+                </button>
+            </div>
 
+            {/* Tabs */}
             <div className="tabs tabs-lift w-full mb-0">
                 {TABS.map((t) => (
                     <button
@@ -150,47 +158,59 @@ export default function NotificationPage() {
                 ))}
             </div>
 
-            <div className="card bg-base-100 shadow p-6 w-full border-t-0 rounded-t-none">
-                <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-5 text-xs">
+            {/* Content Card */}
+            <div className="card bg-base-100 shadow-sm border border-gray-100 p-4 border-t-0 rounded-t-none">
+                {/* Filter Section */}
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 mb-4 text-xs">
                     <div className="flex flex-col gap-1">
-                        <label className="font-semibold">Status</label>
-                        <Select options={STATUS_OPTIONS} value={status} onChange={setStatus} className="text-xs" />
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <Filter size={12} /> Status
+                        </label>
+                        <Select options={STATUS_OPTIONS} value={status} onChange={setStatus} className="text-xs" classNamePrefix="react-select" />
                     </div>
 
                     <div className="flex flex-col gap-1">
-                        <label className="font-semibold">Dari Tanggal</label>
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <Calendar size={12} /> Dari Tanggal
+                        </label>
                         <input
                             type="date"
-                            className="input input-sm input-bordered w-full"
+                            className="input input-sm input-bordered w-full text-xs"
                             value={startDate}
                             onChange={(e) => setStartDate(e.target.value)}
                         />
                     </div>
 
                     <div className="flex flex-col gap-1">
-                        <label className="font-semibold">Sampai Tanggal</label>
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <Calendar size={12} /> Sampai Tanggal
+                        </label>
                         <input
                             type="date"
-                            className="input input-sm input-bordered w-full"
+                            className="input input-sm input-bordered w-full text-xs"
                             value={endDate}
                             onChange={(e) => setEndDate(e.target.value)}
                         />
                     </div>
 
                     <div className="flex flex-col gap-1">
-                        <label className="font-semibold invisible">.</label>
-                        <button className="btn btn-sm btn-accent btn-soft w-full flex gap-2" onClick={clearFilter}>
+                        <label className="font-medium text-gray-600 invisible">.</label>
+                        <button className="btn btn-sm btn-accent btn-soft w-full flex gap-2 rounded-lg" onClick={clearFilter}>
                             <Eraser size={14} /> Clear Filter
                         </button>
                     </div>
                 </div>
 
+                {/* Notification List */}
                 {loading ? (
-                    <div className="flex justify-center py-10">
-                        <span className="loading loading-dots loading-md" />
+                    <div className="flex justify-center py-16">
+                        <span className="loading loading-dots loading-lg text-primary" />
                     </div>
                 ) : rows.length === 0 ? (
-                    <p className="text-gray-400 text-sm">Tidak ada notifikasi</p>
+                    <div className="flex flex-col items-center py-16 text-gray-400">
+                        <Bell size={48} className="mb-3 opacity-30" />
+                        <p className="text-sm">Tidak ada notifikasi</p>
+                    </div>
                 ) : (
                     <div className="space-y-3">
                         {rows.map((n) => (
@@ -217,17 +237,22 @@ export default function NotificationPage() {
                     </div>
                 )}
 
-                <Pagination
-                    page={page}
-                    totalPages={totalPages}
-                    totalElements={totalElements}
-                    rowsPerPage={rowsPerPage}
-                    onPageChange={setPage}
-                    onRowsPerPageChange={(v) => {
-                        setRowsPerPage(v);
-                        setPage(1);
-                    }}
-                />
+                {/* Pagination */}
+                {rows.length > 0 && (
+                    <div className="border-t border-gray-100 pt-3 mt-4">
+                        <Pagination
+                            page={page}
+                            totalPages={totalPages}
+                            totalElements={totalElements}
+                            rowsPerPage={rowsPerPage}
+                            onPageChange={setPage}
+                            onRowsPerPageChange={(v) => {
+                                setRowsPerPage(v);
+                                setPage(1);
+                            }}
+                        />
+                    </div>
+                )}
             </div>
 
             {selected && (

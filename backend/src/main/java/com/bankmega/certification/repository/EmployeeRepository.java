@@ -8,6 +8,8 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.lang.NonNull;
+import org.springframework.lang.Nullable;
 
 import java.util.Collection;
 import java.util.List;
@@ -71,5 +73,6 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long>, JpaSp
 
     @Override
     @EntityGraph(attributePaths = { "regional", "division", "unit", "jobPosition" })
-    Page<Employee> findAll(Specification<Employee> spec, Pageable pageable);
+    @NonNull
+    Page<Employee> findAll(@Nullable Specification<Employee> spec, @NonNull Pageable pageable);
 }

@@ -10,6 +10,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.lang.NonNull;
+import org.springframework.lang.Nullable;
 
 import java.util.Collection;
 import java.util.List;
@@ -46,9 +48,11 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
     // EntityGraph override for paging with eager fetch
     @Override
     @EntityGraph(attributePaths = { "role", "employee" })
-    Page<User> findAll(Specification<User> spec, Pageable pageable);
+    @NonNull
+    Page<User> findAll(@Nullable Specification<User> spec, @NonNull Pageable pageable);
 
     @Override
     @EntityGraph(attributePaths = { "role", "employee" })
-    List<User> findAll(Specification<User> spec);
+    @NonNull
+    List<User> findAll(@Nullable Specification<User> spec);
 }

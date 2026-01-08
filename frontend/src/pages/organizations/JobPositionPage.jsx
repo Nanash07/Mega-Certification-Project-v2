@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo } from "react";
 import toast from "react-hot-toast";
 import { fetchJobPositions, toggleJobPosition } from "../../services/jobPositionService";
 import Pagination from "../../components/common/Pagination";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Search, Eraser, Briefcase } from "lucide-react";
 
 export default function JobPositionPage() {
     const [rows, setRows] = useState([]);
@@ -15,7 +15,6 @@ export default function JobPositionPage() {
     const [totalPages, setTotalPages] = useState(0);
     const [totalElements, setTotalElements] = useState(0);
 
-    // floating menu untuk ganti status (Active/Nonactive)
     const [statusMenu, setStatusMenu] = useState(null);
 
     const apiParams = useMemo(
@@ -41,37 +40,22 @@ export default function JobPositionPage() {
         load();
     }, [apiParams]);
 
-    // helper style status
     function getStatusStyle(isActive) {
         if (isActive) {
-            return {
-                label: "Active",
-                badgeCls: "badge-success",
-                btnCls: "btn-success",
-            };
+            return { label: "Active", badgeCls: "badge-success", btnCls: "btn-success" };
         }
-        return {
-            label: "Nonactive",
-            badgeCls: "badge-warning",
-            btnCls: "btn-warning",
-        };
+        return { label: "Nonactive", badgeCls: "badge-warning", btnCls: "btn-warning" };
     }
 
-    // badge status yang bisa diklik
     function renderStatusBadge(row) {
         const { label, badgeCls } = getStatusStyle(row.isActive);
-
         return (
             <button
                 type="button"
                 className={`badge badge-sm whitespace-nowrap cursor-pointer flex items-center gap-1 ${badgeCls} text-white`}
                 onClick={(e) => {
                     const rect = e.currentTarget.getBoundingClientRect();
-                    setStatusMenu({
-                        row,
-                        x: rect.left,
-                        y: rect.bottom + 4,
-                    });
+                    setStatusMenu({ row, x: rect.left, y: rect.bottom + 4 });
                 }}
             >
                 <span>{label}</span>
@@ -80,12 +64,9 @@ export default function JobPositionPage() {
         );
     }
 
-    // ganti status dari floating menu
     async function handleChangeStatus(row, newIsActive) {
         if (row.isActive === newIsActive) return;
-
         try {
-            // toggleJobPosition diasumsikan flip status
             await toggleJobPosition(row.id);
             toast.success(`Job position berhasil di${newIsActive ? "aktifkan" : "nonaktifkan"}`);
             load();
@@ -94,84 +75,121 @@ export default function JobPositionPage() {
         }
     }
 
+    const clearFilter = () => {
+        setQ("");
+        setPage(1);
+        toast.success("Filter dibersihkan");
+    };
+
     const startIdx = totalElements === 0 ? 0 : (page - 1) * rowsPerPage + 1;
 
     return (
-        <div>
-            {/* Toolbar */}
-            <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-end md:gap-6">
-                <div className="flex-1 min-w-[16rem]">
-                    <label className="label pb-1 font-semibold">Search</label>
-                    <input
-                        className="input input-bordered w-full"
-                        value={q}
-                        onChange={(e) => {
-                            setPage(1);
-                            setQ(e.target.value);
-                        }}
-                        placeholder="Cari Job Position..."
-                    />
+        <div className="space-y-4 w-full">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                    <h1 className="text-lg sm:text-xl font-bold">Kelola Jabatan</h1>
+                    <p className="text-xs text-gray-500">{totalElements} jabatan terdaftar</p>
                 </div>
             </div>
 
-            {/* Table */}
-            <div className="overflow-x-auto rounded-xl border border-gray-200 shadow bg-base-100">
-                <table className="table table-zebra text-xs">
-                    <thead className="text-xs bg-base-200">
-                        <tr>
-                            <th>No</th>
-                            <th>Nama Job Position</th>
-                            <th>Status</th>
-                            <th>Updated At</th>
-                        </tr>
-                    </thead>
-                    <tbody className="text-xs">
-                        {loading ? (
-                            <tr>
-                                <td colSpan={4} className="text-center py-10">
-                                    <span className="loading loading-dots loading-md" />
-                                </td>
-                            </tr>
-                        ) : rows.length === 0 ? (
-                            <tr>
-                                <td colSpan={4} className="text-center text-gray-400 py-10">
-                                    Tidak ada data
-                                </td>
-                            </tr>
-                        ) : (
-                            rows.map((j, idx) => (
-                                <tr key={j.id}>
-                                    <td>{startIdx + idx}</td>
-                                    <td>{j.name}</td>
-                                    <td>{renderStatusBadge(j)}</td>
-                                    <td>
-                                        {j.createdAt
-                                            ? new Date(j.createdAt).toLocaleDateString("id-ID", {
-                                                  day: "2-digit",
-                                                  month: "short",
-                                                  year: "numeric",
-                                              })
-                                            : "-"}
-                                    </td>
-                                </tr>
-                            ))
-                        )}
-                    </tbody>
-                </table>
+            {/* Filter Card */}
+            <div className="card bg-base-100 shadow-sm border border-gray-100 p-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+                    <div className="flex flex-col gap-1 lg:col-span-3">
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <Search size={12} /> Cari Jabatan
+                        </label>
+                        <input
+                            className="input input-sm input-bordered w-full rounded-lg"
+                            value={q}
+                            onChange={(e) => {
+                                setPage(1);
+                                setQ(e.target.value);
+                            }}
+                            placeholder="Ketik nama jabatan..."
+                        />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                        <label className="font-medium text-gray-600 invisible">.</label>
+                        <button
+                            className="btn btn-sm btn-accent btn-soft w-full flex gap-2 rounded-lg"
+                            onClick={clearFilter}
+                        >
+                            <Eraser size={14} />
+                            Clear Filter
+                        </button>
+                    </div>
+                </div>
             </div>
 
-            {/* Pagination (seragam) */}
-            <Pagination
-                page={page}
-                totalPages={totalPages}
-                totalElements={totalElements}
-                rowsPerPage={rowsPerPage}
-                onPageChange={setPage}
-                onRowsPerPageChange={(val) => {
-                    setRowsPerPage(val);
-                    setPage(1);
-                }}
-            />
+            {/* Table Card */}
+            <div className="card bg-base-100 shadow-sm border border-gray-100 overflow-hidden">
+                <div className="overflow-x-auto">
+                    <table className="table table-zebra w-full">
+                        <thead className="bg-base-200 text-xs">
+                            <tr>
+                                <th className="w-12">No</th>
+                                <th>Nama Jabatan</th>
+                                <th className="w-28">Status</th>
+                                <th className="w-32">Updated At</th>
+                            </tr>
+                        </thead>
+                        <tbody className="text-xs">
+                            {loading ? (
+                                <tr>
+                                    <td colSpan={4} className="text-center py-16">
+                                        <span className="loading loading-dots loading-lg text-primary" />
+                                    </td>
+                                </tr>
+                            ) : rows.length === 0 ? (
+                                <tr>
+                                    <td colSpan={4} className="text-center py-16">
+                                        <div className="flex flex-col items-center text-gray-400">
+                                            <Briefcase size={48} className="mb-3 opacity-30" />
+                                            <p className="text-sm">Tidak ada data jabatan</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ) : (
+                                rows.map((j, idx) => (
+                                    <tr key={j.id} className="hover">
+                                        <td>{startIdx + idx}</td>
+                                        <td className="font-medium">{j.name}</td>
+                                        <td>{renderStatusBadge(j)}</td>
+                                        <td className="text-gray-500">
+                                            {j.createdAt
+                                                ? new Date(j.createdAt).toLocaleDateString("id-ID", {
+                                                      day: "2-digit",
+                                                      month: "short",
+                                                      year: "numeric",
+                                                  })
+                                                : "-"}
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+
+                {/* Pagination inside card */}
+                {rows.length > 0 && (
+                    <div className="border-t border-gray-100 p-3">
+                        <Pagination
+                            page={page}
+                            totalPages={totalPages}
+                            totalElements={totalElements}
+                            rowsPerPage={rowsPerPage}
+                            onPageChange={setPage}
+                            onRowsPerPageChange={(val) => {
+                                setRowsPerPage(val);
+                                setPage(1);
+                            }}
+                        />
+                    </div>
+                )}
+            </div>
 
             {/* Floating status menu */}
             {statusMenu && (
@@ -181,13 +199,13 @@ export default function JobPositionPage() {
                         style={{ top: statusMenu.y, left: statusMenu.x }}
                         onClick={(e) => e.stopPropagation()}
                     >
-                        <div className="bg-base-100 shadow-xl rounded-2xl p-3 text-xs flex flex-col gap-2">
+                        <div className="bg-base-100 shadow-xl rounded-xl border border-gray-200 p-2 text-xs flex flex-col gap-1.5">
                             {[true, false].map((val) => {
                                 const { label, btnCls } = getStatusStyle(val);
                                 return (
                                     <button
                                         key={String(val)}
-                                        className={`btn btn-xs ${btnCls} text-white rounded-full w-full justify-center`}
+                                        className={`btn btn-xs ${btnCls} text-white rounded-lg w-full justify-center`}
                                         onClick={async () => {
                                             await handleChangeStatus(statusMenu.row, val);
                                             setStatusMenu(null);

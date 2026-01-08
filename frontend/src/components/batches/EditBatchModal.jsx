@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import toast from "react-hot-toast";
 import Select from "react-select";
 import { updateBatch } from "../../services/batchService";
 import { fetchCertificationRules } from "../../services/certificationRuleService";
 import { fetchInstitutions } from "../../services/institutionService";
+import { X, Pencil, Save, Calendar, Users, Building, FileCheck, Tag, Package } from "lucide-react";
 
 const initialForm = {
     id: null,
@@ -23,14 +24,24 @@ export default function EditBatchModal({ open, data, onClose, onSaved }) {
     const [form, setForm] = useState(initialForm);
     const [saving, setSaving] = useState(false);
 
+    const menuPortalTarget = useMemo(() => (typeof document !== "undefined" ? document.body : null), []);
+
+    const selectStyles = useMemo(
+        () => ({
+            menuPortal: (base) => ({ ...base, zIndex: 999999 }),
+            menu: (base) => ({ ...base, zIndex: 999999 }),
+            control: (base) => ({ ...base, borderRadius: "0.5rem", minHeight: "2.5rem" }),
+        }),
+        []
+    );
+
     const typeOptions = [
         { value: "CERTIFICATION", label: "Sertifikasi" },
         { value: "TRAINING", label: "Training" },
         { value: "REFRESHMENT", label: "Refreshment" },
-        { value: "EXTENSION", label: "Perpanjang" }, // 🔹 baru
+        { value: "EXTENSION", label: "Perpanjang" },
     ];
 
-    // helper: normalize ISO date or Date -> yyyy-MM-dd
     const toYMD = (v) => {
         if (!v) return "";
         try {
@@ -44,7 +55,6 @@ export default function EditBatchModal({ open, data, onClose, onSaved }) {
     useEffect(() => {
         if (!open || !data) return;
 
-        // prefilling form (PROSES MASIH SAMA)
         setForm({
             id: data.id,
             batchName: data.batchName || "",
@@ -57,10 +67,8 @@ export default function EditBatchModal({ open, data, onClose, onSaved }) {
             type: data.type || "CERTIFICATION",
         });
 
-        // dropdowns
         Promise.all([fetchCertificationRules(), fetchInstitutions()])
             .then(([rulesRes, insts]) => {
-                // sama seperti Create: labelnya "CODE - LEVEL - SUB"
                 const rulesOpts = rulesRes.map((r) => {
                     const parts = [r.certificationCode, r.certificationLevelName, r.subFieldCode].filter(
                         (x) => x && x.trim() !== ""
@@ -86,7 +94,6 @@ export default function EditBatchModal({ open, data, onClose, onSaved }) {
             const payload = { ...form };
             delete payload.id;
 
-            // quota number atau hapus (PROSES SAMA)
             if (payload.quota === "") {
                 delete payload.quota;
             } else {
@@ -94,12 +101,10 @@ export default function EditBatchModal({ open, data, onClose, onSaved }) {
                 if (Number.isNaN(payload.quota)) delete payload.quota;
             }
 
-            // clean null/empty string (PROSES SAMA)
             Object.keys(payload).forEach((k) => {
                 if (payload[k] === null || payload[k] === "") delete payload[k];
             });
 
-            // status dikirim apa adanya, bebas mau dari FINISHED balik ke ONGOING, dll
             await updateBatch(data.id, payload);
             toast.success("Batch berhasil diperbarui");
             onSaved?.();
@@ -114,84 +119,117 @@ export default function EditBatchModal({ open, data, onClose, onSaved }) {
     if (!open) return null;
 
     return (
-        <dialog className="modal" open={open}>
-            <div className="modal-box max-w-3xl">
-                <h3 className="font-bold text-lg mb-4">Edit Batch</h3>
+        <dialog className="modal modal-open" open={open}>
+            <div className="modal-box max-w-3xl bg-base-100 shadow-2xl border border-gray-100 rounded-2xl">
+                {/* Header */}
+                <div className="flex items-center justify-between pb-4 border-b border-gray-100">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-warning/10 flex items-center justify-center">
+                            <Pencil size={20} className="text-warning" />
+                        </div>
+                        <div>
+                            <h3 className="font-bold text-lg">Edit Batch</h3>
+                            <p className="text-xs text-gray-500">Perbarui informasi batch</p>
+                        </div>
+                    </div>
+                    <button
+                        className="btn btn-sm btn-circle btn-ghost"
+                        onClick={onClose}
+                    >
+                        <X size={18} />
+                    </button>
+                </div>
 
-                {/* === Layout disamain dengan CreateBatchModal === */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                    {/* Nama Batch */}
-                    <div>
-                        <label className="block mb-1">Nama Batch</label>
+                {/* Form Content */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-5 text-sm">
+                    <div className="flex flex-col gap-1">
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <Tag size={14} /> Nama Batch
+                        </label>
                         <input
                             type="text"
                             value={form.batchName ?? ""}
                             onChange={(e) => setForm({ ...form, batchName: e.target.value })}
-                            className="input input-bordered w-full"
+                            className="input input-bordered input-sm w-full rounded-lg"
                             placeholder="Contoh: Batch AAJI Januari 2025"
                         />
                     </div>
 
-                    {/* Jenis Batch */}
-                    <div>
-                        <label className="block mb-1">Jenis Batch</label>
+                    <div className="flex flex-col gap-1">
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <Package size={14} /> Jenis Batch
+                        </label>
                         <Select
+                            menuPortalTarget={menuPortalTarget}
+                            menuPosition="fixed"
+                            styles={selectStyles}
                             options={typeOptions}
                             value={typeOptions.find((t) => t.value === (form.type ?? "CERTIFICATION")) || null}
                             onChange={(opt) => setForm({ ...form, type: opt?.value || "CERTIFICATION" })}
                             placeholder="Pilih Jenis Batch"
                             isClearable={false}
+                            classNamePrefix="react-select"
                         />
                     </div>
 
-                    {/* Aturan Sertifikasi */}
-                    <div>
-                        <label className="block mb-1">Aturan Sertifikasi</label>
+                    <div className="flex flex-col gap-1">
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <FileCheck size={14} /> Aturan Sertifikasi
+                        </label>
                         <Select
+                            menuPortalTarget={menuPortalTarget}
+                            menuPosition="fixed"
+                            styles={selectStyles}
                             options={rules}
                             value={rules.find((r) => r.value === (form.certificationRuleId ?? null)) || null}
                             onChange={(opt) => setForm({ ...form, certificationRuleId: opt?.value ?? null })}
                             placeholder="Pilih Aturan Sertifikasi"
                             isClearable
+                            classNamePrefix="react-select"
                         />
                     </div>
 
-                    {/* Lembaga */}
-                    <div>
-                        <label className="block mb-1">Lembaga</label>
+                    <div className="flex flex-col gap-1">
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <Building size={14} /> Lembaga
+                        </label>
                         <Select
+                            menuPortalTarget={menuPortalTarget}
+                            menuPosition="fixed"
+                            styles={selectStyles}
                             options={institutions}
                             value={institutions.find((i) => i.value === (form.institutionId ?? null)) || null}
                             onChange={(opt) => setForm({ ...form, institutionId: opt?.value ?? null })}
                             placeholder="Pilih Lembaga"
                             isClearable
+                            classNamePrefix="react-select"
                         />
                     </div>
 
-                    {/* Quota */}
-                    <div>
-                        <label className="block mb-1">Quota</label>
+                    <div className="flex flex-col gap-1">
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <Users size={14} /> Quota
+                        </label>
                         <input
                             type="number"
                             value={form.quota ?? ""}
                             onChange={(e) => setForm({ ...form, quota: e.target.value })}
-                            className="input input-bordered w-full"
+                            className="input input-bordered input-sm w-full rounded-lg"
                             placeholder="Contoh: 50"
                             min={1}
                             max={250}
                         />
-                        <p className="text-xs text-gray-500 mt-1">
-                            Quota minimal 1, maksimal 250. Kosongkan untuk unlimited.
+                        <p className="text-xs text-gray-400">
+                            Min 1, max 250. Kosongkan untuk unlimited.
                         </p>
                     </div>
 
-                    {/* Status */}
-                    <div>
-                        <label className="block mb-1">Status</label>
+                    <div className="flex flex-col gap-1">
+                        <label className="font-medium text-gray-600">Status</label>
                         <select
                             value={form.status ?? "PLANNED"}
                             onChange={(e) => setForm({ ...form, status: e.target.value })}
-                            className="select select-bordered w-full"
+                            className="select select-bordered select-sm w-full rounded-lg"
                         >
                             <option value="PLANNED">Planned</option>
                             <option value="ONGOING">Ongoing</option>
@@ -200,43 +238,56 @@ export default function EditBatchModal({ open, data, onClose, onSaved }) {
                         </select>
                     </div>
 
-                    {/* Tanggal Mulai */}
-                    <div>
-                        <label className="block mb-1">Tanggal Mulai</label>
+                    <div className="flex flex-col gap-1">
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <Calendar size={14} /> Tanggal Mulai
+                        </label>
                         <input
                             type="date"
                             value={form.startDate ?? ""}
                             onChange={(e) => setForm({ ...form, startDate: e.target.value })}
-                            className="input input-bordered w-full"
+                            className="input input-bordered input-sm w-full rounded-lg"
                         />
                     </div>
 
-                    {/* Tanggal Selesai */}
-                    <div>
-                        <label className="block mb-1">Tanggal Selesai</label>
+                    <div className="flex flex-col gap-1">
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <Calendar size={14} /> Tanggal Selesai
+                        </label>
                         <input
                             type="date"
                             value={form.endDate ?? ""}
                             onChange={(e) => setForm({ ...form, endDate: e.target.value })}
-                            className="input input-bordered w-full"
+                            className="input input-bordered input-sm w-full rounded-lg"
                         />
                     </div>
                 </div>
 
-                {/* Buttons */}
-                <div className="modal-action">
-                    <button className="btn" onClick={onClose} disabled={saving}>
+                {/* Footer */}
+                <div className="flex justify-end gap-2 pt-4 border-t border-gray-100">
+                    <button
+                        className="btn btn-sm btn-ghost rounded-lg"
+                        onClick={onClose}
+                        disabled={saving}
+                    >
                         Batal
                     </button>
-                    <button className={`btn btn-primary ${saving ? "btn-disabled" : ""}`} onClick={handleSave}>
-                        {saving ? <span className="loading loading-spinner loading-sm" /> : null}
+                    <button
+                        className="btn btn-sm btn-primary rounded-lg gap-1"
+                        onClick={handleSave}
+                        disabled={saving}
+                    >
+                        {saving ? (
+                            <span className="loading loading-spinner loading-xs" />
+                        ) : (
+                            <Save size={14} />
+                        )}
                         {saving ? "Menyimpan..." : "Simpan"}
                     </button>
                 </div>
             </div>
 
-            {/* Backdrop close */}
-            <form method="dialog" className="modal-backdrop">
+            <form method="dialog" className="modal-backdrop bg-black/50">
                 <button onClick={onClose}>close</button>
             </form>
         </dialog>

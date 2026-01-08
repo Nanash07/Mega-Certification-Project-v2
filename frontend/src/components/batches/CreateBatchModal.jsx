@@ -4,11 +4,13 @@ import Select from "react-select";
 import { createBatch } from "../../services/batchService";
 import { fetchCertificationRules } from "../../services/certificationRuleService";
 import { fetchInstitutions } from "../../services/institutionService";
+import { X, Package, Save, Calendar, Users, Building, FileCheck, Tag } from "lucide-react";
 
 export default function CreateBatchModal({ open, onClose, onSaved }) {
     const [rules, setRules] = useState([]);
     const [institutions, setInstitutions] = useState([]);
     const [form, setForm] = useState(defaultForm());
+    const [saving, setSaving] = useState(false);
 
     function defaultForm() {
         return {
@@ -29,6 +31,7 @@ export default function CreateBatchModal({ open, onClose, onSaved }) {
         () => ({
             menuPortal: (base) => ({ ...base, zIndex: 999999 }),
             menu: (base) => ({ ...base, zIndex: 999999 }),
+            control: (base) => ({ ...base, borderRadius: "0.5rem", minHeight: "2.5rem" }),
         }),
         []
     );
@@ -62,6 +65,7 @@ export default function CreateBatchModal({ open, onClose, onSaved }) {
     }, [open]);
 
     async function handleSave() {
+        setSaving(true);
         try {
             const payload = { ...form };
 
@@ -82,6 +86,8 @@ export default function CreateBatchModal({ open, onClose, onSaved }) {
         } catch (err) {
             toast.error(err?.response?.data?.message || "Gagal menambahkan batch");
             console.error(err);
+        } finally {
+            setSaving(false);
         }
     }
 
@@ -95,24 +101,46 @@ export default function CreateBatchModal({ open, onClose, onSaved }) {
     ];
 
     return (
-        <dialog className="modal" open={open}>
-            <div className="modal-box max-w-3xl">
-                <h3 className="font-bold text-lg mb-4">Tambah Batch</h3>
+        <dialog className="modal modal-open" open={open}>
+            <div className="modal-box max-w-3xl bg-base-100 shadow-2xl border border-gray-100 rounded-2xl">
+                {/* Header */}
+                <div className="flex items-center justify-between pb-4 border-b border-gray-100">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                            <Package size={20} className="text-primary" />
+                        </div>
+                        <div>
+                            <h3 className="font-bold text-lg">Tambah Batch Baru</h3>
+                            <p className="text-xs text-gray-500">Buat batch sertifikasi/training baru</p>
+                        </div>
+                    </div>
+                    <button
+                        className="btn btn-sm btn-circle btn-ghost"
+                        onClick={onClose}
+                    >
+                        <X size={18} />
+                    </button>
+                </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                    <div>
-                        <label className="block mb-1">Nama Batch</label>
+                {/* Form Content */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-5 text-sm">
+                    <div className="flex flex-col gap-1">
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <Tag size={14} /> Nama Batch
+                        </label>
                         <input
                             type="text"
                             value={form.batchName}
                             onChange={(e) => setForm({ ...form, batchName: e.target.value })}
-                            className="input input-bordered w-full"
+                            className="input input-bordered input-sm w-full rounded-lg"
                             placeholder="Contoh: Batch AAJI Januari 2025"
                         />
                     </div>
 
-                    <div>
-                        <label className="block mb-1">Jenis Batch</label>
+                    <div className="flex flex-col gap-1">
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <Package size={14} /> Jenis Batch
+                        </label>
                         <Select
                             menuPortalTarget={menuPortalTarget}
                             menuPosition="fixed"
@@ -122,11 +150,14 @@ export default function CreateBatchModal({ open, onClose, onSaved }) {
                             onChange={(opt) => setForm({ ...form, type: opt?.value || "CERTIFICATION" })}
                             placeholder="Pilih Jenis Batch"
                             isClearable={false}
+                            classNamePrefix="react-select"
                         />
                     </div>
 
-                    <div>
-                        <label className="block mb-1">Aturan Sertifikasi</label>
+                    <div className="flex flex-col gap-1">
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <FileCheck size={14} /> Aturan Sertifikasi
+                        </label>
                         <Select
                             menuPortalTarget={menuPortalTarget}
                             menuPosition="fixed"
@@ -136,11 +167,14 @@ export default function CreateBatchModal({ open, onClose, onSaved }) {
                             onChange={(opt) => setForm({ ...form, certificationRuleId: opt?.value || null })}
                             placeholder="Pilih Aturan Sertifikasi"
                             isClearable
+                            classNamePrefix="react-select"
                         />
                     </div>
 
-                    <div>
-                        <label className="block mb-1">Lembaga</label>
+                    <div className="flex flex-col gap-1">
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <Building size={14} /> Lembaga
+                        </label>
                         <Select
                             menuPortalTarget={menuPortalTarget}
                             menuPosition="fixed"
@@ -150,31 +184,34 @@ export default function CreateBatchModal({ open, onClose, onSaved }) {
                             onChange={(opt) => setForm({ ...form, institutionId: opt?.value || null })}
                             placeholder="Pilih Lembaga"
                             isClearable
+                            classNamePrefix="react-select"
                         />
                     </div>
 
-                    <div>
-                        <label className="block mb-1">Quota</label>
+                    <div className="flex flex-col gap-1">
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <Users size={14} /> Quota
+                        </label>
                         <input
                             type="number"
                             value={form.quota}
                             onChange={(e) => setForm({ ...form, quota: e.target.value })}
-                            className="input input-bordered w-full"
+                            className="input input-bordered input-sm w-full rounded-lg"
                             placeholder="Contoh: 50"
                             min={1}
                             max={250}
                         />
-                        <p className="text-xs text-gray-500 mt-1">
-                            Quota minimal 1, maksimal 250. Kosongkan untuk unlimited.
+                        <p className="text-xs text-gray-400">
+                            Min 1, max 250. Kosongkan untuk unlimited.
                         </p>
                     </div>
 
-                    <div>
-                        <label className="block mb-1">Status</label>
+                    <div className="flex flex-col gap-1">
+                        <label className="font-medium text-gray-600">Status</label>
                         <select
                             value={form.status}
                             onChange={(e) => setForm({ ...form, status: e.target.value })}
-                            className="select select-bordered w-full"
+                            className="select select-bordered select-sm w-full rounded-lg"
                         >
                             <option value="PLANNED">Planned</option>
                             <option value="ONGOING">Ongoing</option>
@@ -183,38 +220,56 @@ export default function CreateBatchModal({ open, onClose, onSaved }) {
                         </select>
                     </div>
 
-                    <div>
-                        <label className="block mb-1">Tanggal Mulai</label>
+                    <div className="flex flex-col gap-1">
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <Calendar size={14} /> Tanggal Mulai
+                        </label>
                         <input
                             type="date"
                             value={form.startDate}
                             onChange={(e) => setForm({ ...form, startDate: e.target.value })}
-                            className="input input-bordered w-full"
+                            className="input input-bordered input-sm w-full rounded-lg"
                         />
                     </div>
 
-                    <div>
-                        <label className="block mb-1">Tanggal Selesai</label>
+                    <div className="flex flex-col gap-1">
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <Calendar size={14} /> Tanggal Selesai
+                        </label>
                         <input
                             type="date"
                             value={form.endDate}
                             onChange={(e) => setForm({ ...form, endDate: e.target.value })}
-                            className="input input-bordered w-full"
+                            className="input input-bordered input-sm w-full rounded-lg"
                         />
                     </div>
                 </div>
 
-                <div className="modal-action">
-                    <button className="btn" onClick={onClose}>
+                {/* Footer */}
+                <div className="flex justify-end gap-2 pt-4 border-t border-gray-100">
+                    <button
+                        className="btn btn-sm btn-ghost rounded-lg"
+                        onClick={onClose}
+                        disabled={saving}
+                    >
                         Batal
                     </button>
-                    <button className="btn btn-primary" onClick={handleSave}>
-                        Simpan
+                    <button
+                        className="btn btn-sm btn-primary rounded-lg gap-1"
+                        onClick={handleSave}
+                        disabled={saving}
+                    >
+                        {saving ? (
+                            <span className="loading loading-spinner loading-xs" />
+                        ) : (
+                            <Save size={14} />
+                        )}
+                        {saving ? "Menyimpan..." : "Simpan"}
                     </button>
                 </div>
             </div>
 
-            <form method="dialog" className="modal-backdrop">
+            <form method="dialog" className="modal-backdrop bg-black/50">
                 <button onClick={onClose}>close</button>
             </form>
         </dialog>

@@ -1,8 +1,23 @@
 import { useEffect, useState, useRef } from "react";
 import toast from "react-hot-toast";
-import { Save } from "lucide-react";
+import { Save, FileText, Clock, Bell, Calendar, CheckCircle, XCircle, Variable } from "lucide-react";
 import { fetchAllTemplates, updateTemplate } from "../../services/notificationTemplateService";
-import { fetchAllSchedules, updateSchedule, runScheduleNow } from "../../services/notificationScheduleService";
+import { fetchAllSchedules, updateSchedule } from "../../services/notificationScheduleService";
+
+const TAB_CONFIG = {
+    BATCH_NOTIFICATION: { label: "Batch Reminder", color: "info", icon: Calendar },
+    CERT_REMINDER: { label: "Due Reminder", color: "warning", icon: Clock },
+    EXPIRED_NOTICE: { label: "Expired Reminder", color: "error", icon: XCircle },
+};
+
+const VARIABLE_GUIDE = {
+    sapaan: "Bapak/Ibu sesuai gender",
+    nama: "Nama pegawai",
+    namaSertifikasi: "Nama sertifikasi",
+    berlakuSampai: "Tanggal akhir masa berlaku",
+    namaBatch: "Kode/nama batch pelaksanaan",
+    mulaiTanggal: "Tanggal pelaksanaan batch",
+};
 
 export default function NotificationSettingsPage() {
     const [loading, setLoading] = useState(true);
@@ -13,27 +28,7 @@ export default function NotificationSettingsPage() {
     const [saving, setSaving] = useState(false);
     const textareaRef = useRef(null);
 
-    const TAB_LABELS = {
-        BATCH_NOTIFICATION: "Batch Reminder",
-        CERT_REMINDER: "Due Reminder",
-        EXPIRED_NOTICE: "Expired Reminder",
-    };
-
-    const getTabLabel = (code) => TAB_LABELS[code] || code.replaceAll("_", " ");
-
-    const VARIABLE_GUIDE = {
-        sapaan: "Bapak/Ibu sesuai gender",
-        nama: "Nama pegawai",
-        namaSertifikasi: "Nama sertifikasi.",
-        berlakuSampai: "Tanggal akhir masa berlaku",
-        namaBatch: "Kode/nama batch pelaksanaan.",
-        mulaiTanggal: "Tanggal pelaksanaan batch",
-    };
-
-    const extractUsedVariables = (text = "") => {
-        const keys = Object.keys(VARIABLE_GUIDE);
-        return keys.filter((k) => text.includes(`{{${k}}}`));
-    };
+    const getTabConfig = (code) => TAB_CONFIG[code] || { label: code.replaceAll("_", " "), color: "neutral", icon: Bell };
 
     const adjustTextarea = () => {
         const ta = textareaRef.current;
@@ -144,15 +139,6 @@ export default function NotificationSettingsPage() {
         }
     };
 
-    const handleRunNow = async (type) => {
-        try {
-            await runScheduleNow(type);
-            toast.success("Notifikasi dijalankan manual");
-        } catch {
-            toast.error("Gagal menjalankan notifikasi");
-        }
-    };
-
     const escapeHtml = (str = "") =>
         str
             .replaceAll("&", "&amp;")
@@ -190,13 +176,18 @@ export default function NotificationSettingsPage() {
     if (loading) {
         return (
             <div className="flex justify-center items-center h-64">
-                <span className="loading loading-dots loading-lg" />
+                <span className="loading loading-dots loading-lg text-primary" />
             </div>
         );
     }
 
     if (!activeTab || templates.length === 0) {
-        return <div className="text-center p-10">Tidak ada template notifikasi yang ditemukan.</div>;
+        return (
+            <div className="flex flex-col items-center justify-center py-16 text-gray-400">
+                <FileText size={48} className="mb-3 opacity-30" />
+                <p className="text-sm">Tidak ada template notifikasi ditemukan</p>
+            </div>
+        );
     }
 
     const tpl = templates.find((t) => t.code === activeTab);
@@ -207,164 +198,202 @@ export default function NotificationSettingsPage() {
     const currentTitle = editing[tpl.id]?.title ?? tpl.title;
     const currentBody = editing[tpl.id]?.body ?? tpl.body;
     const previewData = renderPreview(currentTitle, currentBody);
-
-    const allKeys = Object.keys(VARIABLE_GUIDE);
+    const tabConfig = getTabConfig(activeTab);
+    const TabIcon = tabConfig.icon;
 
     return (
-        <div className="space-y-6 w-full">
-            <div className="tabs tabs-lift w-full mb-0">
-                {templates.map((tabTpl) => (
-                    <button
-                        key={tabTpl.code}
-                        className={`tab ${activeTab === tabTpl.code ? "tab-active" : ""}`}
-                        onClick={() => setActiveTab(tabTpl.code)}
-                    >
-                        {getTabLabel(tabTpl.code)}
-                    </button>
-                ))}
+        <div className="space-y-4 w-full">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                    <h1 className="text-lg sm:text-xl font-bold">Template & Jadwal</h1>
+                    <p className="text-xs text-gray-500">{templates.length} template notifikasi</p>
+                </div>
             </div>
 
-            <div className="card bg-base-100 shadow p-6 w-full border-t-0 rounded-t-none">
-                <div className="flex justify-between items-center flex-wrap gap-3">
-                    <div>
-                        <h3 className="font-semibold text-lg">{getTabLabel(tpl.code)}</h3>
-                        <p className="text-xs text-gray-400">
-                            Terakhir diperbarui{" "}
-                            {new Date(tpl.updatedAt).toLocaleString("id-ID", {
-                                day: "2-digit",
-                                month: "short",
-                                year: "numeric",
-                                hour: "2-digit",
-                                minute: "2-digit",
-                            })}{" "}
-                            oleh {tpl.updatedBy || "–"}
-                        </p>
+            {/* Tabs - Pill Style */}
+            <div className="flex flex-wrap gap-2">
+                {templates.map((tabTpl) => {
+                    const cfg = getTabConfig(tabTpl.code);
+                    const Icon = cfg.icon;
+                    return (
+                        <button
+                            key={tabTpl.code}
+                            className={`btn btn-sm rounded-full transition-all ${
+                                activeTab === tabTpl.code
+                                    ? "btn-primary shadow-md"
+                                    : "btn-ghost border border-gray-200 hover:border-primary/50"
+                            }`}
+                            onClick={() => setActiveTab(tabTpl.code)}
+                        >
+                            <Icon size={14} />
+                            {cfg.label}
+                        </button>
+                    );
+                })}
+            </div>
+
+            {/* Main Content Card */}
+            <div className="card bg-base-100 shadow-sm border border-gray-100 overflow-hidden">
+                {/* Card Header */}
+                <div className="p-4 sm:p-5 border-b border-gray-100">
+                    <div className="flex items-start gap-3">
+                        <div className={`p-2 rounded-lg bg-${tabConfig.color}/10`}>
+                            <TabIcon size={20} className={`text-${tabConfig.color}`} />
+                        </div>
+                        <div className="flex-1">
+                            <h3 className="font-semibold text-base sm:text-lg">{tabConfig.label}</h3>
+                            <p className="text-xs text-gray-400 mt-0.5">
+                                Terakhir diperbarui{" "}
+                                {new Date(tpl.updatedAt).toLocaleString("id-ID", {
+                                    day: "2-digit",
+                                    month: "short",
+                                    year: "numeric",
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                })}{" "}
+                                oleh {tpl.updatedBy || "–"}
+                            </p>
+                        </div>
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-5 items-stretch">
-                    <div className="flex flex-col space-y-3 h-full">
-                        <div>
-                            <label className="text-gray-500 mb-1 block text-xs">Judul Notifikasi</label>
-                            <input
-                                type="text"
-                                className="input input-bordered w-full text-xs"
-                                value={currentTitle}
-                                onChange={(e) => handleChangeTemplate(tpl.id, "title", e.target.value)}
-                            />
+                {/* Card Body */}
+                <div className="p-4 sm:p-5 space-y-5">
+                    {/* Template Editor & Preview */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                        {/* Left: Editor */}
+                        <div className="space-y-4">
+                            <div>
+                                <label className="text-xs font-medium text-gray-600 mb-1.5 block flex items-center gap-1">
+                                    <Bell size={12} /> Judul Notifikasi
+                                </label>
+                                <input
+                                    type="text"
+                                    className="input input-bordered input-sm w-full text-sm rounded-lg"
+                                    value={currentTitle}
+                                    onChange={(e) => handleChangeTemplate(tpl.id, "title", e.target.value)}
+                                />
+                            </div>
+
+                            <div>
+                                <label className="text-xs font-medium text-gray-600 mb-1.5 block flex items-center gap-1">
+                                    <FileText size={12} /> Isi Pesan
+                                </label>
+                                <textarea
+                                    ref={textareaRef}
+                                    key={tpl.id}
+                                    className="textarea textarea-bordered w-full text-sm resize-none overflow-hidden rounded-lg"
+                                    style={{
+                                        wordBreak: "break-word",
+                                        whiteSpace: "pre-wrap",
+                                        lineHeight: "1.6",
+                                        minHeight: "120px",
+                                    }}
+                                    value={currentBody}
+                                    onChange={(e) => handleChangeTemplate(tpl.id, "body", e.target.value)}
+                                />
+                            </div>
+
+                            {/* Variable Guide */}
+                            <div className="border border-gray-200 rounded-xl p-3">
+                                <label className="text-xs font-medium text-gray-600 mb-2 block flex items-center gap-1">
+                                    <Variable size={12} /> Variabel yang Tersedia
+                                </label>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                                    {Object.entries(VARIABLE_GUIDE).map(([key, desc]) => (
+                                        <div key={key} className="flex items-start gap-2">
+                                            <code className="badge badge-xs badge-neutral badge-outline font-mono">{`{{${key}}}`}</code>
+                                            <span className="text-gray-600">{desc}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
                         </div>
 
-                        <div className="flex-1 flex flex-col">
-                            <label className="text-gray-500 mb-1 block text-xs">Isi Pesan</label>
-                            <textarea
-                                ref={textareaRef}
-                                key={tpl.id}
-                                className="textarea textarea-bordered w-full text-xs resize-none overflow-hidden break-words"
-                                style={{
-                                    wordBreak: "break-word",
-                                    whiteSpace: "pre-wrap",
-                                    lineHeight: "1.6",
-                                    minHeight: "80px",
-                                }}
-                                value={currentBody}
-                                onChange={(e) => handleChangeTemplate(tpl.id, "body", e.target.value)}
-                            />
-                        </div>
-
-                        <div className="mt-2">
-                            <label className="text-gray-500 mb-3 block text-xs">Penjelasan variabel yang dipakai</label>
-                            <div className="grid grid-cols-2 gap-3 text-xs">
-                                {allKeys.map((key) => (
-                                    <div key={key} className="flex items-start gap-2">
-                                        <code className="badge badge-xs badge-soft">{`{{${key}}}`}</code>
-                                        <span className="text-gray-600">{VARIABLE_GUIDE[key]}</span>
-                                    </div>
-                                ))}
+                        {/* Right: Preview */}
+                        <div className="flex flex-col">
+                            <label className="text-xs font-medium text-gray-600 mb-1.5 block">Preview</label>
+                            <div className="flex-1 bg-gradient-to-br from-gray-50 to-gray-100 border border-gray-200 rounded-xl p-4 text-sm">
+                                <p className="font-semibold text-base text-gray-900 mb-2">{previewData.hasilJudul}</p>
+                                <div
+                                    className="text-gray-700 leading-relaxed text-sm"
+                                    dangerouslySetInnerHTML={{ __html: previewData.hasilIsiHTML }}
+                                />
                             </div>
                         </div>
                     </div>
 
-                    <div className="flex flex-col h-full">
-                        <label className="text-gray-500 mb-1 block text-xs">Preview</label>
-                        <div className="border border-gray-300 rounded-xl p-4 flex-1 text-xs leading-relaxed bg-gray-50 break-words">
-                            <p className="font-semibold text-base text-black mb-2 break-words">
-                                {previewData.hasilJudul}
-                            </p>
-                            <div
-                                className="text-gray-700 break-words"
-                                dangerouslySetInnerHTML={{ __html: previewData.hasilIsiHTML }}
-                            />
-                        </div>
+                    {/* Save Template Button */}
+                    <div className="flex justify-end">
+                        <button
+                            className="btn btn-primary btn-sm rounded-lg flex items-center gap-2"
+                            onClick={() => handleSaveTemplate(tpl.id)}
+                            disabled={saving}
+                        >
+                            <Save size={14} />
+                            {saving ? "Menyimpan..." : "Simpan Template"}
+                        </button>
                     </div>
                 </div>
 
-                <div className="flex justify-end py-3">
-                    <button
-                        className="btn btn-primary btn-sm flex items-center gap-2"
-                        onClick={() => handleSaveTemplate(tpl.id)}
-                        disabled={saving}
-                    >
-                        <Save size={16} />
-                        {saving ? "Menyimpan..." : "Simpan Template"}
-                    </button>
-                </div>
+                {/* Schedule Section */}
+                <div className="border-t border-gray-100 p-4 sm:p-5">
+                    <div className="flex items-center gap-2 mb-4">
+                        <Clock size={16} className="text-gray-500" />
+                        <h4 className="font-semibold text-sm text-gray-700">Jadwal Notifikasi Otomatis</h4>
+                    </div>
 
-                <div className="border-t pt-5">
-                    <h4 className="font-semibold text-xs mb-3 text-gray-600">Jadwal Notifikasi Otomatis</h4>
-
-                    <div className="w-full md:w-1/2 space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+                        {/* Time */}
                         <div>
-                            <label className="text-gray-500 text-xs mb-1 block">Jam</label>
+                            <label className="text-xs font-medium text-gray-600 mb-1.5 block">Jam Pengiriman</label>
                             <input
                                 type="time"
-                                className="input input-bordered w-full"
+                                className="input input-bordered input-sm w-full rounded-lg"
                                 value={schedule.time || ""}
                                 onChange={(e) => handleChangeSchedule(tpl.code, "time", e.target.value)}
                             />
                         </div>
 
-                        <div className="flex items-center gap-3">
+                        {/* Active Toggle */}
+                        <div className="flex items-center gap-3 bg-white rounded-lg p-2.5 border border-gray-100">
                             <input
                                 type="checkbox"
-                                className="toggle toggle-success"
+                                className="toggle toggle-success toggle-sm"
                                 checked={schedule.active || false}
                                 onChange={(e) => handleChangeSchedule(tpl.code, "active", e.target.checked)}
                             />
                             <div>
-                                <p className="font-medium text-xs text-gray-700">Aktif</p>
-                                <p className="text-xs text-gray-400">
-                                    Aktifkan agar notifikasi ini berjalan otomatis sesuai jadwal
+                                <p className="font-medium text-xs text-gray-700 flex items-center gap-1">
+                                    {schedule.active ? <CheckCircle size={12} className="text-success" /> : <XCircle size={12} className="text-gray-400" />}
+                                    {schedule.active ? "Aktif" : "Nonaktif"}
                                 </p>
                             </div>
                         </div>
 
-                        <div className="flex items-center gap-3">
+                        {/* Skip Weekend Toggle */}
+                        <div className="flex items-center gap-3 bg-white rounded-lg p-2.5 border border-gray-100">
                             <input
                                 type="checkbox"
-                                className="toggle toggle-warning"
+                                className="toggle toggle-warning toggle-sm"
                                 checked={schedule.skipWeekend || false}
                                 onChange={(e) => handleChangeSchedule(tpl.code, "skipWeekend", e.target.checked)}
                             />
                             <div>
                                 <p className="font-medium text-xs text-gray-700">Skip Weekend</p>
-                                <p className="text-xs text-gray-400">
-                                    Lewati pengiriman notifikasi di hari Sabtu & Minggu
-                                </p>
                             </div>
                         </div>
 
-                        <div className="flex justify-end gap-2 pt-2">
-                            <button
-                                className="btn btn-primary btn-sm flex items-center gap-2"
-                                onClick={() => handleSaveSchedule(schedule)}
-                                disabled={saving}
-                            >
-                                <Save size={16} />
-                                {saving ? "Menyimpan..." : "Simpan Jadwal"}
-                            </button>
-
-                            {/* <button className="btn btn-ghost btn-sm" onClick={() => handleRunNow(tpl.code)}>Run Now</button> */}
-                        </div>
+                        {/* Save Schedule */}
+                        <button
+                            className="btn btn-accent btn-sm rounded-lg flex items-center gap-2"
+                            onClick={() => handleSaveSchedule(schedule)}
+                            disabled={saving}
+                        >
+                            <Save size={14} />
+                            {saving ? "Menyimpan..." : "Simpan Jadwal"}
+                        </button>
                     </div>
                 </div>
             </div>

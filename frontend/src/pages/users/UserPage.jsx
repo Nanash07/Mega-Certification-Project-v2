@@ -10,7 +10,7 @@ import { fetchUsers, deleteUser, toggleUser, fetchActiveUsers } from "../../serv
 import { fetchRoles } from "../../services/roleService";
 import CreateUserModal from "../../components/users/CreateUserModal";
 import EditUserModal from "../../components/users/EditUserModal";
-import { Pencil, Trash2, ChevronDown, Plus, Eraser, Target } from "lucide-react";
+import { Pencil, Trash2, ChevronDown, Plus, Eraser, Target, Users, Search, Filter, ShieldCheck, User } from "lucide-react";
 
 export default function UserPage() {
     const navigate = useNavigate();
@@ -182,172 +182,214 @@ export default function UserPage() {
 
     // ===================== UI =====================
     return (
-        <div>
-            {/* Toolbar */}
-            <div className="mb-4 space-y-3">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 text-xs items-end">
-                    <AsyncSelect
-                        cacheOptions
-                        defaultOptions
-                        loadOptions={loadUserOptions}
-                        value={filterUser}
-                        onChange={setFilterUser}
-                        placeholder="Cari User"
-                        isClearable
-                    />
-
-                    <Select
-                        options={rolesForSelect.map((r) => ({ value: r.id, label: r.name }))}
-                        value={filterRole}
-                        onChange={setFilterRole}
-                        placeholder="Filter Role"
-                        isClearable
-                    />
-
-                    <Select
-                        options={[
-                            { value: "all", label: "Semua Status" },
-                            { value: true, label: "Aktif" },
-                            { value: false, label: "Nonaktif" },
-                        ]}
-                        value={filterStatus}
-                        onChange={setFilterStatus}
-                        placeholder="Filter Status"
-                        isClearable
-                    />
-
+        <div className="space-y-4 w-full">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                    <h1 className="text-lg sm:text-xl font-bold">Kelola User</h1>
+                    <p className="text-xs text-gray-500">{totalElements} pengguna terdaftar</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
                     <button
-                        className="btn btn-sm btn-primary w-full"
+                        className="btn btn-sm btn-primary rounded-lg"
                         type="button"
                         onClick={() => setShowCreateModal(true)}
                     >
-                        <Plus className="w-4 h-4" />
+                        <Plus size={14} />
                         Tambah User
                     </button>
-
-                    {/* PIC tidak boleh kelola PIC Scope */}
                     {!isPic && (
                         <button
-                            className="btn btn-sm btn-info w-full"
+                            className="btn btn-sm btn-info rounded-lg"
                             type="button"
                             onClick={() => navigate("/mapping/pic-certification-scope")}
                         >
-                            <Target className="w-4 h-4" />
+                            <Target size={14} />
                             Kelola PIC Scope
                         </button>
                     )}
-
-                    <button
-                        className="btn btn-sm btn-accent btn-soft border-accent w-full"
-                        type="button"
-                        onClick={resetFilter}
-                    >
-                        <Eraser className="w-4 h-4" />
-                        Clear Filter
-                    </button>
                 </div>
             </div>
 
-            {/* Table */}
-            <div className="overflow-x-auto rounded-xl border border-gray-200 shadow bg-base-100">
-                <table className="table table-zebra">
-                    <thead className="bg-base-200 text-xs">
-                        <tr>
-                            <th>No</th>
-                            <th>Aksi</th>
-                            <th>Username</th>
-                            <th>Email</th>
-                            <th>Nama Pegawai</th>
-                            <th>NIP</th>
-                            <th>Status</th>
-                            <th>Role</th>
-                            <th>Updated At</th>
-                        </tr>
-                    </thead>
-                    <tbody className="text-xs">
-                        {loading ? (
-                            <tr>
-                                <td colSpan={9} className="text-center py-10">
-                                    <span className="loading loading-dots loading-md" />
-                                </td>
-                            </tr>
-                        ) : rows.length === 0 ? (
-                            <tr>
-                                <td colSpan={9} className="text-center text-gray-400 py-10">
-                                    Tidak ada data
-                                </td>
-                            </tr>
-                        ) : (
-                            rows.map((u, idx) => {
-                                const targetPrivileged = isPrivilegedRole(u.roleName);
-                                const disableActions = isPic && targetPrivileged;
+            {/* Filter Card */}
+            <div className="card bg-base-100 shadow-sm border border-gray-100 p-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+                    <div className="flex flex-col gap-1">
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <Search size={12} /> Cari User
+                        </label>
+                        <AsyncSelect
+                            cacheOptions
+                            defaultOptions
+                            loadOptions={loadUserOptions}
+                            value={filterUser}
+                            onChange={setFilterUser}
+                            placeholder="Ketik username..."
+                            isClearable
+                            className="text-xs"
+                            classNamePrefix="react-select"
+                        />
+                    </div>
 
-                                return (
-                                    <tr key={u.id}>
-                                        <td>{startIdx + idx}</td>
-                                        <td className="whitespace-nowrap">
-                                            <div className="flex gap-2">
-                                                {!disableActions && (
-                                                    <>
-                                                        <div className="tooltip" data-tip="Edit user">
-                                                            <button
-                                                                type="button"
-                                                                className="btn btn-warning btn-soft btn-xs border border-warning"
-                                                                onClick={() => setEditData(u)}
-                                                            >
-                                                                <Pencil className="w-3 h-3" />
-                                                            </button>
-                                                        </div>
-                                                        <div className="tooltip" data-tip="Hapus user">
-                                                            <button
-                                                                type="button"
-                                                                className="btn btn-error btn-soft btn-xs border border-error"
-                                                                onClick={() => setConfirm({ open: true, id: u.id })}
-                                                            >
-                                                                <Trash2 className="w-3 h-3" />
-                                                            </button>
-                                                        </div>
-                                                    </>
-                                                )}
-                                            </div>
-                                        </td>
-                                        <td>{u.username}</td>
-                                        <td>{u.email || "-"}</td>
-                                        <td>{u.employeeName || "-"}</td>
-                                        <td>{u.employeeNip || "-"}</td>
-                                        <td>{renderStatusBadge(u)}</td>
-                                        <td>{u.roleName || "-"}</td>
-                                        <td>
-                                            {u.updatedAt
-                                                ? new Date(u.updatedAt).toLocaleDateString("id-ID", {
-                                                      day: "2-digit",
-                                                      month: "short",
-                                                      year: "numeric",
-                                                      hour: "2-digit",
-                                                      minute: "2-digit",
-                                                  })
-                                                : "-"}
-                                        </td>
-                                    </tr>
-                                );
-                            })
-                        )}
-                    </tbody>
-                </table>
+                    <div className="flex flex-col gap-1">
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <ShieldCheck size={12} /> Role
+                        </label>
+                        <Select
+                            options={rolesForSelect.map((r) => ({ value: r.id, label: r.name }))}
+                            value={filterRole}
+                            onChange={setFilterRole}
+                            placeholder="Semua Role"
+                            isClearable
+                            className="text-xs"
+                            classNamePrefix="react-select"
+                        />
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <Filter size={12} /> Status
+                        </label>
+                        <Select
+                            options={[
+                                { value: "all", label: "Semua Status" },
+                                { value: true, label: "Aktif" },
+                                { value: false, label: "Nonaktif" },
+                            ]}
+                            value={filterStatus}
+                            onChange={setFilterStatus}
+                            placeholder="Semua Status"
+                            isClearable
+                            className="text-xs"
+                            classNamePrefix="react-select"
+                        />
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                        <label className="font-medium text-gray-600 invisible">.</label>
+                        <button
+                            className="btn btn-sm btn-accent btn-soft w-full flex gap-2 rounded-lg"
+                            type="button"
+                            onClick={resetFilter}
+                        >
+                            <Eraser size={14} />
+                            Clear Filter
+                        </button>
+                    </div>
+                </div>
             </div>
 
-            {/* Pagination */}
-            <Pagination
-                page={page}
-                totalPages={totalPages}
-                totalElements={totalElements}
-                rowsPerPage={rowsPerPage}
-                onPageChange={setPage}
-                onRowsPerPageChange={(val) => {
-                    setRowsPerPage(val);
-                    setPage(1);
-                }}
-            />
+            {/* Table Card */}
+            <div className="card bg-base-100 shadow-sm border border-gray-100 overflow-hidden">
+                <div className="overflow-x-auto">
+                    <table className="table table-zebra w-full">
+                        <thead className="bg-base-200 text-xs">
+                            <tr>
+                                <th className="w-12">No</th>
+                                <th className="w-24">Aksi</th>
+                                <th>Username</th>
+                                <th>Email</th>
+                                <th>Nama Pegawai</th>
+                                <th>NIP</th>
+                                <th>Status</th>
+                                <th>Role</th>
+                                <th>Updated At</th>
+                            </tr>
+                        </thead>
+                        <tbody className="text-xs">
+                            {loading ? (
+                                <tr>
+                                    <td colSpan={9} className="text-center py-16">
+                                        <span className="loading loading-dots loading-lg text-primary" />
+                                    </td>
+                                </tr>
+                            ) : rows.length === 0 ? (
+                                <tr>
+                                    <td colSpan={9} className="text-center py-16">
+                                        <div className="flex flex-col items-center text-gray-400">
+                                            <User size={48} className="mb-3 opacity-30" />
+                                            <p className="text-sm">Tidak ada data user</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ) : (
+                                rows.map((u, idx) => {
+                                    const targetPrivileged = isPrivilegedRole(u.roleName);
+                                    const disableActions = isPic && targetPrivileged;
+
+                                    return (
+                                        <tr key={u.id} className="hover">
+                                            <td>{startIdx + idx}</td>
+                                            <td className="whitespace-nowrap">
+                                                <div className="flex gap-1">
+                                                    {!disableActions && (
+                                                        <>
+                                                            <div className="tooltip" data-tip="Edit user">
+                                                                <button
+                                                                    type="button"
+                                                                    className="btn btn-warning btn-soft btn-xs border border-warning rounded-lg"
+                                                                    onClick={() => setEditData(u)}
+                                                                >
+                                                                    <Pencil size={12} />
+                                                                </button>
+                                                            </div>
+                                                            <div className="tooltip" data-tip="Hapus user">
+                                                                <button
+                                                                    type="button"
+                                                                    className="btn btn-error btn-soft btn-xs border border-error rounded-lg"
+                                                                    onClick={() => setConfirm({ open: true, id: u.id })}
+                                                                >
+                                                                    <Trash2 size={12} />
+                                                                </button>
+                                                            </div>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </td>
+                                            <td className="font-medium">{u.username}</td>
+                                            <td>{u.email || "-"}</td>
+                                            <td>{u.employeeName || "-"}</td>
+                                            <td>{u.employeeNip || "-"}</td>
+                                            <td>{renderStatusBadge(u)}</td>
+                                            <td>
+                                                <span className="badge badge-sm badge-ghost">{u.roleName || "-"}</span>
+                                            </td>
+                                            <td className="text-gray-500">
+                                                {u.updatedAt
+                                                    ? new Date(u.updatedAt).toLocaleDateString("id-ID", {
+                                                          day: "2-digit",
+                                                          month: "short",
+                                                          year: "numeric",
+                                                          hour: "2-digit",
+                                                          minute: "2-digit",
+                                                      })
+                                                    : "-"}
+                                            </td>
+                                        </tr>
+                                    );
+                                })
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+
+                {/* Pagination inside card */}
+                {rows.length > 0 && (
+                    <div className="border-t border-gray-100 p-3">
+                        <Pagination
+                            page={page}
+                            totalPages={totalPages}
+                            totalElements={totalElements}
+                            rowsPerPage={rowsPerPage}
+                            onPageChange={setPage}
+                            onRowsPerPageChange={(val) => {
+                                setRowsPerPage(val);
+                                setPage(1);
+                            }}
+                        />
+                    </div>
+                )}
+            </div>
 
             {/* Modals */}
             {showCreateModal && (
@@ -388,13 +430,13 @@ export default function UserPage() {
                         style={{ top: statusMenu.y, left: statusMenu.x }}
                         onClick={(e) => e.stopPropagation()}
                     >
-                        <div className="bg-base-100 shadow-xl rounded-2xl p-3 text-xs flex flex-col gap-2">
+                        <div className="bg-base-100 shadow-xl rounded-xl border border-gray-200 p-2 text-xs flex flex-col gap-1.5">
                             {[true, false].map((val) => {
                                 const { label, btnCls } = getStatusStyle(val);
                                 return (
                                     <button
                                         key={String(val)}
-                                        className={`btn btn-xs ${btnCls} text-white rounded-full w-full justify-center`}
+                                        className={`btn btn-xs ${btnCls} text-white rounded-lg w-full justify-center`}
                                         onClick={async () => {
                                             await handleChangeStatus(statusMenu.row, val);
                                             setStatusMenu(null);

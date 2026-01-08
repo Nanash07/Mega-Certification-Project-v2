@@ -14,7 +14,7 @@ import EditBatchModal from "../../components/batches/EditBatchModal";
 import Pagination from "../../components/common/Pagination";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
 import { getCurrentRole } from "../../utils/helpers";
-import { ArrowLeft, Plus, Send, RotateCcw, Pencil } from "lucide-react";
+import { ArrowLeft, Plus, Send, RotateCcw, Pencil, Users, Eraser, Filter } from "lucide-react";
 import Select from "react-select";
 
 function getStoredUser() {
@@ -236,218 +236,222 @@ export default function DetailBatchPage() {
 
     // ================== RENDER ==================
     return (
-        <div className="space-y-6">
-            {/* Header Row */}
-            <div className="flex items-center justify-between gap-2">
-                <button className="btn btn-sm btn-accent flex items-center gap-1" onClick={() => navigate(-1)}>
-                    <ArrowLeft className="w-4 h-4" />
-                    Kembali
-                </button>
-
-                {/* Edit batch: only PIC/SUPERADMIN */}
-                {canManageBatch && (
+        <div className="space-y-4 w-full">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div className="flex items-center gap-3">
                     <button
-                        className="btn btn-secondary btn-sm flex items-center gap-1 disabled:opacity-60"
-                        onClick={() => setOpenEdit(true)}
-                        disabled={!batch}
-                        title="Edit detail batch"
+                        className="btn btn-sm btn-ghost btn-circle"
+                        onClick={() => navigate(-1)}
                     >
-                        <Pencil className="w-4 h-4" />
-                        Edit Batch
+                        <ArrowLeft size={16} />
                     </button>
-                )}
+                    <div>
+                        <h1 className="text-lg sm:text-xl font-bold">Detail Batch</h1>
+                        <p className="text-xs text-gray-500">{totalElements} peserta terdaftar</p>
+                    </div>
+                </div>
+                    <div className="flex flex-wrap gap-2">
+                        {canManageBatch && (
+                            <>
+                                <button
+                                    className="btn btn-sm btn-primary rounded-lg"
+                                    onClick={() => setOpenAdd(true)}
+                                >
+                                    <Plus size={14} />
+                                    Tambah Peserta
+                                </button>
+                                <button
+                                    className="btn btn-sm btn-success rounded-lg"
+                                    onClick={() => setConfirmSend(true)}
+                                    disabled={sendingEmails || !batch}
+                                >
+                                    <Send size={14} />
+                                    Kirim Email
+                                </button>
+                                <button
+                                    className="btn btn-sm btn-secondary rounded-lg"
+                                    onClick={() => setOpenEdit(true)}
+                                    disabled={!batch}
+                                >
+                                    <Pencil size={14} />
+                                    Edit Batch
+                                </button>
+                            </>
+                        )}
+                    </div>
             </div>
 
-            <h2 className="text-xl font-bold">Detail Batch</h2>
-
-            {/* Batch Info */}
+            {/* Batch Info Card */}
             {batch && (
-                <div className="card bg-base-100 shadow border border-gray-200">
-                    <div className="card-body grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-y-3 text-sm">
+                <div className="card bg-base-100 shadow-sm border border-gray-100 p-4">
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 text-xs">
                         <div>
-                            <span className="font-bold">Nama Batch:</span>
-                            <div>{batch.batchName}</div>
+                            <span className="font-medium text-gray-500">Nama Batch</span>
+                            <div className="font-semibold">{batch.batchName}</div>
                         </div>
-
                         <div>
-                            <span className="font-bold">Jenis Batch:</span>
+                            <span className="font-medium text-gray-500">Jenis</span>
                             <div>{renderTypeBadge(batch.type)}</div>
                         </div>
-
                         <div>
-                            <span className="font-bold">Sertifikasi:</span>
-                            <div>
-                                {[
-                                    batch.certificationCode,
-                                    batch.certificationLevelName,
-                                    batch.subFieldCode ?? batch.subBidangCode,
-                                ]
+                            <span className="font-medium text-gray-500">Sertifikasi</span>
+                            <div className="font-semibold">
+                                {[batch.certificationCode, batch.certificationLevelName, batch.subFieldCode ?? batch.subBidangCode]
                                     .filter((x) => x && String(x).trim() !== "")
                                     .join(" - ") || "-"}
                             </div>
                         </div>
-
                         <div>
-                            <span className="font-bold">Lembaga:</span>
+                            <span className="font-medium text-gray-500">Lembaga</span>
                             <div>{batch.institutionName || "-"}</div>
                         </div>
                         <div>
-                            <span className="font-bold">Tanggal Mulai:</span>
-                            <div>{batch.startDate ? new Date(batch.startDate).toLocaleDateString("id-ID") : "-"}</div>
-                        </div>
-                        <div>
-                            <span className="font-bold">Tanggal Selesai:</span>
-                            <div>{batch.endDate ? new Date(batch.endDate).toLocaleDateString("id-ID") : "-"}</div>
-                        </div>
-                        <div>
-                            <span className="font-bold">Quota:</span>
-                            <div>{batch.quota ?? "-"}</div>
-                        </div>
-                        <div>
-                            <span className="font-bold">Total Peserta:</span>
-                            <div>{batch.totalParticipants ?? 0}</div>
-                        </div>
-                        <div>
-                            <span className="font-bold">Total Lulus:</span>
-                            <div>{batch.totalPassed ?? 0}</div>
-                        </div>
-
-                        <div>
-                            <span className="font-bold">Status:</span>
+                            <span className="font-medium text-gray-500">Status</span>
                             <div>
                                 <span
                                     className={`badge badge-sm text-white ${
-                                        batch.status === "PLANNED"
-                                            ? "badge-warning"
-                                            : batch.status === "ONGOING"
-                                            ? "badge-info"
-                                            : batch.status === "FINISHED"
-                                            ? "badge-success"
+                                        batch.status === "PLANNED" ? "badge-warning"
+                                            : batch.status === "ONGOING" ? "badge-info"
+                                            : batch.status === "FINISHED" ? "badge-success"
                                             : "badge-error"
                                     }`}
                                 >
-                                    {batch.status === "ONGOING"
-                                        ? "Ongoing"
-                                        : batch.status === "PLANNED"
-                                        ? "Planned"
-                                        : batch.status === "FINISHED"
-                                        ? "Finished"
-                                        : batch.status === "CANCELLED"
-                                        ? "Cancelled"
+                                    {batch.status === "ONGOING" ? "Ongoing"
+                                        : batch.status === "PLANNED" ? "Planned"
+                                        : batch.status === "FINISHED" ? "Finished"
+                                        : batch.status === "CANCELLED" ? "Cancelled"
                                         : batch.status}
                                 </span>
                             </div>
                         </div>
+                        <div>
+                            <span className="font-medium text-gray-500">Tanggal Mulai</span>
+                            <div>{batch.startDate ? new Date(batch.startDate).toLocaleDateString("id-ID") : "-"}</div>
+                        </div>
+                        <div>
+                            <span className="font-medium text-gray-500">Tanggal Selesai</span>
+                            <div>{batch.endDate ? new Date(batch.endDate).toLocaleDateString("id-ID") : "-"}</div>
+                        </div>
+                        <div>
+                            <span className="font-medium text-gray-500">Quota</span>
+                            <div>{batch.quota ?? "-"}</div>
+                        </div>
+                        <div>
+                            <span className="font-medium text-gray-500">Total Peserta</span>
+                            <div className="font-semibold">{batch.totalParticipants ?? 0}</div>
+                        </div>
+                        <div>
+                            <span className="font-medium text-gray-500">Total Lulus</span>
+                            <div className="font-semibold text-success">{batch.totalPassed ?? 0}</div>
+                        </div>
                     </div>
                 </div>
             )}
 
-            {/* Actions */}
-            {canManageBatch ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-6 gap-3 items-center">
-                    <div className="col-span-1">
-                        <button
-                            className="btn btn-primary btn-sm w-full flex items-center gap-1"
-                            onClick={() => setOpenAdd(true)}
-                        >
-                            <Plus className="w-4 h-4" />
-                            Tambah Peserta
-                        </button>
+            {/* Filter Card */}
+            <div className="card bg-base-100 shadow-sm border border-gray-100 p-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 text-xs">
+                    <div className="flex flex-col gap-1">
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <Filter size={12} /> Nama/NIP
+                        </label>
+                        <Select
+                            options={employeeOptions}
+                            value={filterEmployee}
+                            onChange={(opt) => { setFilterEmployee(opt); setPage(1); }}
+                            placeholder="Filter Nama/NIP"
+                            isClearable
+                            className="text-xs"
+                            classNamePrefix="react-select"
+                        />
                     </div>
-
-                    <div className="col-span-1">
-                        <button
-                            className="btn btn-success btn-sm w-full flex items-center gap-1 disabled:opacity-60"
-                            onClick={() => setConfirmSend(true)}
-                            disabled={sendingEmails || !batch}
-                        >
-                            <Send className="w-4 h-4" />
-                            Kirim Email ke Peserta
-                        </button>
+                    <div className="flex flex-col gap-1">
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <Filter size={12} /> Status
+                        </label>
+                        <Select
+                            options={statusOptions}
+                            value={filterStatus}
+                            onChange={(opt) => { setFilterStatus(opt); setPage(1); }}
+                            placeholder="Filter Status"
+                            isClearable
+                            className="text-xs"
+                            classNamePrefix="react-select"
+                        />
                     </div>
-
-                    <div className="col-span-1 xl:col-start-6">
-                        <button className="btn btn-accent btn-soft border-accent btn-sm w-full" onClick={resetFilter}>
-                            Clear Filter
-                        </button>
+                    <div className="flex flex-col gap-1">
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <Filter size={12} /> Regional
+                        </label>
+                        <Select
+                            options={regionalOptions}
+                            value={filterRegional}
+                            onChange={(opt) => { setFilterRegional(opt); setPage(1); }}
+                            placeholder="Filter Regional"
+                            isClearable
+                            className="text-xs"
+                            classNamePrefix="react-select"
+                        />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <Filter size={12} /> Division
+                        </label>
+                        <Select
+                            options={divisionOptions}
+                            value={filterDivision}
+                            onChange={(opt) => { setFilterDivision(opt); setPage(1); }}
+                            placeholder="Filter Division"
+                            isClearable
+                            className="text-xs"
+                            classNamePrefix="react-select"
+                        />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <Filter size={12} /> Unit
+                        </label>
+                        <Select
+                            options={unitOptions}
+                            value={filterUnit}
+                            onChange={(opt) => { setFilterUnit(opt); setPage(1); }}
+                            placeholder="Filter Unit"
+                            isClearable
+                            className="text-xs"
+                            classNamePrefix="react-select"
+                        />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <Filter size={12} /> Jabatan
+                        </label>
+                        <Select
+                            options={jobOptions}
+                            value={filterJob}
+                            onChange={(opt) => { setFilterJob(opt); setPage(1); }}
+                            placeholder="Filter Jabatan"
+                            isClearable
+                            className="text-xs"
+                            classNamePrefix="react-select"
+                        />
                     </div>
                 </div>
-            ) : (
-                <div className="flex justify-end">
-                    <button className="btn btn-accent btn-soft border-accent btn-sm" onClick={resetFilter}>
+                <div className="flex justify-end mt-3">
+                    <button
+                        className="btn btn-sm btn-accent btn-soft rounded-lg flex gap-2"
+                        onClick={resetFilter}
+                    >
+                        <Eraser size={14} />
                         Clear Filter
                     </button>
                 </div>
-            )}
-
-            {/* Filters */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-6 gap-3 text-xs items-end">
-                <Select
-                    options={employeeOptions}
-                    value={filterEmployee}
-                    onChange={(opt) => {
-                        setFilterEmployee(opt);
-                        setPage(1);
-                    }}
-                    placeholder="Filter Nama/NIP"
-                    isClearable
-                />
-                <Select
-                    options={statusOptions}
-                    value={filterStatus}
-                    onChange={(opt) => {
-                        setFilterStatus(opt);
-                        setPage(1);
-                    }}
-                    placeholder="Filter Status"
-                    isClearable
-                />
-                <Select
-                    options={regionalOptions}
-                    value={filterRegional}
-                    onChange={(opt) => {
-                        setFilterRegional(opt);
-                        setPage(1);
-                    }}
-                    placeholder="Filter Regional"
-                    isClearable
-                />
-                <Select
-                    options={divisionOptions}
-                    value={filterDivision}
-                    onChange={(opt) => {
-                        setFilterDivision(opt);
-                        setPage(1);
-                    }}
-                    placeholder="Filter Division"
-                    isClearable
-                />
-                <Select
-                    options={unitOptions}
-                    value={filterUnit}
-                    onChange={(opt) => {
-                        setFilterUnit(opt);
-                        setPage(1);
-                    }}
-                    placeholder="Filter Unit"
-                    isClearable
-                />
-                <Select
-                    options={jobOptions}
-                    value={filterJob}
-                    onChange={(opt) => {
-                        setFilterJob(opt);
-                        setPage(1);
-                    }}
-                    placeholder="Filter Job Position"
-                    isClearable
-                />
             </div>
 
-            {/* Table */}
-            <div className="card bg-base-100 shadow border border-gray-200">
-                <div className="card-body p-0 overflow-x-auto">
-                    <table className="table table-zebra text-sm">
+            {/* Table Card */}
+            <div className="card bg-base-100 shadow-sm border border-gray-100 overflow-hidden">
+                <div className="overflow-x-auto">
+                    <table className="table table-zebra text-xs w-full">
                         <thead className="bg-base-200">
                             <tr>
                                 <th>No</th>
@@ -465,14 +469,17 @@ export default function DetailBatchPage() {
                         <tbody>
                             {loading ? (
                                 <tr>
-                                    <td colSpan={TABLE_COLSPAN} className="text-center py-10">
-                                        <span className="loading loading-dots loading-md" />
+                                    <td colSpan={TABLE_COLSPAN} className="text-center py-16">
+                                        <span className="loading loading-dots loading-lg text-primary" />
                                     </td>
                                 </tr>
                             ) : participants.length === 0 ? (
                                 <tr>
-                                    <td colSpan={TABLE_COLSPAN} className="text-center text-gray-400 py-10">
-                                        Tidak ada peserta
+                                    <td colSpan={TABLE_COLSPAN} className="text-center py-16">
+                                        <div className="flex flex-col items-center text-gray-400">
+                                            <Users size={48} className="mb-3 opacity-30" />
+                                            <p className="text-sm">Tidak ada peserta terdaftar</p>
+                                        </div>
                                     </td>
                                 </tr>
                             ) : (
@@ -557,7 +564,7 @@ export default function DetailBatchPage() {
                                                                             Attend
                                                                         </button>
                                                                         <button
-                                                                            className={`btn btn-xs btn-neutral btn-soft border-neutral ${
+                                                                            className={`btn btn-xs btn-error btn-soft border-error ${
                                                                                 pendingRowId === p.id
                                                                                     ? "btn-disabled"
                                                                                     : ""
@@ -650,20 +657,24 @@ export default function DetailBatchPage() {
                         </tbody>
                     </table>
                 </div>
-            </div>
 
-            {/* Pagination */}
-            <Pagination
-                page={page}
-                totalPages={totalPages}
-                totalElements={totalElements}
-                rowsPerPage={rowsPerPage}
-                onPageChange={setPage}
-                onRowsPerPageChange={(val) => {
-                    setRowsPerPage(val);
-                    setPage(1);
-                }}
-            />
+                {/* Pagination inside card */}
+                {participants.length > 0 && (
+                    <div className="border-t border-gray-100 p-3">
+                        <Pagination
+                            page={page}
+                            totalPages={totalPages}
+                            totalElements={totalElements}
+                            rowsPerPage={rowsPerPage}
+                            onPageChange={setPage}
+                            onRowsPerPageChange={(val) => {
+                                setRowsPerPage(val);
+                                setPage(1);
+                            }}
+                        />
+                    </div>
+                )}
+            </div>
 
             {/* Modals: only PIC/SUPERADMIN */}
             {canManageBatch && (

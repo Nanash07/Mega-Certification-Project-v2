@@ -1,23 +1,13 @@
-// src/pages/certifications/CertificationPage.jsx
 import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
-import { Pencil, Trash2, Plus } from "lucide-react";
+import { Pencil, Trash2, Plus, Award } from "lucide-react";
 import { fetchCertifications, deleteCertification } from "../../services/certificationService";
 import CreateCertificationModal from "../../components/certifications/CreateCertificationModal";
 import EditCertificationModal from "../../components/certifications/EditCertificationModal";
 
-// helper render (kalau nanti mau dipakai)
-function YesNo({ val }) {
-    return val ? <span className="badge badge-success">Ya</span> : <span className="badge">Tidak</span>;
-}
-
 export default function CertificationPage() {
-    // filter basic (belum ada input, tapi disiapin kalau nanti mau ditambah search)
-    const [q, setQ] = useState("");
-    // data state
     const [rows, setRows] = useState([]);
     const [loading, setLoading] = useState(false);
-    // modals
     const [openCreate, setOpenCreate] = useState(false);
     const [editItem, setEditItem] = useState(null);
     const [confirm, setConfirm] = useState({ open: false, id: undefined, name: "" });
@@ -40,12 +30,6 @@ export default function CertificationPage() {
         load();
     }, []);
 
-    const filtered = useMemo(() => {
-        const s = q.trim().toLowerCase();
-        if (!s) return rows;
-        return rows.filter((r) => r.name?.toLowerCase().includes(s) || r.code?.toLowerCase().includes(s));
-    }, [q, rows]);
-
     async function onDelete(id) {
         try {
             await deleteCertification(id);
@@ -57,84 +41,88 @@ export default function CertificationPage() {
     }
 
     return (
-        <div>
-            {/* Toolbar */}
-            <div className="mb-4 space-y-3">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 text-xs items-end">
-                    <div className="col-span-1">
-                        <button className="btn btn-sm btn-primary w-full" onClick={() => setOpenCreate(true)}>
-                            <Plus className="w-4 h-4" />
-                            Tambah Jenis Sertifikasi
-                        </button>
-                    </div>
+        <div className="space-y-4 w-full">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                    <h1 className="text-lg sm:text-xl font-bold">Jenis Sertifikasi</h1>
+                    <p className="text-xs text-gray-500">{rows.length} jenis sertifikasi</p>
                 </div>
+                <button
+                    className="btn btn-sm btn-primary rounded-lg"
+                    onClick={() => setOpenCreate(true)}
+                >
+                    <Plus size={14} />
+                    Tambah Sertifikasi
+                </button>
             </div>
 
-            {/* Table */}
-            <div className="overflow-x-auto rounded-xl border border-gray-200 shadow bg-base-100">
-                <table className="table table-zebra">
-                    <thead className="bg-base-200 text-xs whitespace-nowrap">
-                        <tr>
-                            <th>No.</th>
-                            <th>Aksi</th>
-                            <th>Nama</th>
-                            <th>Kode</th>
-                        </tr>
-                    </thead>
-                    <tbody className="text-xs whitespace-nowrap">
-                        {loading && (
+            {/* Table Card */}
+            <div className="card bg-base-100 shadow-sm border border-gray-100 overflow-hidden">
+                <div className="overflow-x-auto">
+                    <table className="table table-zebra w-full">
+                        <thead className="bg-base-200 text-xs">
                             <tr>
-                                <td colSpan={4} className="py-10 text-center">
-                                    <span className="loading loading-dots loading-md" />
-                                </td>
+                                <th className="w-12">No</th>
+                                <th className="w-24">Aksi</th>
+                                <th>Nama</th>
+                                <th>Kode</th>
                             </tr>
-                        )}
-
-                        {!loading && filtered.length === 0 && (
-                            <tr>
-                                <td colSpan={4} className="text-center text-gray-400 py-10">
-                                    Tidak ada data
-                                </td>
-                            </tr>
-                        )}
-
-                        {!loading &&
-                            filtered.length > 0 &&
-                            filtered.map((c, idx) => (
-                                <tr key={c.id}>
-                                    <td>{idx + 1}</td>
-                                    <td>
-                                        <div className="flex gap-2">
-                                            <div className="tooltip" data-tip="Edit jenis sertifikasi">
-                                                <button
-                                                    className="btn btn-xs btn-soft btn-warning border-warning"
-                                                    onClick={() => setEditItem(c)}
-                                                >
-                                                    <Pencil className="w-3 h-3" />
-                                                </button>
-                                            </div>
-                                            <div className="tooltip" data-tip="Hapus jenis sertifikasi">
-                                                <button
-                                                    className="btn btn-xs btn-soft btn-error border-error"
-                                                    onClick={() =>
-                                                        setConfirm({
-                                                            open: true,
-                                                            id: c.id,
-                                                            name: c.name,
-                                                        })
-                                                    }
-                                                >
-                                                    <Trash2 className="w-3 h-3" />
-                                                </button>
-                                            </div>
+                        </thead>
+                        <tbody className="text-xs">
+                            {loading ? (
+                                <tr>
+                                    <td colSpan={4} className="text-center py-16">
+                                        <span className="loading loading-dots loading-lg text-primary" />
+                                    </td>
+                                </tr>
+                            ) : rows.length === 0 ? (
+                                <tr>
+                                    <td colSpan={4} className="text-center py-16">
+                                        <div className="flex flex-col items-center text-gray-400">
+                                            <Award size={48} className="mb-3 opacity-30" />
+                                            <p className="text-sm">Tidak ada data sertifikasi</p>
                                         </div>
                                     </td>
-                                    <td>{c.name}</td>
-                                    <td>{c.code}</td>
                                 </tr>
-                            ))}
-                    </tbody>
-                </table>
+                            ) : (
+                                rows.map((c, idx) => (
+                                    <tr key={c.id} className="hover">
+                                        <td>{idx + 1}</td>
+                                        <td>
+                                            <div className="flex gap-1">
+                                                <div className="tooltip" data-tip="Edit sertifikasi">
+                                                    <button
+                                                        className="btn btn-xs btn-soft btn-warning border border-warning rounded-lg"
+                                                        onClick={() => setEditItem(c)}
+                                                    >
+                                                        <Pencil size={12} />
+                                                    </button>
+                                                </div>
+                                                <div className="tooltip" data-tip="Hapus sertifikasi">
+                                                    <button
+                                                        className="btn btn-xs btn-soft btn-error border border-error rounded-lg"
+                                                        onClick={() =>
+                                                            setConfirm({
+                                                                open: true,
+                                                                id: c.id,
+                                                                name: c.name,
+                                                            })
+                                                        }
+                                                    >
+                                                        <Trash2 size={12} />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="font-medium">{c.name}</td>
+                                        <td>{c.code}</td>
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
             {/* Modals */}

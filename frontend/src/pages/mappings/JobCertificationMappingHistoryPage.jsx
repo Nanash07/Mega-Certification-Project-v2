@@ -1,4 +1,3 @@
-// src/pages/job-certification-mapping/JobCertificationMappingHistoryPage.jsx
 import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
@@ -7,7 +6,7 @@ import Pagination from "../../components/common/Pagination";
 import { getCurrentRole } from "../../utils/helpers";
 import { fetchJobCertMappingHistories } from "../../services/jobCertificationMappingHistoryService";
 import { fetchMyPicScope } from "../../services/picScopeService";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Eraser, Filter, History as HistoryIcon } from "lucide-react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 
@@ -16,17 +15,13 @@ const TABLE_COLS = 8;
 export default function JobCertificationMappingHistoryPage() {
     const navigate = useNavigate();
 
-    // ===== role state (load dulu, baru dipakai) =====
     const [role, setRole] = useState(null);
     const isRoleLoaded = role !== null;
     const isEmployee = role === "EMPLOYEE" || role === "PEGAWAI";
     const isPic = role === "PIC";
-    const isSuperadmin = role === "SUPERADMIN";
 
-    // PIC scope: list certificationId yang boleh dilihat
-    const [allowedCertIds, setAllowedCertIds] = useState(null); // null = belum ke-load, [] = kosong
+    const [allowedCertIds, setAllowedCertIds] = useState(null);
 
-    // State data
     const [rows, setRows] = useState([]);
     const [loading, setLoading] = useState(false);
     const [page, setPage] = useState(1);
@@ -34,32 +29,26 @@ export default function JobCertificationMappingHistoryPage() {
     const [totalPages, setTotalPages] = useState(0);
     const [totalElements, setTotalElements] = useState(0);
 
-    // Filters
     const [filterAction, setFilterAction] = useState({ value: "all", label: "Semua Aksi" });
     const [startDate, setStartDate] = useState(null);
     const [endDate, setEndDate] = useState(null);
 
-    // ===== INIT ROLE =====
     useEffect(() => {
         setRole(getCurrentRole());
     }, []);
 
-    // ===== Redirect kalau PEGAWAI =====
     useEffect(() => {
         if (!isRoleLoaded) return;
         if (isEmployee) {
             toast.error("Anda tidak berwenang mengakses halaman ini");
             navigate("/", { replace: true });
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isRoleLoaded, isEmployee]);
 
-    // ===== Load PIC scope =====
     useEffect(() => {
-        // cuma PIC yang perlu scope
         if (!isRoleLoaded) return;
         if (!isPic) {
-            setAllowedCertIds(null); // superadmin / role lain: ga kirim param, lihat semua
+            setAllowedCertIds(null);
             return;
         }
 
@@ -68,27 +57,20 @@ export default function JobCertificationMappingHistoryPage() {
                 const scope = await fetchMyPicScope();
                 const scopeCerts = scope?.certifications || [];
                 const ids = scopeCerts.map((c) => c.certificationId).filter((id) => id != null);
-
                 setAllowedCertIds(ids);
             } catch (err) {
                 console.error("Gagal load PIC scope:", err);
                 toast.error("Gagal memuat scope sertifikasi PIC");
-                setAllowedCertIds([]); // fail-safe
+                setAllowedCertIds([]);
             }
         };
-
         loadScope();
     }, [isRoleLoaded, isPic]);
 
-    // ===== Fetch data =====
     const load = useCallback(async () => {
-        // Kalau role belum kebaca, atau lagi redirect pegawai → jangan load
         if (!isRoleLoaded || isEmployee) return;
-
-        // PIC: tunggu scope ke-load dulu
         if (isPic && allowedCertIds === null) return;
 
-        // Validasi tanggal
         if (startDate && endDate && startDate > endDate) {
             toast.error("Tanggal awal tidak boleh lebih besar dari tanggal akhir");
             return;
@@ -104,7 +86,6 @@ export default function JobCertificationMappingHistoryPage() {
                 end: endDate ? endDate.toISOString() : null,
             };
 
-            // PIC: kirim allowedCertificationIds ke backend
             if (isPic && Array.isArray(allowedCertIds) && allowedCertIds.length > 0) {
                 params.allowedCertificationIds = allowedCertIds;
             }
@@ -121,23 +102,20 @@ export default function JobCertificationMappingHistoryPage() {
         }
     }, [page, rowsPerPage, filterAction, startDate, endDate, isRoleLoaded, isEmployee, isPic, allowedCertIds]);
 
-    // Auto reload when filters/pagination/role/scope change
     useEffect(() => {
         load();
     }, [load]);
 
-    // Reset page when filter changes
     useEffect(() => {
         setPage(1);
     }, [filterAction, startDate, endDate]);
 
-    // Reset filter
     const resetFilter = () => {
         setFilterAction({ value: "all", label: "Semua Aksi" });
         setStartDate(null);
         setEndDate(null);
         setPage(1);
-        toast.success("Filter direset");
+        toast.success("Filter dibersihkan");
     };
 
     const formatDate = (val, withTime = true) => {
@@ -152,157 +130,179 @@ export default function JobCertificationMappingHistoryPage() {
 
     const startIdx = totalElements === 0 ? 0 : (page - 1) * rowsPerPage + 1;
 
-    // Selama role belum kebaca, atau user pegawai (lagi redirect) → jangan render apa-apa
-    if (!isRoleLoaded || isEmployee) {
-        return null;
-    }
+    if (!isRoleLoaded || isEmployee) return null;
 
     return (
-        <div className="p-4 space-y-5">
-            {/* Back button */}
-            <div className="flex justify-start mb-3">
-                <button className="btn btn-accent btn-sm flex items-center gap-2" onClick={() => navigate(-1)}>
-                    <ArrowLeft size={16} /> Kembali
-                </button>
-            </div>
-
-            {/* Filters */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 text-xs items-center">
-                {/* Aksi */}
-                <div className="col-span-1">
-                    <Select
-                        options={[
-                            { value: "all", label: "Semua Aksi" },
-                            { value: "CREATED", label: "CREATED" },
-                            { value: "UPDATED", label: "UPDATED" },
-                            { value: "TOGGLED", label: "TOGGLED" },
-                            { value: "DELETED", label: "DELETED" },
-                        ]}
-                        value={filterAction}
-                        onChange={(opt) => setFilterAction(opt || { value: "all", label: "Semua Aksi" })}
-                        placeholder="Filter Aksi"
-                        isClearable
-                    />
-                </div>
-
-                {/* Date Range */}
-                <div className="col-span-2 grid grid-cols-2 gap-2">
-                    <DatePicker
-                        selected={startDate}
-                        onChange={(date) => setStartDate(date)}
-                        selectsStart
-                        startDate={startDate}
-                        endDate={endDate}
-                        className="input input-bordered input-sm w-full"
-                        placeholderText="Dari Tanggal"
-                        dateFormat="dd MMM yyyy"
-                    />
-                    <DatePicker
-                        selected={endDate}
-                        onChange={(date) => setEndDate(date)}
-                        selectsEnd
-                        startDate={startDate}
-                        endDate={endDate}
-                        minDate={startDate}
-                        className="input input-bordered input-sm w-full"
-                        placeholderText="Sampai Tanggal"
-                        dateFormat="dd MMM yyyy"
-                    />
-                </div>
-                <div className="hidden lg:block lg:col-span-2"></div>
-
-                {/* Clear Filter */}
-                <div className="col-span-1">
+        <div className="space-y-4 w-full">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div className="flex items-center gap-3">
                     <button
-                        className="btn btn-accent btn-soft border-accent btn-sm w-full"
-                        type="button"
-                        onClick={resetFilter}
+                        className="btn btn-sm btn-ghost btn-circle"
+                        onClick={() => navigate(-1)}
                     >
-                        Clear Filter
+                        <ArrowLeft size={16} />
                     </button>
+                    <div>
+                        <h1 className="text-lg sm:text-xl font-bold">Histori Mapping Jabatan</h1>
+                        <p className="text-xs text-gray-500">{totalElements} riwayat perubahan</p>
+                    </div>
                 </div>
             </div>
 
-            {/* Table */}
-            <div className="overflow-x-auto rounded-xl border border-gray-200 shadow bg-base-100">
-                <table className="table table-zebra text-xs">
-                    <thead className="bg-base-200">
-                        <tr>
-                            <th>No</th>
-                            <th>Aksi</th>
-                            <th>Tanggal Aksi</th>
-                            <th>Job</th>
-                            <th>Cert Code</th>
-                            <th>Level</th>
-                            <th>Sub Field</th>
-                            <th>Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {loading ? (
+            {/* Filter Card */}
+            <div className="card bg-base-100 shadow-sm border border-gray-100 p-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 text-xs">
+                    <div className="flex flex-col gap-1">
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <Filter size={12} /> Aksi
+                        </label>
+                        <Select
+                            options={[
+                                { value: "all", label: "Semua Aksi" },
+                                { value: "CREATED", label: "CREATED" },
+                                { value: "UPDATED", label: "UPDATED" },
+                                { value: "TOGGLED", label: "TOGGLED" },
+                                { value: "DELETED", label: "DELETED" },
+                            ]}
+                            value={filterAction}
+                            onChange={(opt) => setFilterAction(opt || { value: "all", label: "Semua Aksi" })}
+                            placeholder="Filter Aksi"
+                            isClearable
+                            className="text-xs"
+                            classNamePrefix="react-select"
+                        />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                        <label className="font-medium text-gray-600">Dari Tanggal</label>
+                        <DatePicker
+                            selected={startDate}
+                            onChange={(date) => setStartDate(date)}
+                            selectsStart
+                            startDate={startDate}
+                            endDate={endDate}
+                            className="input input-bordered input-sm w-full rounded-lg"
+                            placeholderText="Dari Tanggal"
+                            dateFormat="dd MMM yyyy"
+                        />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                        <label className="font-medium text-gray-600">Sampai Tanggal</label>
+                        <DatePicker
+                            selected={endDate}
+                            onChange={(date) => setEndDate(date)}
+                            selectsEnd
+                            startDate={startDate}
+                            endDate={endDate}
+                            minDate={startDate}
+                            className="input input-bordered input-sm w-full rounded-lg"
+                            placeholderText="Sampai Tanggal"
+                            dateFormat="dd MMM yyyy"
+                        />
+                    </div>
+                    <div className="lg:col-span-1"></div>
+                    <div className="flex flex-col gap-1">
+                        <label className="font-medium text-gray-600 invisible">.</label>
+                        <button
+                            className="btn btn-sm btn-accent btn-soft w-full flex gap-2 rounded-lg"
+                            onClick={resetFilter}
+                        >
+                            <Eraser size={14} />
+                            Clear Filter
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            {/* Table Card */}
+            <div className="card bg-base-100 shadow-sm border border-gray-100 overflow-hidden">
+                <div className="overflow-x-auto">
+                    <table className="table table-zebra w-full">
+                        <thead className="bg-base-200 text-xs">
                             <tr>
-                                <td colSpan={TABLE_COLS} className="text-center py-10">
-                                    <span className="loading loading-dots loading-md" />
-                                </td>
+                                <th className="w-12">No</th>
+                                <th>Aksi</th>
+                                <th>Tanggal Aksi</th>
+                                <th>Job</th>
+                                <th>Cert Code</th>
+                                <th>Level</th>
+                                <th>Sub Field</th>
+                                <th>Status</th>
                             </tr>
-                        ) : rows.length === 0 ? (
-                            <tr>
-                                <td colSpan={TABLE_COLS} className="text-center text-gray-400 py-10">
-                                    Tidak ada data
-                                </td>
-                            </tr>
-                        ) : (
-                            rows.map((r, idx) => (
-                                <tr key={r.id || idx}>
-                                    <td>{startIdx + idx}</td>
-                                    <td>
-                                        <span
-                                            className={`badge badge-sm text-white ${
-                                                r.actionType === "CREATED"
-                                                    ? "badge-success"
-                                                    : r.actionType === "UPDATED"
-                                                    ? "badge-info"
-                                                    : r.actionType === "TOGGLED"
-                                                    ? "badge-warning"
-                                                    : "badge-error"
-                                            }`}
-                                        >
-                                            {r.actionType}
-                                        </span>
-                                    </td>
-                                    <td>{formatDate(r.actionAt, true)}</td>
-                                    <td>{r.jobName || "-"}</td>
-                                    <td>{r.certificationCode || "-"}</td>
-                                    <td>{r.certificationLevel || "-"}</td>
-                                    <td>{r.subFieldCode || "-"}</td>
-                                    <td>
-                                        <span
-                                            className={`badge badge-sm text-white ${
-                                                r.isActive ? "badge-success" : "badge-error"
-                                            }`}
-                                        >
-                                            {r.isActive ? "ACTIVE" : "INACTIVE"}
-                                        </span>
+                        </thead>
+                        <tbody className="text-xs">
+                            {loading ? (
+                                <tr>
+                                    <td colSpan={TABLE_COLS} className="text-center py-16">
+                                        <span className="loading loading-dots loading-lg text-primary" />
                                     </td>
                                 </tr>
-                            ))
-                        )}
-                    </tbody>
-                </table>
-            </div>
+                            ) : rows.length === 0 ? (
+                                <tr>
+                                    <td colSpan={TABLE_COLS} className="text-center py-16">
+                                        <div className="flex flex-col items-center text-gray-400">
+                                            <HistoryIcon size={48} className="mb-3 opacity-30" />
+                                            <p className="text-sm">Tidak ada data histori</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ) : (
+                                rows.map((r, idx) => (
+                                    <tr key={r.id || idx} className="hover">
+                                        <td>{startIdx + idx}</td>
+                                        <td>
+                                            <span
+                                                className={`badge badge-sm text-white ${
+                                                    r.actionType === "CREATED"
+                                                        ? "badge-success"
+                                                        : r.actionType === "UPDATED"
+                                                        ? "badge-info"
+                                                        : r.actionType === "TOGGLED"
+                                                        ? "badge-warning"
+                                                        : "badge-error"
+                                                }`}
+                                            >
+                                                {r.actionType}
+                                            </span>
+                                        </td>
+                                        <td className="text-gray-500">{formatDate(r.actionAt, true)}</td>
+                                        <td className="font-medium">{r.jobName || "-"}</td>
+                                        <td>{r.certificationCode || "-"}</td>
+                                        <td>{r.certificationLevel || "-"}</td>
+                                        <td>{r.subFieldCode || "-"}</td>
+                                        <td>
+                                            <span
+                                                className={`badge badge-sm text-white ${
+                                                    r.isActive ? "badge-success" : "badge-error"
+                                                }`}
+                                            >
+                                                {r.isActive ? "ACTIVE" : "INACTIVE"}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                </div>
 
-            {/* Pagination */}
-            <Pagination
-                page={page}
-                totalPages={totalPages}
-                totalElements={totalElements}
-                rowsPerPage={rowsPerPage}
-                onPageChange={setPage}
-                onRowsPerPageChange={(val) => {
-                    setRowsPerPage(val);
-                    setPage(1);
-                }}
-            />
+                {/* Pagination inside card */}
+                {rows.length > 0 && (
+                    <div className="border-t border-gray-100 p-3">
+                        <Pagination
+                            page={page}
+                            totalPages={totalPages}
+                            totalElements={totalElements}
+                            rowsPerPage={rowsPerPage}
+                            onPageChange={setPage}
+                            onRowsPerPageChange={(val) => {
+                                setRowsPerPage(val);
+                                setPage(1);
+                            }}
+                        />
+                    </div>
+                )}
+            </div>
         </div>
     );
 }

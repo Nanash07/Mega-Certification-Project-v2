@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Eraser, Eye } from "lucide-react";
+import { Eraser, Eye, Filter, UserX } from "lucide-react";
 import toast from "react-hot-toast";
 import Select from "react-select";
 import AsyncSelect from "react-select/async";
@@ -23,7 +23,7 @@ export default function EmployeeResignedPage() {
     const [totalPages, setTotalPages] = useState(0);
     const [totalElements, setTotalElements] = useState(0);
 
-    const TABLE_COLS = 11;
+    const TABLE_COLS = 12;
 
     const [filterEmployee, setFilterEmployee] = useState(null);
     const [regionalIds, setRegionalIds] = useState([]);
@@ -101,158 +101,205 @@ export default function EmployeeResignedPage() {
         setUnitIds([]);
         setJobPositionIds([]);
         setPage(1);
-        toast.success("Clear filter berhasil");
+        toast.success("Filter dibersihkan");
     }
 
     const startIdx = totalElements === 0 ? 0 : (page - 1) * rowsPerPage + 1;
 
     return (
-        <div>
-            <div className="mb-4 space-y-3">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 text-xs items-center">
-                    <AsyncSelect
-                        cacheOptions
-                        defaultOptions
-                        loadOptions={loadEmployees}
-                        value={filterEmployee}
-                        onChange={setFilterEmployee}
-                        placeholder="Filter Pegawai"
-                        isClearable
-                    />
+        <div className="space-y-4 w-full">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                    <h1 className="text-lg sm:text-xl font-bold">Pegawai Resign</h1>
+                    <p className="text-xs text-gray-500">{totalElements} pegawai resign terdaftar</p>
+                </div>
+            </div>
 
-                    <Select
-                        isMulti
-                        options={regionalOptions}
-                        value={regionalIds}
-                        onChange={setRegionalIds}
-                        placeholder="Filter Regional"
-                    />
-
-                    <Select
-                        isMulti
-                        options={divisionOptions}
-                        value={divisionIds}
-                        onChange={setDivisionIds}
-                        placeholder="Filter Division"
-                    />
-
-                    <Select
-                        isMulti
-                        options={unitOptions}
-                        value={unitIds}
-                        onChange={setUnitIds}
-                        placeholder="Filter Unit"
-                    />
-
-                    <Select
-                        isMulti
-                        options={jobOptions}
-                        value={jobPositionIds}
-                        onChange={setJobPositionIds}
-                        placeholder="Filter Jabatan"
-                    />
-
-                    <div className="col-span-1 lg:col-span-1">
-                        <button className="btn btn-accent btn-soft border-accent btn-sm w-full" onClick={resetFilter}>
-                            <Eraser className="w-4 h-4" />
+            {/* Filter Card */}
+            <div className="card bg-base-100 shadow-sm border border-gray-100 p-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 text-xs">
+                    <div className="flex flex-col gap-1">
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <Filter size={12} /> Pegawai
+                        </label>
+                        <AsyncSelect
+                            cacheOptions
+                            defaultOptions
+                            loadOptions={loadEmployees}
+                            value={filterEmployee}
+                            onChange={setFilterEmployee}
+                            placeholder="Filter Pegawai"
+                            isClearable
+                            className="text-xs"
+                            classNamePrefix="react-select"
+                        />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <Filter size={12} /> Regional
+                        </label>
+                        <Select
+                            isMulti
+                            options={regionalOptions}
+                            value={regionalIds}
+                            onChange={setRegionalIds}
+                            placeholder="Filter Regional"
+                            className="text-xs"
+                            classNamePrefix="react-select"
+                        />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <Filter size={12} /> Division
+                        </label>
+                        <Select
+                            isMulti
+                            options={divisionOptions}
+                            value={divisionIds}
+                            onChange={setDivisionIds}
+                            placeholder="Filter Division"
+                            className="text-xs"
+                            classNamePrefix="react-select"
+                        />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <Filter size={12} /> Unit
+                        </label>
+                        <Select
+                            isMulti
+                            options={unitOptions}
+                            value={unitIds}
+                            onChange={setUnitIds}
+                            placeholder="Filter Unit"
+                            className="text-xs"
+                            classNamePrefix="react-select"
+                        />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <Filter size={12} /> Jabatan
+                        </label>
+                        <Select
+                            isMulti
+                            options={jobOptions}
+                            value={jobPositionIds}
+                            onChange={setJobPositionIds}
+                            placeholder="Filter Jabatan"
+                            className="text-xs"
+                            classNamePrefix="react-select"
+                        />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                        <label className="font-medium text-gray-600 invisible">.</label>
+                        <button className="btn btn-sm btn-accent btn-soft w-full flex gap-2 rounded-lg" onClick={resetFilter}>
+                            <Eraser size={14} />
                             Clear Filter
                         </button>
                     </div>
                 </div>
             </div>
 
-            <div className="overflow-x-auto rounded-xl border border-gray-200 shadow bg-base-100">
-                <table className="table table-zebra">
-                    <thead className="bg-base-200 text-xs">
-                        <tr>
-                            <th>No</th>
-                            <th>NIP</th>
-                            <th>Nama</th>
-                            <th>Detail</th>
-                            <th>Status</th>
-                            <th>Email</th>
-                            <th>Gender</th>
-                            <th>Regional</th>
-                            <th>Division</th>
-                            <th>Unit</th>
-                            <th>Jabatan</th>
-                            <th>SK Efektif</th>
-                        </tr>
-                    </thead>
-
-                    <tbody className="text-xs">
-                        {loading ? (
+            {/* Table Card */}
+            <div className="card bg-base-100 shadow-sm border border-gray-100 overflow-hidden">
+                <div className="overflow-x-auto">
+                    <table className="table table-zebra w-full">
+                        <thead className="bg-base-200 text-xs">
                             <tr>
-                                <td colSpan={TABLE_COLS + 1} className="text-center py-10">
-                                    <span className="loading loading-dots loading-md" />
-                                </td>
+                                <th className="w-12">No</th>
+                                <th>NIP</th>
+                                <th>Nama</th>
+                                <th className="w-16">Detail</th>
+                                <th className="w-24">Status</th>
+                                <th>Email</th>
+                                <th>Gender</th>
+                                <th>Regional</th>
+                                <th>Division</th>
+                                <th>Unit</th>
+                                <th>Jabatan</th>
+                                <th>SK Efektif</th>
                             </tr>
-                        ) : rows.length === 0 ? (
-                            <tr>
-                                <td colSpan={TABLE_COLS + 1} className="text-center text-gray-400 py-10">
-                                    Tidak ada data
-                                </td>
-                            </tr>
-                        ) : (
-                            rows.map((e, idx) => (
-                                <tr key={e.id}>
-                                    <td>{startIdx + idx}</td>
-                                    <td>{e.nip}</td>
-                                    <td>{e.name}</td>
-
-                                    <td>
-                                        <div className="tooltip" data-tip="Lihat detail pegawai">
-                                            <Link
-                                                to={`/employee/${e.id}`}
-                                                className="btn btn-xs btn-info btn-soft border-info"
-                                            >
-                                                <Eye className="w-3 h-3" />
-                                            </Link>
-                                        </div>
-                                    </td>
-
-                                    <td>
-                                        <span className="badge badge-sm text-white badge-error">
-                                            {formatStatusLabel(e.status)}
-                                        </span>
-                                    </td>
-
-                                    <td>{e.email}</td>
-                                    <td>{e.gender}</td>
-                                    <td>{e.regionalName || "-"}</td>
-                                    <td>{e.divisionName || "-"}</td>
-                                    <td>{e.unitName || "-"}</td>
-                                    <td>{e.jobName || "-"}</td>
-                                    <td>
-                                        {e.effectiveDate
-                                            ? new Date(e.effectiveDate)
-                                                  .toLocaleDateString("id-ID", {
-                                                      day: "2-digit",
-                                                      month: "short",
-                                                      year: "numeric",
-                                                  })
-                                                  .replace(/\./g, "")
-                                                  .replace(/(\b[a-z])/g, (x) => x.toUpperCase())
-                                            : "-"}
+                        </thead>
+                        <tbody className="text-xs">
+                            {loading ? (
+                                <tr>
+                                    <td colSpan={TABLE_COLS} className="text-center py-16">
+                                        <span className="loading loading-dots loading-lg text-primary" />
                                     </td>
                                 </tr>
-                            ))
-                        )}
-                    </tbody>
-                </table>
-            </div>
+                            ) : rows.length === 0 ? (
+                                <tr>
+                                    <td colSpan={TABLE_COLS} className="text-center py-16">
+                                        <div className="flex flex-col items-center text-gray-400">
+                                            <UserX size={48} className="mb-3 opacity-30" />
+                                            <p className="text-sm">Tidak ada data pegawai resign</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ) : (
+                                rows.map((e, idx) => (
+                                    <tr key={e.id} className="hover">
+                                        <td>{startIdx + idx}</td>
+                                        <td>{e.nip}</td>
+                                        <td className="font-medium">{e.name}</td>
+                                        <td>
+                                            <div className="tooltip" data-tip="Lihat detail pegawai">
+                                                <Link
+                                                    to={`/employee/${e.id}`}
+                                                    className="btn btn-xs btn-info btn-soft border border-info rounded-lg"
+                                                >
+                                                    <Eye size={12} />
+                                                </Link>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <span className="badge badge-sm text-white badge-error">
+                                                {formatStatusLabel(e.status)}
+                                            </span>
+                                        </td>
+                                        <td>{e.email}</td>
+                                        <td>{e.gender}</td>
+                                        <td>{e.regionalName || "-"}</td>
+                                        <td>{e.divisionName || "-"}</td>
+                                        <td>{e.unitName || "-"}</td>
+                                        <td>{e.jobName || "-"}</td>
+                                        <td>
+                                            {e.effectiveDate
+                                                ? new Date(e.effectiveDate)
+                                                      .toLocaleDateString("id-ID", {
+                                                          day: "2-digit",
+                                                          month: "short",
+                                                          year: "numeric",
+                                                      })
+                                                      .replace(/\./g, "")
+                                                      .replace(/(\b[a-z])/g, (x) => x.toUpperCase())
+                                                : "-"}
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                </div>
 
-            <Pagination
-                page={page}
-                totalPages={totalPages}
-                totalElements={totalElements}
-                rowsPerPage={rowsPerPage}
-                onPageChange={setPage}
-                onRowsPerPageChange={(val) => {
-                    setRowsPerPage(val);
-                    setPage(1);
-                }}
-            />
+                {/* Pagination inside card */}
+                {rows.length > 0 && (
+                    <div className="border-t border-gray-100 p-3">
+                        <Pagination
+                            page={page}
+                            totalPages={totalPages}
+                            totalElements={totalElements}
+                            rowsPerPage={rowsPerPage}
+                            onPageChange={setPage}
+                            onRowsPerPageChange={(val) => {
+                                setRowsPerPage(val);
+                                setPage(1);
+                            }}
+                        />
+                    </div>
+                )}
+            </div>
         </div>
     );
 }

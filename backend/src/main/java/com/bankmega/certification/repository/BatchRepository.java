@@ -11,44 +11,49 @@ import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.stereotype.Repository;
+import org.springframework.lang.NonNull;
+import org.springframework.lang.Nullable;
 
 import java.util.List;
 import java.util.Optional;
 
 @Repository
 public interface BatchRepository extends JpaRepository<Batch, Long>, JpaSpecificationExecutor<Batch> {
-    Optional<Batch> findByIdAndDeletedAtIsNull(Long id);
+        Optional<Batch> findByIdAndDeletedAtIsNull(Long id);
 
-    @Override
-    @EntityGraph(attributePaths = {
-            "certificationRule",
-            "certificationRule.certification",
-            "certificationRule.certificationLevel",
-            "certificationRule.subField",
-            "certificationRule.refreshmentType",
-            "institution"
-    })
-    Page<Batch> findAll(Specification<Batch> spec, Pageable pageable);
+        @Override
+        @EntityGraph(attributePaths = {
+                        "certificationRule",
+                        "certificationRule.certification",
+                        "certificationRule.certificationLevel",
+                        "certificationRule.subField",
+                        "certificationRule.refreshmentType",
+                        "institution"
+        })
+        @NonNull
+        Page<Batch> findAll(@Nullable Specification<Batch> spec, @NonNull Pageable pageable);
 
-    @Override
-    @EntityGraph(attributePaths = {
-            "certificationRule",
-            "certificationRule.certification",
-            "certificationRule.certificationLevel",
-            "certificationRule.subField",
-            "certificationRule.refreshmentType",
-            "institution"
-    })
-    List<Batch> findAll(Specification<Batch> spec, Sort sort);
+        @Override
+        @EntityGraph(attributePaths = {
+                        "certificationRule",
+                        "certificationRule.certification",
+                        "certificationRule.certificationLevel",
+                        "certificationRule.subField",
+                        "certificationRule.refreshmentType",
+                        "institution"
+        })
+        @NonNull
+        List<Batch> findAll(@Nullable Specification<Batch> spec, @NonNull Sort sort);
 
-    @Override
-    @EntityGraph(attributePaths = {
-            "certificationRule",
-            "certificationRule.certification",
-            "certificationRule.certificationLevel",
-            "certificationRule.subField",
-            "certificationRule.refreshmentType",
-            "institution"
-    })
-    List<Batch> findAll(Specification<Batch> spec);
+        @Override
+        @EntityGraph(attributePaths = {
+                        "certificationRule",
+                        "certificationRule.certification",
+                        "certificationRule.certificationLevel",
+                        "certificationRule.subField",
+                        "certificationRule.refreshmentType",
+                        "institution"
+        })
+        @NonNull
+        List<Batch> findAll(@Nullable Specification<Batch> spec);
 }

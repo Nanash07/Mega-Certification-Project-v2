@@ -12,23 +12,35 @@ import {
     Bell,
     ClipboardList,
     Settings,
+    UserX,
+    FileCheck,
+    Network,
 } from "lucide-react";
 
+// Menu structure with sections
 export const MENU = [
+    // ─── OVERVIEW ───
     {
+        section: "OVERVIEW",
         label: "Dashboard",
         icon: <LayoutDashboard size={18} />,
         href: "/dashboard",
         key: "dashboard",
     },
+
+    // ─── KEPEGAWAIAN ───
     {
-        label: "Pegawai",
+        section: "KEPEGAWAIAN",
+        label: "Data Pegawai",
         icon: <User size={18} />,
-        key: "pegawai",
-        subMenu: [
-            { label: "Data Pegawai", href: "/employee/data" },
-            { label: "Data Pegawai Resign", href: "/employee/resigned" },
-        ],
+        href: "/employee/data",
+        key: "data-pegawai",
+    },
+    {
+        label: "Pegawai Resign",
+        icon: <UserX size={18} />,
+        href: "/employee/resigned",
+        key: "pegawai-resign",
     },
     {
         label: "Eligibility",
@@ -45,21 +57,27 @@ export const MENU = [
         href: "/employee/certification",
         key: "sertifikat-pegawai",
     },
+
+    // ─── SERTIFIKASI ───
     {
+        section: "SERTIFIKASI",
         label: "Batch",
         icon: <ClipboardList size={18} />,
         href: "/batch",
         key: "batch",
     },
     {
-        label: "Mapping",
-        icon: <ListChecks size={18} />,
+        label: "Mapping Jabatan",
+        icon: <Network size={18} />,
         href: "/mapping/job-certification",
         key: "mapping",
     },
+
+    // ─── MASTER DATA ───
     {
+        section: "MASTER DATA",
         label: "Sertifikat",
-        icon: <BadgeCheck size={18} />,
+        icon: <FileCheck size={18} />,
         key: "sertifikat",
         subMenu: [
             { label: "Aturan Sertifikat", href: "/sertifikat/aturan-sertifikat" },
@@ -80,8 +98,11 @@ export const MENU = [
             { label: "Job Position", href: "/organization/job-position" },
         ],
     },
+
+    // ─── PENGATURAN ───
     {
-        label: "User",
+        section: "PENGATURAN",
+        label: "Kelola User",
         icon: <Settings size={18} />,
         href: "/user",
         key: "user",
@@ -89,7 +110,7 @@ export const MENU = [
     {
         label: "Notifikasi",
         icon: <Bell size={18} />,
-        key: "settings",
+        key: "notifikasi",
         subMenu: [
             { label: "Template & Jadwal", href: "/settings/notification-settings" },
             { label: "Konfigurasi Email", href: "/settings/email-config" },
@@ -136,7 +157,7 @@ export const filterMenuByRole = (menu, roleRaw) => {
                         ),
                     };
                 }
-                if (item.key === "settings") {
+                if (item.key === "notifikasi") {
                     return {
                         ...item,
                         subMenu: item.subMenu.filter(
@@ -156,6 +177,7 @@ export const filterMenuByRole = (menu, roleRaw) => {
         return [
             ...allowed,
             {
+                section: "LAINNYA",
                 label: "Notifikasi",
                 icon: <Bell size={18} />,
                 href: "/notifications",
@@ -164,7 +186,7 @@ export const filterMenuByRole = (menu, roleRaw) => {
         ];
     }
 
-    return menu.filter((item) => item.key === "dashboard" || item.key === "pegawai" || item.key === "eligibility");
+    return menu.filter((item) => item.key === "dashboard" || item.key === "data-pegawai" || item.key === "eligibility");
 };
 
 export default function Sidebar({ open, setOpen }) {
@@ -191,17 +213,20 @@ export default function Sidebar({ open, setOpen }) {
         if (window.innerWidth < 1024) setOpen(false);
     };
 
+    // Track which section we've rendered
+    let lastSection = null;
+
     return (
         <>
-            {open && <div className="fixed inset-0 z-30 lg:hidden" onClick={() => setOpen(false)} />}
+            {open && <div className="fixed inset-0 z-40 lg:hidden bg-black/20" onClick={() => setOpen(false)} />}
 
             <aside
                 className={`
-          fixed z-40 top-0 left-0 h-full w-56 bg-white shadow-sm
+          fixed z-50 top-0 left-0 h-full w-56 bg-white shadow-sm
           flex flex-col transition-transform duration-300
           ${open ? "translate-x-0" : "-translate-x-full"}
           border-r border-gray-200
-          lg:translate-x-0 lg:static
+          lg:translate-x-0 lg:static lg:z-auto
         `}
             >
                 <div className="flex items-center h-20 px-6 border-b border-gray-200">
@@ -210,54 +235,72 @@ export default function Sidebar({ open, setOpen }) {
                     </Link>
                 </div>
 
-                <nav className="flex-1 overflow-y-auto pt-6 px-2 space-y-1">
-                    {visibleMenu.map((item) =>
-                        item.subMenu ? (
-                            <div key={item.key} className="mb-2">
-                                <button
-                                    type="button"
-                                    onClick={() => handleMenuClick(item.key)}
-                                    className={`btn w-full justify-start gap-3 mb-2 text-xs ${
-                                        isMenuActive(item) ? "btn-primary" : "btn-ghost"
-                                    }`}
-                                >
-                                    {item.icon}
-                                    <span className="flex-1 text-left text-xs">{item.label}</span>
-                                    {openMenu === item.key ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                                </button>
+                <nav className="flex-1 overflow-y-auto pt-4 px-2">
+                    {visibleMenu.map((item, index) => {
+                        // Check if we need to render a section header
+                        const showSection = item.section && item.section !== lastSection;
+                        if (item.section) lastSection = item.section;
 
-                                {openMenu === item.key && (
-                                    <div className="ml-4 space-y-1">
-                                        {item.subMenu.map((sub) => (
-                                            <Link
-                                                key={sub.href}
-                                                to={sub.href}
-                                                className={`btn w-full justify-start text-xs ${
-                                                    isActive(sub.href) ? "btn-primary" : "btn-ghost"
-                                                }`}
-                                                onClick={handleLinkClick}
-                                            >
-                                                {sub.label}
-                                            </Link>
-                                        ))}
+                        return (
+                            <div key={item.key}>
+                                {/* Section Header */}
+                                {showSection && (
+                                    <div className={`px-3 pt-4 pb-2 ${index === 0 ? "pt-1" : ""}`}>
+                                        <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
+                                            {item.section}
+                                        </span>
+                                    </div>
+                                )}
+
+                                {/* Menu Item */}
+                                {item.subMenu ? (
+                                    <div className="mb-1">
+                                        <button
+                                            type="button"
+                                            onClick={() => handleMenuClick(item.key)}
+                                            className={`btn btn-sm w-full justify-start gap-3 text-xs ${
+                                                isMenuActive(item) ? "btn-primary" : "btn-ghost"
+                                            }`}
+                                        >
+                                            {item.icon}
+                                            <span className="flex-1 text-left text-xs">{item.label}</span>
+                                            {openMenu === item.key ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                                        </button>
+
+                                        {openMenu === item.key && (
+                                            <div className="ml-4 mt-1 space-y-1">
+                                                {item.subMenu.map((sub) => (
+                                                    <Link
+                                                        key={sub.href}
+                                                        to={sub.href}
+                                                        className={`btn btn-sm w-full justify-start text-xs ${
+                                                            isActive(sub.href) ? "btn-primary" : "btn-ghost"
+                                                        }`}
+                                                        onClick={handleLinkClick}
+                                                    >
+                                                        {sub.label}
+                                                    </Link>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div className="mb-1">
+                                        <Link
+                                            to={item.href}
+                                            className={`btn btn-sm w-full justify-start gap-3 text-xs ${
+                                                isMenuActive(item) ? "btn-primary" : "btn-ghost"
+                                            }`}
+                                            onClick={handleLinkClick}
+                                        >
+                                            {item.icon}
+                                            {item.label}
+                                        </Link>
                                     </div>
                                 )}
                             </div>
-                        ) : (
-                            <div key={item.key} className="mb-2">
-                                <Link
-                                    to={item.href}
-                                    className={`btn w-full justify-start gap-3 text-xs ${
-                                        isMenuActive(item) ? "btn-primary" : "btn-ghost"
-                                    }`}
-                                    onClick={handleLinkClick}
-                                >
-                                    {item.icon}
-                                    {item.label}
-                                </Link>
-                            </div>
-                        )
-                    )}
+                        );
+                    })}
                 </nav>
             </aside>
         </>
