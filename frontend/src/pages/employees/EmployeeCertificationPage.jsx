@@ -242,7 +242,7 @@ export default function EmployeeCertificationPage() {
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div>
-                    <h1 className="text-lg sm:text-xl font-bold">Sertifikasi Pegawai</h1>
+                    <h1 className="text-lg sm:text-xl font-bold">Sertifikat Pegawai</h1>
                     <p className="text-xs text-gray-500">{totalElements} sertifikat terdaftar</p>
                 </div>
                 <div className="flex flex-wrap gap-2">

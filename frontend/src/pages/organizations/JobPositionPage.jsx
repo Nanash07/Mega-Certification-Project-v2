@@ -88,7 +88,7 @@ export default function JobPositionPage() {
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div>
-                    <h1 className="text-lg sm:text-xl font-bold">Kelola Jabatan</h1>
+                    <h1 className="text-lg sm:text-xl font-bold">Kelola Job Position</h1>
                     <p className="text-xs text-gray-500">{totalElements} jabatan terdaftar</p>
                 </div>
             </div>
