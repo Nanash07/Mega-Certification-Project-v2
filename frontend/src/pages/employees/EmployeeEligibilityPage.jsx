@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import Select from "react-select";
 import AsyncSelect from "react-select/async";
@@ -22,6 +22,7 @@ import { Eye, RotateCw, Eraser, Download, ClipboardList, Search, Briefcase, Awar
 const TABLE_COLS = 17;
 
 export default function EmployeeEligibilityPage() {
+    const [searchParams] = useSearchParams();
     const [role] = useState(() => getCurrentRole());
     const isSuperadmin = role === "SUPERADMIN";
     const isPic = role === "PIC";
@@ -52,6 +53,35 @@ export default function EmployeeEligibilityPage() {
     const [certOptions, setCertOptions] = useState([]);
     const [levelOptions, setLevelOptions] = useState([]);
     const [subOptions, setSubOptions] = useState([]);
+
+    // Status options for filter
+    const statusOptions = useMemo(
+        () => [
+            { value: "NOT_YET_CERTIFIED", label: "Belum Sertifikasi" },
+            { value: "ACTIVE", label: "Active" },
+            { value: "DUE", label: "Due" },
+            { value: "EXPIRED", label: "Expired" },
+        ],
+        []
+    );
+
+    // Read URL query params on mount and URL change
+    useEffect(() => {
+        const statusParam = searchParams.get("status");
+        if (statusParam) {
+            const opts = [
+                { value: "NOT_YET_CERTIFIED", label: "Belum Sertifikasi" },
+                { value: "ACTIVE", label: "Active" },
+                { value: "DUE", label: "Due" },
+                { value: "EXPIRED", label: "Expired" },
+            ];
+            const statusOption = opts.find((s) => s.value === statusParam);
+            if (statusOption) {
+                setFilterStatus(statusOption);
+            }
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchParams.get("status")]);
 
     const statusBadgeClass = useMemo(
         () => ({
@@ -376,12 +406,7 @@ export default function EmployeeEligibilityPage() {
                             <Filter size={12} /> Status
                         </label>
                         <Select
-                            options={[
-                                { value: "NOT_YET_CERTIFIED", label: "Belum Sertifikasi" },
-                                { value: "ACTIVE", label: "Active" },
-                                { value: "DUE", label: "Due" },
-                                { value: "EXPIRED", label: "Expired" },
-                            ]}
+                            options={statusOptions}
                             value={filterStatus}
                             onChange={setFilterStatus}
                             placeholder="Semua Status"

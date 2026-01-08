@@ -1,11 +1,10 @@
 // src/components/Navbar.jsx
 import { useState, useEffect, useRef } from "react";
-import { Menu, Bell } from "lucide-react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Menu, Bell, Mail, MailOpen, Clock, ArrowRight } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 import ProfileDropdown from "./ProfileDropdown";
 import { fetchUnreadCount, fetchLatestNotifications, markNotificationAsRead } from "../services/notificationService";
-import { MENU, filterMenuByRole } from "./Sidebar";
 
 // ====== HELPERS ======
 const getStoredUser = () => {
@@ -21,42 +20,61 @@ const getCurrentRole = () => {
 
     return (
         storedUser.role ||
-        localStorage.getItem("role") || // fallback lama
+        localStorage.getItem("role") ||
         ""
     )
         .toString()
         .toUpperCase();
 };
 
-// Ambil title dari menu yang sudah difilter by role
-const getMenuTitle = (pathname, menu) => {
-    // flatten menu + submenu jadi satu list
-    const flat = menu.flatMap((item) =>
-        item.subMenu
-            ? item.subMenu.map((sub) => ({
-                  ...sub,
-              }))
-            : [item]
-    );
+const getTypeLabel = (type) => {
+    const map = {
+        CERT_REMINDER: "Due",
+        BATCH_NOTIFICATION: "Batch",
+        EXPIRED_NOTICE: "Expired",
+    };
+    return map[type] || "";
+};
 
-    const match = flat.find((entry) => pathname === entry.href || pathname.startsWith(entry.href + "/"));
+const getTypeBadgeClass = (type) => {
+    const map = {
+        CERT_REMINDER: "bg-amber-100 text-amber-700",
+        BATCH_NOTIFICATION: "bg-blue-100 text-blue-700",
+        EXPIRED_NOTICE: "bg-red-100 text-red-700",
+    };
+    return map[type] || "bg-gray-100 text-gray-600";
+};
 
-    return match?.label || "Dashboard";
+const getTypeIconColor = (type) => {
+    const map = {
+        CERT_REMINDER: "text-amber-500",
+        BATCH_NOTIFICATION: "text-blue-500",
+        EXPIRED_NOTICE: "text-red-500",
+    };
+    return map[type] || "text-gray-400";
+};
+
+const formatDate = (value) => {
+    if (!value) return "-";
+    return new Date(value).toLocaleDateString("id-ID", {
+        day: "2-digit",
+        month: "short",
+    });
+};
+
+const formatTime = (value) => {
+    if (!value) return "";
+    return new Date(value).toLocaleTimeString("id-ID", {
+        hour: "2-digit",
+        minute: "2-digit",
+    });
 };
 
 export default function Navbar({ onMenuClick, hideMenuButton = false }) {
     const navigate = useNavigate();
-    const location = useLocation();
 
     const rawRole = getCurrentRole();
     const isEmployee = rawRole === "PEGAWAI";
-
-    const visibleMenu = filterMenuByRole(MENU, rawRole);
-
-    // 🔑 Di sini kuncinya:
-    // Pegawai: title fix "Mega Certification"
-    // Lainnya: ikut title dari menu
-    const title = isEmployee ? "Mega Certification" : getMenuTitle(location.pathname, visibleMenu);
 
     const [notifOpen, setNotifOpen] = useState(false);
     const notifRef = useRef(null);
@@ -64,8 +82,6 @@ export default function Navbar({ onMenuClick, hideMenuButton = false }) {
     const [unreadCount, setUnreadCount] = useState(0);
     const [latest, setLatest] = useState([]);
 
-    // Pegawai aja yang punya notifikasi
-    // (role lain notifnya di menu sidebar/settings)
     useEffect(() => {
         if (!isEmployee) return;
 
@@ -87,7 +103,6 @@ export default function Navbar({ onMenuClick, hideMenuButton = false }) {
         }
     };
 
-    // Close dropdown if outside click
     useEffect(() => {
         function handleClick(e) {
             if (notifRef.current && !notifRef.current.contains(e.target)) {
@@ -101,7 +116,6 @@ export default function Navbar({ onMenuClick, hideMenuButton = false }) {
     const openFullNotification = async (notifId) => {
         try {
             await markNotificationAsRead(notifId);
-
             setLatest((prev) => prev.map((n) => (n.id === notifId ? { ...n, read: true } : n)));
             setUnreadCount((prev) => (prev > 0 ? prev - 1 : 0));
         } catch (err) {
@@ -113,63 +127,120 @@ export default function Navbar({ onMenuClick, hideMenuButton = false }) {
     };
 
     return (
-        <header className="flex items-center h-20 px-4 lg:px-8 bg-white border-b border-gray-200 relative z-40">
-            {/* Hamburger: cuma non-pegawai yang punya */}
+        <header className="flex items-center h-16 px-4 lg:px-6 bg-white border-b border-gray-100 relative z-40">
+            {/* Hamburger */}
             {!hideMenuButton && (
-                <button className="btn btn-ghost btn-square border border-gray-200 lg:hidden" onClick={onMenuClick}>
-                    <Menu size={24} className="text-gray-400" />
+                <button 
+                    className="w-10 h-10 flex items-center justify-center rounded-xl border border-gray-200 hover:bg-gray-50 transition-colors lg:hidden" 
+                    onClick={onMenuClick}
+                >
+                    <Menu size={20} className="text-gray-500" />
                 </button>
             )}
 
-            {/* Page Title */}
-            <h1 className="ml-4 font-bold text-base sm:text-lg md:text-xl lg:text-2xl truncate max-w-[70%]">{title}</h1>
-
-            <div className="flex items-center gap-4 ml-auto">
+            <div className="flex items-center gap-3 ml-auto">
                 {/* 🔔 Notification Button (Pegawai Only) */}
                 {isEmployee && (
                     <div className="relative" ref={notifRef}>
                         <button
-                            className="btn btn-ghost btn-circle border border-gray-200 relative"
+                            className="w-10 h-10 flex items-center justify-center rounded-xl border border-gray-200 hover:bg-gray-50 transition-colors relative"
                             onClick={() => setNotifOpen((v) => !v)}
                         >
-                            <Bell size={22} className="text-gray-500" />
+                            <Bell size={20} className="text-gray-500" />
                             {unreadCount > 0 && (
-                                <span className="absolute top-2 right-2 w-3 h-3 bg-red-500 rounded-full ring-2 ring-white" />
+                                <span className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1.5 bg-red-500 rounded-full ring-2 ring-white flex items-center justify-center">
+                                    <span className="text-[11px] font-bold text-white">{unreadCount > 9 ? "9+" : unreadCount}</span>
+                                </span>
                             )}
                         </button>
 
                         {notifOpen && (
-                            <div className="absolute right-0 mt-3 w-80 bg-white rounded-2xl shadow-xl border border-gray-100 z-50 overflow-hidden">
-                                <div className="px-6 pt-4 pb-2 font-bold text-lg">Notifikasi</div>
-
-                                <div className="max-h-80 overflow-y-auto divide-y divide-gray-100">
-                                    {latest.length === 0 ? (
-                                        <p className="p-4 text-sm text-gray-400">Tidak ada notifikasi</p>
-                                    ) : (
-                                        latest.map((n) => (
-                                            <button
-                                                key={n.id}
-                                                onClick={() => openFullNotification(n.id)}
-                                                className="w-full text-left px-4 py-3 hover:bg-gray-50 flex flex-col"
-                                            >
-                                                <div className="font-semibold text-sm">{n.title}</div>
-                                                <div className="text-xs text-gray-500">
-                                                    {new Date(n.createdAt).toLocaleDateString("id-ID")}
-                                                </div>
-                                                <div className="text-xs text-gray-600 line-clamp-2">{n.message}</div>
-                                            </button>
-                                        ))
+                            <div className="absolute right-0 mt-2 w-96 bg-white rounded-2xl shadow-2xl border border-gray-100 z-50 overflow-hidden">
+                                {/* Header */}
+                                <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+                                    <div className="flex items-center gap-2">
+                                        <Bell size={18} className="text-primary" />
+                                        <span className="font-semibold text-gray-800">Notifikasi</span>
+                                    </div>
+                                    {unreadCount > 0 && (
+                                        <span className="text-xs font-medium text-primary bg-primary/10 px-2 py-0.5 rounded-full">{unreadCount} baru</span>
                                     )}
                                 </div>
 
+                                {/* List */}
+                                <div className="max-h-[360px] overflow-y-auto">
+                                    {latest.length === 0 ? (
+                                        <div className="flex flex-col items-center justify-center py-10 text-gray-400">
+                                            <Bell size={36} className="mb-2 opacity-30" />
+                                            <p className="text-sm">Tidak ada notifikasi</p>
+                                        </div>
+                                    ) : (
+                                        <div className="divide-y divide-gray-50">
+                                            {latest.map((n) => (
+                                                <button
+                                                    key={n.id}
+                                                    onClick={() => openFullNotification(n.id)}
+                                                    className={`w-full text-left p-3.5 hover:bg-gray-50 transition-all flex gap-3 group ${
+                                                        !n.read ? "bg-primary/5" : ""
+                                                    }`}
+                                                >
+                                                    {/* Icon */}
+                                                    <div className="flex-shrink-0 relative pt-0.5">
+                                                        {!n.read ? (
+                                                            <Mail size={18} className={getTypeIconColor(n.type)} />
+                                                        ) : (
+                                                            <MailOpen size={18} className="text-gray-300" />
+                                                        )}
+                                                        {!n.read && (
+                                                            <span className="absolute -top-1 -right-1 w-2 h-2 bg-primary rounded-full ring-1 ring-white" />
+                                                        )}
+                                                    </div>
+
+                                                    {/* Content */}
+                                                    <div className="flex-1 min-w-0">
+                                                        <h4 className={`text-sm line-clamp-1 ${
+                                                            !n.read ? "font-semibold text-gray-900" : "font-medium text-gray-600"
+                                                        }`}>
+                                                            {n.title}
+                                                        </h4>
+                                                        
+                                                        <p className="text-xs text-gray-500 line-clamp-1 mt-0.5">
+                                                            {n.message}
+                                                        </p>
+
+                                                        <div className="flex items-center gap-2 mt-1">
+                                                            {getTypeLabel(n.type) && (
+                                                                <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${getTypeBadgeClass(n.type)}`}>
+                                                                    {getTypeLabel(n.type)}
+                                                                </span>
+                                                            )}
+                                                            <span className="text-[10px] text-gray-400 flex items-center gap-1">
+                                                                <Clock size={10} />
+                                                                {formatDate(n.createdAt)}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Arrow on hover */}
+                                                    <div className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity self-center">
+                                                        <ArrowRight size={14} className="text-gray-400" />
+                                                    </div>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Footer */}
                                 <button
-                                    className="w-full py-3 text-center text-primary text-sm font-medium hover:bg-gray-50"
+                                    className="w-full py-3 text-center text-primary text-sm font-medium hover:bg-primary/5 transition-colors border-t border-gray-100 flex items-center justify-center gap-1.5"
                                     onClick={() => {
                                         navigate("/notifications");
                                         setNotifOpen(false);
                                     }}
                                 >
                                     Lihat Semua
+                                    <ArrowRight size={14} />
                                 </button>
                             </div>
                         )}

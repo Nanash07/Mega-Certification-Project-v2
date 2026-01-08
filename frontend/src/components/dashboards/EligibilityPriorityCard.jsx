@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import PaginationSimple from "../common/PaginationSimple";
 import { fetchEmployeeEligibilityPaged } from "../../services/employeeEligibilityService";
 import { formatShortIdDate } from "../../utils/date";
+import { Clock, AlertTriangle, XCircle, FileWarning, ArrowRight, User } from "lucide-react";
 
 const toDate = (d) => (d ? new Date(d) : null);
 const fmtID = (d) => (d ? formatShortIdDate(d) : "-");
@@ -34,24 +35,12 @@ function getRuleCode(row) {
     return "-";
 }
 
-function getPriorityPath(row) {
-    const nip = row?.nip || "";
-    const rule = getRuleCode(row);
-    if (row?.eligibilityId) {
-        return `/employee/eligibility?nip=${encodeURIComponent(nip)}&rule=${encodeURIComponent(rule)}`;
-    }
-    return `/employee/certification?nip=${encodeURIComponent(nip)}&rule=${encodeURIComponent(rule)}`;
+function getPriorityPath() {
+    return "/employee/eligibility";
 }
 
 /**
  * Reusable card untuk list eligibility by status (NOT_YET_CERTIFIED / DUE / EXPIRED)
- *
- * props:
- * - title: judul card
- * - status: string status eligibility (NOT_YET_CERTIFIED | DUE | EXPIRED)
- * - accentClass: className tambahan di title (misal "text-sky-600")
- * - filters: object filter { divisionId, regionalId, unitId, certificationId, levelId, subFieldId, employeeId? }
- * - initialRowsPerPage: default 10
  */
 export default function EligibilityPriorityCard({
     title,
@@ -102,94 +91,142 @@ export default function EligibilityPriorityCard({
     const isDue = status === "DUE";
     const isExpired = status === "EXPIRED";
 
-    const colSpan = isDue ? 5 : isExpired ? 4 : 3;
+    // Define accent colors and icons based on status for consistency with BatchListCard style
+    const getStatusConfig = () => {
+        if (isNotYet) return { color: "text-sky-600", borderColor: "border-l-sky-500", Icon: Clock };
+        if (isDue) return { color: "text-amber-600", borderColor: "border-l-amber-500", Icon: AlertTriangle };
+        if (isExpired) return { color: "text-red-600", borderColor: "border-l-red-500", Icon: XCircle };
+        return { color: "text-gray-600", borderColor: "border-l-gray-500", Icon: FileWarning };
+    };
+
+    const { color, Icon } = getStatusConfig();
+
+    const handleHeaderClick = () => {
+        const p = new URLSearchParams();
+        if (status) p.set("status", status);
+        if (filters.divisionId) p.set("divisionId", filters.divisionId);
+        if (filters.regionalId) p.set("regionalId", filters.regionalId);
+        if (filters.unitId) p.set("unitId", filters.unitId);
+        if (filters.certificationId) p.set("certificationId", filters.certificationId);
+        if (filters.levelId) p.set("levelId", filters.levelId);
+        if (filters.subFieldId) p.set("subFieldId", filters.subFieldId);
+
+        navigate(`/employee/eligibility?${p.toString()}`);
+    };
 
     return (
-        <div className="card bg-base-100 border rounded-2xl shadow-sm">
-            <div className="card-body p-4 md:p-5">
-                <div className="flex items-center justify-between">
-                    <h2 className={`card-title text-base md:text-lg ${accentClass}`}>{title}</h2>
-                </div>
-
-                <div className="mt-2 overflow-x-auto">
-                    <table className="table table-xs md:table-sm">
-                        <thead>
-                            <tr>
-                                <th>NIP</th>
-                                <th>Nama</th>
-                                <th>Rule</th>
-                                {isDue || isExpired ? <th>Jatuh Tempo</th> : null}
-                                {isDue ? <th>Sisa</th> : null}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {loading ? (
-                                Array.from({ length: 6 }).map((_, i) => (
-                                    <tr key={i}>
-                                        <td colSpan={colSpan}>
-                                            <div className="skeleton h-5 w-full" />
-                                        </td>
-                                    </tr>
-                                ))
-                            ) : rows.length === 0 ? (
-                                <tr>
-                                    <td colSpan={colSpan} className="text-sm opacity-60">
-                                        Tidak ada data
-                                    </td>
-                                </tr>
-                            ) : (
-                                rows.map((x, idx) => {
-                                    const deadline = getDeadline(x);
-                                    const sisa = deadline ? daysBetween(deadline, new Date()) : null;
-                                    return (
-                                        <tr
-                                            key={idx}
-                                            className="hover cursor-pointer"
-                                            onClick={(e) => {
-                                                e.preventDefault();
-                                                e.stopPropagation();
-                                                navigate(getPriorityPath(x));
-                                            }}
-                                        >
-                                            <td className="whitespace-nowrap">{x.nip}</td>
-                                            <td className="whitespace-nowrap">{x.employeeName ?? x.name}</td>
-                                            <td className="whitespace-nowrap">{getRuleCode(x)}</td>
-                                            {(isDue || isExpired) && (
-                                                <td className="whitespace-nowrap">{fmtID(deadline)}</td>
-                                            )}
-                                            {isDue && (
-                                                <td className="whitespace-nowrap text-amber-600">
-                                                    {sisa != null ? `Tinggal ${sisa} hari` : "-"}
-                                                </td>
-                                            )}
-                                        </tr>
-                                    );
-                                })
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-
-                {totalElements > 0 && (
-                    <div className="mt-3">
-                        <PaginationSimple
-                            page={page}
-                            totalPages={totalPages}
-                            totalElements={totalElements}
-                            rowsPerPage={rowsPerPage}
-                            onPageChange={(p) => {
-                                if (p !== page) {
-                                    load(p);
-                                }
-                            }}
-                            onRowsPerPageChange={(n) => {
-                                setRowsPerPage(n);
-                                load(1, n);
-                            }}
-                        />
-                    </div>
-                )}
+        <div className="card bg-base-100 shadow-sm border border-gray-200 h-full flex flex-col min-h-[480px]">
+            <div className="p-4 border-b border-gray-100 flex justify-between items-center group/header">
+                <h2
+                    className="font-semibold text-base flex items-center gap-2 text-gray-800 cursor-pointer hover:underline decoration-dashed underline-offset-4"
+                    onClick={handleHeaderClick}
+                    title="Lihat selengkapnya"
+                >
+                    <Icon size={18} className={color} />
+                    {title}
+                </h2>
+                <button
+                    onClick={handleHeaderClick}
+                    className="btn btn-xs btn-ghost btn-circle opacity-0 group-hover/header:opacity-100 transition-opacity"
+                >
+                    <ArrowRight size={14} />
+                </button>
             </div>
+
+            <div className="flex-1">
+                <div className="p-2">
+                    {loading && rows.length === 0 ? (
+                        <div className="space-y-1">
+                            {Array.from({ length: 10 }).map((_, i) => (
+                                <div key={i} className="skeleton h-8 w-full rounded" />
+                            ))}
+                        </div>
+                    ) : rows.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-10 text-gray-400">
+                            <Icon size={40} strokeWidth={1.5} className="mb-3 opacity-50" />
+                            <p className="text-sm">Tidak ada data</p>
+                        </div>
+                    ) : (
+                        <div className="space-y-1">
+                            {rows.map((x, idx) => {
+                                const deadline = getDeadline(x);
+                                const sisa = deadline ? daysBetween(deadline, new Date()) : null;
+                                const ruleCode = getRuleCode(x);
+
+                                return (
+                                    <div
+                                        key={idx}
+                                        className="group bg-white border border-gray-200 rounded py-1.5 px-2.5 hover:border-gray-300 hover:shadow-sm transition-all cursor-pointer min-h-[42px] flex items-center"
+                                        onClick={() => navigate(getPriorityPath())}
+                                    >
+                                        <div className="flex items-start justify-between gap-2">
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                                                    <h3 className="font-semibold text-sm text-gray-800 truncate leading-tight">
+                                                        {x.employeeName ?? x.name}
+                                                    </h3>
+                                                    {ruleCode !== "-" && (
+                                                        <span className="badge badge-xs badge-outline badge-neutral text-[10px] h-5 px-1.5 opacity-70">
+                                                            {ruleCode}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <div className="flex items-center gap-2 text-[10px] text-gray-500">
+                                                    <span className="flex items-center gap-1 font-mono bg-gray-50 px-1.5 rounded">
+                                                        {x.nip}
+                                                    </span>
+                                                </div>
+
+                                                {(isDue || isExpired) && (
+                                                    <div className="mt-1.5 flex items-center gap-2 text-[11px]">
+                                                        <span className="flex items-center gap-1 text-gray-500">
+                                                            {isExpired ? "Kadaluarsa:" : "Jatuh Tempo:"} {fmtID(deadline)}
+                                                        </span>
+                                                        
+                                                        {isDue && sisa != null && (
+                                                            <span className={`px-1.5 py-px rounded-full text-[9px] font-medium leading-none border ${
+                                                                sisa <= 7 ? "bg-red-50 border-red-100 text-red-600" : 
+                                                                sisa <= 30 ? "bg-amber-50 border-amber-100 text-amber-700" :
+                                                                "bg-blue-50 border-blue-100 text-blue-700"
+                                                            }`}>
+                                                                {sisa} hari
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <ArrowRight
+                                                size={14}
+                                                className="text-gray-300 group-hover:text-gray-600 group-hover:translate-x-0.5 transition-all flex-shrink-0 mt-0.5"
+                                            />
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {totalElements > 0 && (
+                <div className="p-3 border-t border-gray-100">
+                    <PaginationSimple
+                        page={page}
+                        totalPages={totalPages}
+                        totalElements={totalElements}
+                        rowsPerPage={rowsPerPage}
+                        onPageChange={(p) => {
+                            if (p !== page) {
+                                load(p);
+                            }
+                        }}
+                        onRowsPerPageChange={(n) => {
+                            setRowsPerPage(n);
+                            load(1, n);
+                        }}
+                    />
+                </div>
+            )}
         </div>
     );
 }

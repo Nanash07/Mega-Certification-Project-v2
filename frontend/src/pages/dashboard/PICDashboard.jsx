@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Select from "react-select";
 import api from "../../services/api";
+import { Users, Award, AlertTriangle, XCircle, Clock, Layers, Filter, CalendarDays, LayoutDashboard } from "lucide-react";
 
 import { fetchRegionals } from "../../services/regionalService";
 import { fetchUnits } from "../../services/unitService";
@@ -46,6 +47,9 @@ function toOptions(data, labelPicker) {
     const arr = Array.isArray(data?.content) ? data.content : Array.isArray(data) ? data : [];
     return arr.filter(Boolean).map((x) => ({ value: x.id, label: labelPicker(x), raw: x }));
 }
+
+/* ===== Stat card with icon and gradient ===== */
+import StatCard from "../../components/dashboards/StatCard";
 
 export default function PicDashboard() {
     const navigate = useNavigate();
@@ -344,10 +348,12 @@ export default function PicDashboard() {
         return [
             {
                 key: "employees",
-                label: "Total Kewajiban Sertifikasi",
+                label: "Total Kewajiban",
                 value: summary?.employees?.active,
                 tip: "Total kewajiban sertifikasi",
                 href: `/employee/data${qs}`,
+                icon: Users,
+                color: "primary",
             },
             {
                 key: "tersretifikasi",
@@ -359,6 +365,8 @@ export default function PicDashboard() {
                         : undefined,
                 tip: "Kewajiban sertifikasi yang sudah dipenuhi",
                 href: `/employee/eligibility${qs}`,
+                icon: Award,
+                color: "success",
             },
             {
                 key: "due",
@@ -366,6 +374,8 @@ export default function PicDashboard() {
                 value: summary?.certifications?.due,
                 tip: "Sertifikasi yang akan jatuh tempo",
                 href: `/employee/certification${qs ? `${qs}&status=DUE` : "?status=DUE"}`,
+                icon: AlertTriangle,
+                color: "warning",
             },
             {
                 key: "expired",
@@ -373,13 +383,17 @@ export default function PicDashboard() {
                 value: summary?.certifications?.expired,
                 tip: "Sertifikasi yang sudah kadaluarsa",
                 href: `/employee/certification${qs ? `${qs}&status=EXPIRED` : "?status=EXPIRED"}`,
+                icon: XCircle,
+                color: "error",
             },
             {
                 key: "notyet",
-                label: "Belum Bersertifikat",
+                label: "Belum Sertifikasi",
                 value: kpi?.notYetCertified ?? 0,
                 tip: "Kewajiban sertifikasi yang belum dipenuhi",
                 href: `/employee/certification${qs ? `${qs}&status=NOT_YET_CERTIFIED` : "?status=NOT_YET_CERTIFIED"}`,
+                icon: Clock,
+                color: "neutral",
             },
             {
                 key: "batches",
@@ -387,6 +401,8 @@ export default function PicDashboard() {
                 value: summary?.batches?.ongoing ?? summary?.batchesOngoing ?? summary?.batchesCount ?? 0,
                 tip: "Batch yang sedang berjalan",
                 href: `/batch${qs ? `${qs}&status=ONGOING` : "?status=ONGOING"}`,
+                icon: Layers,
+                color: "info",
             },
         ];
     }, [
@@ -404,20 +420,31 @@ export default function PicDashboard() {
         eligibleTotal,
     ]);
 
+    const PIE_COLORS = ["#22c55e", "#f97316", "#ef4444", "#6b7280"];
+
     /* ===== UI ===== */
     return (
-        <div className="p-4 md:p-6 space-y-6">
-            {/* Judul */}
-            <div>
-                <h1 className="text-2xl md:text-3xl font-bold">Dashboard PIC</h1>
-                <p className="text-sm opacity-70 pt-1">{computedAt ? ` ${formatShortIdDateTime(computedAt)}` : ""}</p>
+        <div className="space-y-6">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                    <h1 className="text-xl sm:text-2xl font-bold">Dashboard PIC</h1>
+                    <p className="text-xs text-gray-500">
+                        {computedAt ? `Diperbarui ${formatShortIdDateTime(computedAt)}` : "Memuat data..."}
+                    </p>
+                </div>
             </div>
 
-            {/* Filter organisasi/sertifikasi */}
-            <div className="grid grid-cols-1 md:grid-cols-6 gap-2">
-                <div className="tooltip tooltip-top" data-tip="Regional" title="Regional">
+            {/* Filter Card */}
+            <div className="card bg-base-100 shadow-sm border border-gray-100 p-4">
+                <div className="flex items-center gap-2 mb-3">
+                    <Filter size={16} className="text-gray-500" />
+                    <span className="font-medium text-sm">Filter Data</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 text-xs">
                     <Select
                         className="w-full"
+                        classNamePrefix="react-select"
                         menuPortalTarget={menuPortalTarget}
                         menuPosition="fixed"
                         options={regionalOptions}
@@ -427,10 +454,9 @@ export default function PicDashboard() {
                         isClearable
                         isSearchable
                     />
-                </div>
-                <div className="tooltip tooltip-top" data-tip="Divisi" title="Divisi">
                     <Select
                         className="w-full"
+                        classNamePrefix="react-select"
                         menuPortalTarget={menuPortalTarget}
                         menuPosition="fixed"
                         options={divisionOptions}
@@ -440,10 +466,9 @@ export default function PicDashboard() {
                         isClearable
                         isSearchable
                     />
-                </div>
-                <div className="tooltip tooltip-top" data-tip="Unit" title="Unit">
                     <Select
                         className="w-full"
+                        classNamePrefix="react-select"
                         menuPortalTarget={menuPortalTarget}
                         menuPosition="fixed"
                         options={unitOptions}
@@ -453,27 +478,21 @@ export default function PicDashboard() {
                         isClearable
                         isSearchable
                     />
-                </div>
-                <div
-                    className="tooltip tooltip-top"
-                    data-tip="Filter Sertifikasi (sesuai scope PIC)"
-                    title="Sertifikat"
-                >
                     <Select
                         className="w-full"
+                        classNamePrefix="react-select"
                         menuPortalTarget={menuPortalTarget}
                         menuPosition="fixed"
                         options={certOptions}
                         value={certSel}
                         onChange={setCertSel}
-                        placeholder="Filter Sertifikasi"
+                        placeholder="Sertifikasi (scope PIC)"
                         isClearable
                         isSearchable
                     />
-                </div>
-                <div className="tooltip tooltip-top" data-tip="Jenjang" title="Jenjang">
                     <Select
                         className="w-full"
+                        classNamePrefix="react-select"
                         menuPortalTarget={menuPortalTarget}
                         menuPosition="fixed"
                         options={levelOptions}
@@ -483,10 +502,9 @@ export default function PicDashboard() {
                         isClearable
                         isSearchable
                     />
-                </div>
-                <div className="tooltip tooltip-top" data-tip="Sub Bidang" title="Sub Bidang">
                     <Select
                         className="w-full"
+                        classNamePrefix="react-select"
                         menuPortalTarget={menuPortalTarget}
                         menuPosition="fixed"
                         options={subFieldOptions}
@@ -497,31 +515,27 @@ export default function PicDashboard() {
                         isSearchable
                     />
                 </div>
-            </div>
 
-            {/* Filter tanggal */}
-            <div className="grid grid-cols-1 md:grid-cols-6 gap-2">
-                <div className="tooltip tooltip-top" data-tip="Tanggal Mulai Batch" title="Tanggal Mulai Batch">
-                    <div className="form-control w-full">
-                        <label className="label py-1">
-                            <span className="label-text text-xs">Tanggal Mulai Batch</span>
+                {/* Date filters */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 mt-3 text-xs">
+                    <div className="flex flex-col gap-1">
+                        <label className="text-gray-500 flex items-center gap-1">
+                            <CalendarDays size={12} /> Mulai Batch
                         </label>
                         <input
                             type="date"
-                            className="input input-sm input-bordered w-full"
+                            className="input input-sm input-bordered w-full rounded-lg"
                             value={startDate || ""}
                             onChange={(e) => setStartDate(e.target.value || "")}
                         />
                     </div>
-                </div>
-                <div className="tooltip tooltip-top" data-tip="Tanggal Selesai Batch" title="Tanggal Selesai Batch">
-                    <div className="form-control w-full">
-                        <label className="label py-1">
-                            <span className="label-text text-xs">Tanggal Selesai Batch</span>
+                    <div className="flex flex-col gap-1">
+                        <label className="text-gray-500 flex items-center gap-1">
+                            <CalendarDays size={12} /> Selesai Batch
                         </label>
                         <input
                             type="date"
-                            className="input input-sm input-bordered w-full"
+                            className="input input-sm input-bordered w-full rounded-lg"
                             value={endDate || ""}
                             onChange={(e) => setEndDate(e.target.value || "")}
                         />
@@ -530,43 +544,38 @@ export default function PicDashboard() {
             </div>
 
             {/* Summary cards */}
-            <div className="grid grid-cols-2 md:grid-cols-6 gap-3 md:gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
                 {!summary
                     ? Array.from({ length: 6 }).map((_, i) => (
-                          <div key={i} className="card bg-base-100 border rounded-2xl shadow-sm">
-                              <div className="card-body p-4 min-h-[88px] justify-center">
-                                  <div className="skeleton h-3 w-24 mb-3" />
-                                  <div className="skeleton h-6 w-20" />
+                          <div key={i} className="card bg-base-100 border border-gray-100 shadow-sm">
+                              <div className="card-body p-4">
+                                  <div className="skeleton h-3 w-20 mb-2" />
+                                  <div className="skeleton h-8 w-16" />
                               </div>
                           </div>
                       ))
                     : cardConfigs.map((c) => (
-                          <div
+                          <StatCard
                               key={c.key}
-                              className="tooltip tooltip-top w-full"
-                              data-tip={c.tip || c.label}
-                              title={c.tip || c.label}
-                          >
-                              <button
-                                  onClick={() => navigate(c.href)}
-                                  className="rounded-2xl border border-base-200 bg-base-100 p-3 w-full text-left transition hover:shadow cursor-pointer min-h-[88px]"
-                              >
-                                  <div className="text-[11px] opacity-70">{c.label}</div>
-                                  <div className="text-xl font-bold">{c.value ?? 0}</div>
-                                  {c.sub ? <div className="text-[11px] opacity-60">{c.sub}</div> : null}
-                              </button>
-                          </div>
+                              label={c.label}
+                              value={c.value}
+                              sub={c.sub}
+                              tip={c.tip}
+                              icon={c.icon}
+                              color={c.color}
+                              onClick={() => navigate(c.href)}
+                          />
                       ))}
             </div>
 
-            {/* Realisasi & Bulanan */}
+            {/* Charts Row */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {/* Realisasi */}
-                <div className="card bg-base-100 border rounded-2xl shadow-sm">
-                    <div className="card-body p-4 md:p-5">
-                        <h2 className="card-title text-base md:text-lg">Capaian Sertifikasi Wajib</h2>
+                {/* Pie Chart */}
+                <div className="card bg-base-100 shadow-sm border border-gray-100">
+                    <div className="card-body p-4">
+                        <h2 className="font-semibold text-base">Capaian Sertifikasi Wajib</h2>
                         {!kpi ? (
-                            <div className="skeleton h-56 w-full rounded-xl" />
+                            <div className="skeleton h-64 w-full rounded-xl" />
                         ) : (
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
                                 <div className="h-56 relative">
@@ -577,73 +586,64 @@ export default function PicDashboard() {
                                                     { name: "Aktif", value: real.activeOnly },
                                                     { name: "Jatuh Tempo", value: real.due },
                                                     { name: "Kadaluarsa", value: real.expired },
-                                                    { name: "Belum Bersertifikat", value: real.notYet },
+                                                    { name: "Belum Sertifikasi", value: real.notYet },
                                                 ]}
                                                 dataKey="value"
                                                 nameKey="name"
-                                                innerRadius={55}
-                                                outerRadius={85}
-                                                label
+                                                innerRadius={50}
+                                                outerRadius={80}
+                                                paddingAngle={2}
                                             >
-                                                <Cell fill="#16a34a" />
-                                                <Cell fill="#f97316" />
-                                                <Cell fill="#ef4444" />
-                                                <Cell fill="#717171" />
+                                                {PIE_COLORS.map((color, i) => (
+                                                    <Cell key={i} fill={color} />
+                                                ))}
                                             </Pie>
                                             <ReTooltip />
                                         </PieChart>
                                     </ResponsiveContainer>
-                                    <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-2xl font-bold">
-                                        {real.pct}%
+                                    <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-center">
+                                        <div className="text-2xl font-bold">{real.pct}%</div>
+                                        <div className="text-[10px] text-gray-500">Tercapai</div>
                                     </div>
                                 </div>
-                                <div className="space-y-2 text-sm">
+                                <div className="space-y-3 text-sm">
                                     <div className="flex items-center gap-2">
-                                        <span
-                                            className="inline-block w-3 h-3 rounded-sm"
-                                            style={{ background: "#16a34a" }}
-                                        />
+                                        <span className="w-3 h-3 rounded-full" style={{ background: "#22c55e" }} />
                                         <span>Aktif</span>
                                         <span className="font-semibold ml-auto">{real.activeOnly}</span>
                                     </div>
                                     <div className="flex items-center gap-2">
-                                        <span
-                                            className="inline-block w-3 h-3 rounded-sm"
-                                            style={{ background: "#f97316" }}
-                                        />
+                                        <span className="w-3 h-3 rounded-full" style={{ background: "#f97316" }} />
                                         <span>Jatuh Tempo</span>
                                         <span className="font-semibold ml-auto">{real.due}</span>
                                     </div>
                                     <div className="flex items-center gap-2">
-                                        <span
-                                            className="inline-block w-3 h-3 rounded-sm"
-                                            style={{ background: "#ef4444" }}
-                                        />
+                                        <span className="w-3 h-3 rounded-full" style={{ background: "#ef4444" }} />
                                         <span>Kadaluarsa</span>
                                         <span className="font-semibold ml-auto">{real.expired}</span>
                                     </div>
                                     <div className="flex items-center gap-2">
-                                        <span
-                                            className="inline-block w-3 h-3 rounded-sm"
-                                            style={{ background: "#717171" }}
-                                        />
-                                        <span>Belum Bersertifikat</span>
+                                        <span className="w-3 h-3 rounded-full" style={{ background: "#6b7280" }} />
+                                        <span>Belum Sertifikasi</span>
                                         <span className="font-semibold ml-auto">{real.notYet}</span>
                                     </div>
-                                    <div className="pt-2 text-xs opacity-70">Total populasi: {real.total}</div>
+                                    <div className="pt-2 text-xs text-gray-500 border-t">
+                                        Total populasi: <span className="font-semibold">{real.total}</span>
+                                    </div>
                                 </div>
                             </div>
                         )}
                     </div>
                 </div>
 
-                {/* Bulanan */}
-                <div className="card bg-base-100 border rounded-2xl shadow-sm">
-                    <div className="card-body p-4 md:p-5">
-                        <div className="flex items-center justify-between gap-2">
-                            <h2 className="card-title text-base md:text-lg">Pelaksanaan Batch</h2>
-                            <div className="min-w-[160px]">
+                {/* Bar Chart */}
+                <div className="card bg-base-100 shadow-sm border border-gray-100">
+                    <div className="card-body p-4">
+                        <div className="flex items-center justify-between gap-2 mb-2">
+                            <h2 className="font-semibold text-base">Pelaksanaan Batch</h2>
+                            <div className="min-w-[150px]">
                                 <Select
+                                    classNamePrefix="react-select"
                                     menuPortalTarget={menuPortalTarget}
                                     menuPosition="fixed"
                                     options={batchTypeOptions}
@@ -661,11 +661,11 @@ export default function PicDashboard() {
                             ) : (
                                 <ResponsiveContainer width="100%" height="100%">
                                     <BarChart data={monthly}>
-                                        <CartesianGrid strokeDasharray="3 3" />
-                                        <XAxis dataKey="label" />
-                                        <YAxis allowDecimals={false} />
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                        <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                                        <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
                                         <ReTooltip />
-                                        <Bar dataKey="count" fill="#16a34a" />
+                                        <Bar dataKey="count" fill="#10b981" radius={[4, 4, 0, 0]} name="Jumlah Batch" />
                                     </BarChart>
                                 </ResponsiveContainer>
                             )}
@@ -674,10 +674,8 @@ export default function PicDashboard() {
                 </div>
             </div>
 
-            {/* ====== Batch Berjalan & Selesai & Belum Bersertifikat ====== */}
+            {/* Priority Lists */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                <BatchListCard title="Batch Berjalan" status="ONGOING" filters={currentFilters()} initialRows={10} />
-                <BatchListCard title="Batch Selesai" status="FINISHED" filters={currentFilters()} initialRows={10} />
                 <EligibilityPriorityCard
                     title="Belum Bersertifikat"
                     status="NOT_YET_CERTIFIED"
@@ -685,10 +683,6 @@ export default function PicDashboard() {
                     filters={currentFilters()}
                     initialRowsPerPage={10}
                 />
-            </div>
-
-            {/* ====== Due | Kadaluarsa ====== */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <EligibilityPriorityCard
                     title="Jatuh Tempo"
                     status="DUE"
@@ -703,6 +697,12 @@ export default function PicDashboard() {
                     filters={currentFilters()}
                     initialRowsPerPage={10}
                 />
+            </div>
+
+            {/* Batch Lists */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <BatchListCard title="Batch Berjalan" status="ONGOING" filters={currentFilters()} initialRows={10} />
+                <BatchListCard title="Batch Selesai" status="FINISHED" filters={currentFilters()} initialRows={10} />
             </div>
         </div>
     );

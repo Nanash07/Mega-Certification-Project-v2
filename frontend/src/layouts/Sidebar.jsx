@@ -229,7 +229,7 @@ export default function Sidebar({ open, setOpen }) {
           lg:translate-x-0 lg:static lg:z-auto
         `}
             >
-                <div className="flex items-center h-20 px-6 border-b border-gray-200">
+                <div className="flex items-center h-16 px-6 border-b border-gray-200">
                     <Link to="/dashboard" className="font-bold text-2xl" onClick={handleLinkClick}>
                         Mega Certification
                     </Link>

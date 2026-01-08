@@ -2,19 +2,34 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Select from "react-select";
+import {
+    LayoutDashboard,
+    Layers,
+    Clock,
+    CheckCircle2,
+    XCircle,
+    AlertTriangle,
+    Award,
+    Calendar,
+    Building2,
+    ArrowRight,
+    Users,
+} from "lucide-react";
+
+import StatCard from "../../components/dashboards/StatCard";
 
 import {
     fetchEmployeeEligibilityPaged,
     fetchEligibilityCount,
-    getCurrentEmployeeId, // 🔹 util shared dari service
+    getCurrentEmployeeId,
 } from "../../services/employeeEligibilityService";
 import {
     fetchEmployeeOngoingBatchesPaged,
     fetchMonthlyBatches,
-    fetchBatches, // 🔹 pakai service untuk batch selesai juga
+    fetchBatches,
 } from "../../services/batchService";
 
-import { formatShortIdDateTime } from "../../utils/date";
+import { formatShortIdDateTime, formatShortIdDate } from "../../utils/date";
 
 import {
     PieChart,
@@ -36,34 +51,6 @@ const MONTHS = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "
 /* ========= utils ========= */
 const toNum = (v) => Number(v ?? 0) || 0;
 
-/* ========= small components ========= */
-function MiniCard({ label, value, sub, tip }) {
-    return (
-        <div className="tooltip tooltip-top w-full" data-tip={tip || label} title={tip || label}>
-            <div className="rounded-2xl border border-base-200 bg-base-100 p-3 w-full min-h-[88px]">
-                <div className="text-[11px] opacity-70">{label}</div>
-                <div className="text-xl font-bold">{value ?? 0}</div>
-                {sub ? <div className="text-[11px] opacity-60">{sub}</div> : null}
-            </div>
-        </div>
-    );
-}
-
-function SummarySkeletonRow({ count = 6 }) {
-    return (
-        <>
-            {Array.from({ length: count }).map((_, i) => (
-                <div key={i} className="card bg-base-100 border rounded-2xl shadow-sm">
-                    <div className="card-body p-4 min-h-[88px] justify-center">
-                        <div className="skeleton h-3 w-24 mb-3" />
-                        <div className="skeleton h-6 w-20" />
-                    </div>
-                </div>
-            ))}
-        </>
-    );
-}
-
 /** ======= QuotaBar ======= */
 function QuotaBar({ filled = 0, quota = 0, className }) {
     const f = Math.max(0, Number(filled) || 0);
@@ -84,17 +71,15 @@ function QuotaBar({ filled = 0, quota = 0, className }) {
             title={label}
             aria-label={`Kuota ${label}`}
         >
-            <div className="relative w-full h-3 rounded-full bg-base-200 overflow-hidden">
+            <div className="relative w-full h-2 rounded-full bg-gray-100 overflow-hidden">
                 {pct > 0 && (
                     <div
                         className={`absolute left-0 top-0 h-full rounded-full ${barColor}`}
                         style={{ width: `${pct}%` }}
                     />
                 )}
-                <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-[10px] font-medium text-base-content/80">{label}</span>
-                </div>
             </div>
+             <div className="text-[10px] text-gray-400 mt-1 text-right">{label}</div>
         </div>
     );
 }
@@ -134,445 +119,23 @@ function statusLabel(status) {
 function statusBadgeClass(status) {
     switch (status) {
         case "NOT_YET_CERTIFIED":
-            return "badge badge-sm badge-info";
+            return "badge badge-sm border-gray-200 bg-gray-50 text-gray-600";
         case "DUE":
-            return "badge badge-sm badge-warning";
+            return "badge badge-sm badge-warning badge-outline";
         case "EXPIRED":
-            return "badge badge-sm badge-error";
+            return "badge badge-sm badge-error badge-outline";
         case "ACTIVE":
-            return "badge badge-sm badge-success";
+            return "badge badge-sm badge-success badge-outline";
         default:
-            return "badge badge-sm";
+            return "badge badge-sm badge-ghost";
     }
-}
-
-/* ========== SECTION COMPONENTS ========== */
-
-function SummaryCardsRow({ summary, cardConfigs }) {
-    return (
-        <div className="grid grid-cols-2 md:grid-cols-6 gap-3 md:gap-4">
-            {!summary ? <SummarySkeletonRow /> : cardConfigs.map(({ id, ...rest }) => <MiniCard key={id} {...rest} />)}
-        </div>
-    );
-}
-
-function OwnershipPieSection({ kpi, real }) {
-    return (
-        <div className="card bg-base-100 border rounded-2xl shadow-sm">
-            <div className="card-body p-4 md:p-5">
-                <h2 className="card-title text-base md:text-lg">Kepemilikan Sertifikat</h2>
-                {!kpi ? (
-                    <div className="skeleton h-56 w-full rounded-xl" />
-                ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
-                        <div className="h-56 relative">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <PieChart>
-                                    <Pie
-                                        data={[
-                                            { name: "Aktif", value: real.activeOnly },
-                                            { name: "Jatuh Tempo", value: real.due },
-                                            { name: "Kadaluarsa", value: real.expired },
-                                            { name: "Belum Bersertifikat", value: real.notYet },
-                                        ]}
-                                        dataKey="value"
-                                        nameKey="name"
-                                        innerRadius={55}
-                                        outerRadius={85}
-                                        label
-                                    >
-                                        <Cell fill="#16a34a" />
-                                        <Cell fill="#f97316" />
-                                        <Cell fill="#ef4444" />
-                                        <Cell fill="#717171" />
-                                    </Pie>
-                                    <ReTooltip />
-                                </PieChart>
-                            </ResponsiveContainer>
-                            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-2xl font-bold">
-                                {real.pct}%
-                            </div>
-                        </div>
-                        <div className="space-y-2 text-sm">
-                            <div className="flex items-center gap-2">
-                                <span className="inline-block w-3 h-3 rounded-sm" style={{ background: "#16a34a" }} />
-                                <span>Aktif</span>
-                                <span className="font-semibold ml-auto">{real.activeOnly}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <span className="inline-block w-3 h-3 rounded-sm" style={{ background: "#f97316" }} />
-                                <span>Jatuh Tempo</span>
-                                <span className="font-semibold ml-auto">{real.due}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <span className="inline-block w-3 h-3 rounded-sm" style={{ background: "#ef4444" }} />
-                                <span>Kadaluarsa</span>
-                                <span className="font-semibold ml-auto">{real.expired}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <span className="inline-block w-3 h-3 rounded-sm" style={{ background: "#717171" }} />
-                                <span>Belum Bersertifikat</span>
-                                <span className="font-semibold ml-auto">{real.notYet}</span>
-                            </div>
-                            <div className="pt-2 text-xs opacity-70">Total kewajiban: {real.total}</div>
-                        </div>
-                    </div>
-                )}
-            </div>
-        </div>
-    );
-}
-
-function BatchExecutionSection({ batchTypeOptions, batchType, setBatchType, monthly }) {
-    return (
-        <div className="card bg-base-100 border rounded-2xl shadow-sm">
-            <div className="card-body p-4 md:p-5">
-                <div className="flex items-center justify-between gap-2">
-                    <h2 className="card-title text-base md:text-lg">Pelaksanaan Batch</h2>
-                    <div className="min-w-[180px]">
-                        <label className="label py-1">
-                            <span className="label-text text-xs">Jenis Batch</span>
-                        </label>
-                        <Select
-                            className="w-full text-xs"
-                            classNamePrefix="react-select"
-                            options={batchTypeOptions}
-                            value={batchType}
-                            onChange={(opt) => setBatchType(opt || batchTypeOptions[0])}
-                            isClearable={false}
-                            isSearchable={false}
-                            menuPortalTarget={typeof document !== "undefined" ? document.body : null}
-                            menuPosition="fixed"
-                        />
-                    </div>
-                </div>
-                <div className="h-64">
-                    {!monthly ? (
-                        <div className="skeleton h-full w-full rounded-xl" />
-                    ) : (
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={monthly}>
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis dataKey="label" />
-                                <YAxis allowDecimals={false} />
-                                <ReTooltip />
-                                <Bar dataKey="count" fill="#16a34a" />
-                            </BarChart>
-                        </ResponsiveContainer>
-                    )}
-                </div>
-            </div>
-        </div>
-    );
-}
-
-function OngoingBatchSection({
-    batches,
-    loadingBatch,
-    batchTotalElements,
-    batchTotalPages,
-    batchPage,
-    batchRows,
-    setBatchRows,
-    loadBatches,
-}) {
-    const navigate = useNavigate();
-
-    return (
-        <div className="card bg-base-100 border rounded-2xl shadow-sm">
-            <div className="card-body p-4 md:p-5">
-                <div className="flex items-center justify-between">
-                    <h2 className="card-title text-base md:text-lg">Batch Berjalan</h2>
-                </div>
-
-                <div className="max-h-96 overflow-auto pr-1">
-                    {batches.length === 0 && loadingBatch ? (
-                        <div className="space-y-2">
-                            {Array.from({ length: 4 }).map((_, i) => (
-                                <div key={i} className="skeleton h-14 w-full rounded-xl" />
-                            ))}
-                        </div>
-                    ) : batches.length === 0 ? (
-                        <div className="text-sm opacity-70">Anda belum mengikuti batch berjalan.</div>
-                    ) : (
-                        <ul className="menu w-full">
-                            {batches.map((b) => {
-                                const quota = toNum(b.quota);
-                                const filled = getFilledForBar(b);
-                                const passed = toNum(b.totalPassed ?? b.passed);
-                                const total = toNum(
-                                    b.totalParticipants ?? b.participants ?? b.registeredOrAttended ?? b.onrun
-                                );
-                                const failedExplicit = toNum(b.totalFailed ?? b.failed);
-                                const onrun = toNum(b.onrun ?? b.registeredOrAttended);
-                                const failed =
-                                    failedExplicit > 0 ? failedExplicit : Math.max(total - passed - onrun, 0);
-
-                                return (
-                                    <li key={b.id} className="!p-0">
-                                        <button
-                                            className="w-full text-left hover:bg-base-200 rounded-xl p-2"
-                                            onClick={() => navigate(`/batch/${b.id}`)}
-                                        >
-                                            <div className="min-w-0">
-                                                <div className="font-medium truncate text-sm">
-                                                    {b.name || b.batchName}
-                                                </div>
-                                                <div className="text-[11px] opacity-70 truncate">
-                                                    {b.type || "-"} • {b.startDate} – {b.endDate}
-                                                    {b.institutionName ? ` • ${b.institutionName}` : ""}
-                                                </div>
-                                                <div className="mt-1">
-                                                    <QuotaBar filled={filled} quota={quota} />
-                                                </div>
-                                                <div className="mt-1 text-[11px] opacity-70">
-                                                    Lulus: <span className="font-medium">{passed}</span> • Gagal:{" "}
-                                                    <span className="font-medium">{failed}</span> • Peserta:{" "}
-                                                    <span className="font-medium">{total}</span>
-                                                </div>
-                                            </div>
-                                        </button>
-                                    </li>
-                                );
-                            })}
-                        </ul>
-                    )}
-                </div>
-
-                {batchTotalElements > 0 && (
-                    <PaginationSimple
-                        page={batchPage}
-                        totalPages={batchTotalPages}
-                        totalElements={batchTotalElements}
-                        rowsPerPage={batchRows}
-                        onPageChange={(p) => {
-                            if (p !== batchPage) {
-                                loadBatches(p);
-                            }
-                        }}
-                        onRowsPerPageChange={(n) => {
-                            setBatchRows(n);
-                            loadBatches(1);
-                        }}
-                    />
-                )}
-            </div>
-        </div>
-    );
-}
-
-function EligibilitySection({
-    statusFilterOptions,
-    statusFilter,
-    setStatusFilter,
-    eligLoading,
-    eligData,
-    eligPage,
-    eligRowsPerPage,
-    eligTotalElements,
-    eligTotalPages,
-    setEligPage,
-    setEligRowsPerPage,
-}) {
-    const navigate = useNavigate();
-
-    return (
-        <div className="card bg-base-100 border rounded-2xl shadow-sm">
-            <div className="card-body p-4 md:p-5 space-y-3">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                    <h2 className="card-title text-base md:text-lg">Eligibility Sertifikasi</h2>
-
-                    <div className="min-w-[160px]">
-                        <Select
-                            className="text-xs"
-                            classNamePrefix="react-select"
-                            options={statusFilterOptions}
-                            value={statusFilter}
-                            onChange={(opt) => setStatusFilter(opt || statusFilterOptions[0])}
-                            isSearchable={false}
-                            menuPortalTarget={typeof document !== "undefined" ? document.body : null}
-                            menuPosition="fixed"
-                        />
-                    </div>
-                </div>
-
-                <div className="overflow-x-auto">
-                    <table className="table table-zebra text-xs">
-                        <thead className="bg-base-200">
-                            <tr>
-                                <th>No</th>
-                                <th>Kode Sertifikasi</th>
-                                <th>Nama Sertifikasi</th>
-                                <th>Level</th>
-                                <th>Sub Bidang</th>
-                                <th>Status</th>
-                                <th>Sisa Waktu</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {eligLoading ? (
-                                Array.from({ length: 6 }).map((_, i) => (
-                                    <tr key={i}>
-                                        <td colSpan={7}>
-                                            <div className="skeleton h-5 w-full" />
-                                        </td>
-                                    </tr>
-                                ))
-                            ) : eligData.length === 0 ? (
-                                <tr>
-                                    <td colSpan={7} className="text-sm opacity-60">
-                                        Belum ada data eligibility.
-                                    </td>
-                                </tr>
-                            ) : (
-                                eligData.map((e, idx) => {
-                                    const employeeId = getCurrentEmployeeId();
-                                    return (
-                                        <tr
-                                            key={e.id || idx}
-                                            className="hover cursor-pointer"
-                                            title="Klik untuk lihat detail di halaman pegawai (tab Eligibility)"
-                                            onClick={(ev) => {
-                                                ev.preventDefault();
-                                                ev.stopPropagation();
-                                                if (employeeId) {
-                                                    navigate(`/employee/${employeeId}?tab=eligibility`);
-                                                }
-                                            }}
-                                        >
-                                            <td>{(eligPage - 1) * eligRowsPerPage + idx + 1}</td>
-                                            <td className="whitespace-nowrap">{e.certificationCode || "-"}</td>
-                                            <td className="whitespace-nowrap">{e.certificationName || "-"}</td>
-                                            <td className="whitespace-nowrap">
-                                                {e.certificationLevelLevel ?? e.certificationLevel?.level ?? "-"}
-                                            </td>
-                                            <td className="whitespace-nowrap">{e.subFieldCode || "-"}</td>
-                                            <td className="whitespace-nowrap">
-                                                <span className={statusBadgeClass(e.status)}>
-                                                    {statusLabel(e.status)}
-                                                </span>
-                                            </td>
-                                            <td className="whitespace-nowrap">{e.sisaWaktu || "-"}</td>
-                                        </tr>
-                                    );
-                                })
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-
-                {eligTotalElements > 0 && (
-                    <PaginationSimple
-                        page={eligPage}
-                        totalPages={eligTotalPages}
-                        totalElements={eligTotalElements}
-                        rowsPerPage={eligRowsPerPage}
-                        onPageChange={setEligPage}
-                        onRowsPerPageChange={(n) => {
-                            setEligRowsPerPage(n);
-                            setEligPage(1);
-                        }}
-                    />
-                )}
-            </div>
-        </div>
-    );
-}
-
-function FinishedBatchSection({
-    finishedBatches,
-    loadingFinished,
-    finishedTotalElements,
-    finishedTotalPages,
-    finishedPage,
-    finishedRows,
-    setFinishedRows,
-    loadFinishedBatches,
-}) {
-    const navigate = useNavigate();
-
-    return (
-        <div className="card bg-base-100 border rounded-2xl shadow-sm">
-            <div className="card-body p-4 md:p-5">
-                {/* 🔹 fix typo: justify_between -> justify-between */}
-                <div className="flex items-center justify-between">
-                    <h2 className="card-title text-base md:text-lg">Batch Selesai</h2>
-                </div>
-
-                <div className="max-h-96 overflow-auto pr-1">
-                    {finishedBatches.length === 0 && loadingFinished ? (
-                        <div className="space-y-2">
-                            {Array.from({ length: 4 }).map((_, i) => (
-                                <div key={i} className="skeleton h-14 w-full rounded-xl" />
-                            ))}
-                        </div>
-                    ) : finishedBatches.length === 0 ? (
-                        <div className="text-sm opacity-70">Belum ada batch selesai.</div>
-                    ) : (
-                        <ul className="menu w-full">
-                            {finishedBatches.map((b) => {
-                                const quota = toNum(b.quota);
-                                const passed = toNum(b.totalPassed ?? b.passed);
-                                const total = toNum(b.totalParticipants);
-                                const failed = Math.max(total - passed, 0);
-                                const filled = passed + failed;
-
-                                return (
-                                    <li key={b.id} className="!p-0">
-                                        <button
-                                            className="w-full text-left hover:bg-base-200 rounded-xl p-2"
-                                            onClick={() => navigate(`/batch/${b.id}`)}
-                                        >
-                                            <div className="min-w-0">
-                                                <div className="font-medium truncate text-sm">
-                                                    {b.name || b.batchName}
-                                                </div>
-                                                <div className="text-[11px] opacity-70 truncate">
-                                                    {b.type || "-"} • {b.startDate} – {b.endDate}
-                                                    {b.institutionName ? ` • ${b.institutionName}` : ""}
-                                                </div>
-                                                <div className="mt-1">
-                                                    <QuotaBar filled={filled} quota={quota} />
-                                                </div>
-                                                <div className="mt-1 text-[11px] opacity-70">
-                                                    Lulus: <span className="font-medium">{passed}</span> • Gagal:{" "}
-                                                    <span className="font-medium">{failed}</span> • Peserta:{" "}
-                                                    <span className="font-medium">{total}</span>
-                                                </div>
-                                            </div>
-                                        </button>
-                                    </li>
-                                );
-                            })}
-                        </ul>
-                    )}
-                </div>
-
-                {finishedTotalElements > 0 && (
-                    <PaginationSimple
-                        page={finishedPage}
-                        totalPages={finishedTotalPages}
-                        totalElements={finishedTotalElements}
-                        rowsPerPage={finishedRows}
-                        onPageChange={(p) => {
-                            if (p !== finishedPage) {
-                                loadFinishedBatches(p);
-                            }
-                        }}
-                        onRowsPerPageChange={(n) => {
-                            setFinishedRows(n);
-                            loadFinishedBatches(1);
-                        }}
-                    />
-                )}
-            </div>
-        </div>
-    );
 }
 
 /* ========== MAIN COMPONENT ========== */
 
 export default function EmployeeDashboard() {
+    const navigate = useNavigate();
+
     // ===== filter jenis batch (untuk chart & batch list) =====
     const batchTypeOptions = [
         { value: "", label: "Semua Jenis" },
@@ -802,156 +365,392 @@ export default function EmployeeDashboard() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [batchType]);
 
+    // Eligibility fetch effect
     useEffect(() => {
-        setEligPage(1);
-    }, [statusFilter]);
-
-    useEffect(() => {
-        (async () => {
-            await loadEligibility(eligPage, eligRowsPerPage);
-        })();
+        loadEligibility(eligPage, eligRowsPerPage);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [statusFilter, eligPage, eligRowsPerPage]);
+    }, [eligPage, eligRowsPerPage, statusFilter]);
 
-    /* ===== computed ===== */
-    const eligibleTotal = useMemo(() => {
-        if (summary?.eligibility?.total != null) return Number(summary.eligibility.total);
-        const s = kpi || {};
-        return (s.active ?? 0) + (s.due ?? 0) + (s.expired ?? 0) + (s.notYetCertified ?? 0);
-    }, [summary, kpi]);
-
-    const real = useMemo(() => {
-        const cert = summary?.certifications || {};
-        const k = kpi || {};
-
-        const activePlusDue = Number(cert.active ?? 0);
-        const due = Number(cert.due ?? 0);
-        const expired = Number(cert.expired ?? 0);
-        const activeOnly = Math.max(activePlusDue - due, 0);
-        const notYet = Number(k.notYetCertified ?? 0);
-
-        const certifiedIncDue = activePlusDue;
-        const total = activeOnly + due + expired + notYet;
-        const pct = total > 0 ? Math.round((certifiedIncDue / total) * 1000) / 10 : 0;
-
-        return {
-            activeOnly,
-            due,
-            expired,
-            notYet,
-            certifiedIncDue,
-            total,
-            pct,
-        };
-    }, [summary, kpi]);
-
+    // Card Configs
     const cardConfigs = useMemo(() => {
+        if (!summary) return [];
+        const employeeId = getCurrentEmployeeId();
+
         return [
             {
-                id: "eligible",
-                label: "Kewajiban Sertifikasi",
-                value: eligibleTotal,
-                tip: "Total kewajiban sertifikasi Anda",
+                key: "total",
+                label: "Total Kewajiban",
+                value: summary.eligibility?.total ?? 0,
+                sub: "Sertifikasi Wajib",
+                icon: Layers,
+                color: "primary",
+                tip: "Total sertifikasi yang wajib dimiliki",
+                onClick: () => employeeId && navigate(`/employee/${employeeId}?tab=eligibility`),
             },
             {
-                id: "tersretifikasi",
-                label: "Tersertifikasi",
-                value: Number(summary?.certifications?.active ?? 0),
-                sub:
-                    eligibleTotal > 0
-                        ? `${((Number(summary?.certifications?.active ?? 0) / eligibleTotal) * 100).toFixed(1)}%`
-                        : undefined,
-                tip: "Kewajiban yang sudah tersertifikasi",
+                key: "active",
+                label: "Sertifikat Aktif",
+                value: summary.certifications?.active ?? 0,
+                sub: "Valid & Berlaku",
+                icon: Award,
+                color: "success",
+                tip: "Sertifikat yang masih berlaku (termasuk Jatuh Tempo)",
             },
             {
-                id: "due",
+                key: "due",
                 label: "Jatuh Tempo",
-                value: summary?.certifications?.due,
-                tip: "Sertifikat akan jatuh tempo",
+                value: summary.certifications?.due ?? 0,
+                sub: "Segera Habis",
+                icon: AlertTriangle,
+                color: "warning",
+                tip: "Sertifikat yang akan habis masa berlakunya",
             },
             {
-                id: "expired",
+                key: "expired",
                 label: "Kadaluarsa",
-                value: summary?.certifications?.expired,
-                tip: "Sertifikat sudah kadaluarsa",
+                value: summary.certifications?.expired ?? 0,
+                sub: "Perlu Perpanjangan",
+                icon: XCircle,
+                color: "error",
+                tip: "Sertifikat yang sudah kadaluarsa",
             },
             {
-                id: "notyet",
-                label: "Belum Bersertifikat",
-                value: kpi?.notYetCertified ?? 0,
-                tip: "Kewajiban yang belum tersertifikasi",
-            },
-            {
-                id: "batches",
+                key: "ongoing",
                 label: "Batch Berjalan",
-                value: summary?.batches?.ongoing ?? summary?.batchesOngoing ?? summary?.batchesCount ?? 0,
-                tip: "Batch yang sedang Anda ikuti",
+                value: summary.batches?.ongoing ?? 0,
+                sub: "Sedang Diikuti",
+                icon: Clock,
+                color: "info",
+                tip: "Batch sertifikasi/training yang sedang diikuti",
             },
         ];
-    }, [summary, kpi, eligibleTotal]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [summary]);
 
-    /* ========= render ========= */
+    // Helpers for pie data
+    const pieData = kpi ? [
+        { name: "Aktif", value: kpi.active },
+        { name: "Jatuh Tempo", value: kpi.due },
+        { name: "Kadaluarsa", value: kpi.expired },
+        { name: "Belum Bersertifikat", value: kpi.notYetCertified },
+    ] : [];
+    
+    const kpiTotal = kpi ? (kpi.active + kpi.due + kpi.expired + kpi.notYetCertified) : 0;
+    const kpiPercent = kpiTotal > 0 ? Math.round(((kpi.active + kpi.due) / kpiTotal) * 100) : 0;
+
     return (
-        <div className="p-4 md:p-6 space-y-6">
-            {/* Judul */}
-            <div>
-                <h1 className="text-2xl md:text-3xl font-bold">Dashboard Pegawai</h1>
-                <p className="text-sm opacity-70 pt-1">{computedAt ? ` ${formatShortIdDateTime(computedAt)}` : ""}</p>
+        <div className="p-4 md:p-8 space-y-6 md:space-y-8 min-h-screen bg-gray-50/50 text-gray-900 font-sans">
+            {/* Header */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Dashboard</h1>
+                    <p className="text-gray-500 mt-1">
+                        Selamat datang kembali! Ini ringkasan aktivitas dan sertifikasi Anda.
+                    </p>
+                </div>
+                {computedAt && (
+                    <div className="text-xs text-gray-400 font-mono bg-white px-3 py-1.5 rounded-full border border-gray-200 shadow-sm">
+                        Updated: {formatShortIdDateTime(computedAt)}
+                    </div>
+                )}
             </div>
 
-            {/* Kartu ringkas */}
-            <SummaryCardsRow summary={summary} cardConfigs={cardConfigs} />
-
-            {/* Row 1: PIE + BAR */}
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-                <OwnershipPieSection kpi={kpi} real={real} />
-                <BatchExecutionSection
-                    batchTypeOptions={batchTypeOptions}
-                    batchType={batchType}
-                    setBatchType={setBatchType}
-                    monthly={monthly}
-                />
+            {/* Stat Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                {(!summary ? Array.from({length: 5}) : cardConfigs).map((cfg, i) => (
+                    !summary ? (
+                         <div key={i} className="card bg-base-100 border border-gray-100 shadow-sm h-full min-h-[100px] p-4 justify-center">
+                            <div className="skeleton h-4 w-24 mb-2"/>
+                            <div className="skeleton h-8 w-16"/>
+                        </div>
+                    ) : (
+                        <StatCard key={cfg.key} {...cfg} />
+                    )
+                ))}
             </div>
 
-            {/* Row 2: BATCH BERJALAN + BATCH SELESAI */}
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-                <OngoingBatchSection
-                    batches={batches}
-                    loadingBatch={loadingBatch}
-                    batchTotalElements={batchTotalElements}
-                    batchTotalPages={batchTotalPages}
-                    batchPage={batchPage}
-                    batchRows={batchRows}
-                    setBatchRows={setBatchRows}
-                    loadBatches={loadBatches}
-                />
-                <FinishedBatchSection
-                    finishedBatches={finishedBatches}
-                    loadingFinished={loadingFinished}
-                    finishedTotalElements={finishedTotalElements}
-                    finishedTotalPages={finishedTotalPages}
-                    finishedPage={finishedPage}
-                    finishedRows={finishedRows}
-                    setFinishedRows={setFinishedRows}
-                    loadFinishedBatches={loadFinishedBatches}
-                />
-            </div>
+            {/* Main Content */}
+            <div className="flex flex-col xl:flex-row gap-6">
+                {/* Left Column (Charts & Eligibility) */}
+                <div className="flex-1 space-y-6 min-w-0">
+                    {/* Charts Grid */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        {/* Ownership Pie */}
+                        <div className="card bg-white shadow-sm border border-gray-100 rounded-xl h-full">
+                            <div className="p-5 border-b border-gray-100">
+                                 <h2 className="font-semibold text-lg text-gray-800">Kepemilikan Sertifikat</h2>
+                            </div>
+                            <div className="p-5">
+                                {!kpi ? (
+                                    <div className="skeleton h-64 w-full rounded-xl" />
+                                ) : (
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
+                                        <div className="h-56 relative">
+                                            <ResponsiveContainer width="100%" height="100%">
+                                                <PieChart>
+                                                    <Pie
+                                                        data={pieData}
+                                                        dataKey="value"
+                                                        nameKey="name"
+                                                        innerRadius={60}
+                                                        outerRadius={85}
+                                                        paddingAngle={2}
+                                                    >
+                                                        <Cell fill="#16a34a" /> {/* Aktif */}
+                                                        <Cell fill="#f97316" /> {/* Due */}
+                                                        <Cell fill="#ef4444" /> {/* Expired */}
+                                                        <Cell fill="#9ca3af" /> {/* Not Yet */}
+                                                    </Pie>
+                                                    <ReTooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} />
+                                                </PieChart>
+                                            </ResponsiveContainer>
+                                            <div className="absolute inset-0 flex items-center justify-center flex-col pointer-events-none">
+                                                <span className="text-3xl font-bold text-gray-800">{kpiPercent}%</span>
+                                                <span className="text-[10px] text-gray-400 uppercase tracking-widest">Compliance</span>
+                                            </div>
+                                        </div>
+                                        <div className="space-y-3 text-xs w-full">
+                                             {pieData.map((entry, idx) => (
+                                                 <div key={idx} className="flex items-center justify-between">
+                                                     <div className="flex items-center gap-2">
+                                                         <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: ["#16a34a", "#f97316", "#ef4444", "#9ca3af"][idx] }}></span>
+                                                         <span className="text-gray-600 font-medium">{entry.name}</span>
+                                                     </div>
+                                                     <span className="font-bold text-gray-800">{entry.value}</span>
+                                                 </div>
+                                             ))}
+                                             <div className="pt-3 border-t border-dashed border-gray-200 flex justify-between">
+                                                 <span className="text-gray-500">Total Wajib</span>
+                                                 <span className="font-bold text-gray-800">{kpiTotal}</span>
+                                             </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
 
-            {/* Row 3: LIST ELIGIBILITY */}
-            <div className="grid grid-cols-1 gap-4">
-                <EligibilitySection
-                    statusFilterOptions={statusFilterOptions}
-                    statusFilter={statusFilter}
-                    setStatusFilter={setStatusFilter}
-                    eligLoading={eligLoading}
-                    eligData={eligData}
-                    eligPage={eligPage}
-                    eligRowsPerPage={eligRowsPerPage}
-                    eligTotalElements={eligTotalElements}
-                    eligTotalPages={eligTotalPages}
-                    setEligPage={setEligPage}
-                    setEligRowsPerPage={setEligRowsPerPage}
-                />
+                        {/* Batch Execution Bar */}
+                        <div className="card bg-white shadow-sm border border-gray-100 rounded-xl h-full">
+                            <div className="p-5 border-b border-gray-100 flex items-center justify-between gap-2 flex-wrap">
+                                 <h2 className="font-semibold text-lg text-gray-800">Pelaksanaan Batch</h2>
+                                 <div className="w-36">
+                                     <Select
+                                        className="text-xs"
+                                        classNamePrefix="react-select"
+                                        options={batchTypeOptions}
+                                        value={batchType}
+                                        onChange={(opt) => setBatchType(opt || batchTypeOptions[0])}
+                                        isClearable={false}
+                                        isSearchable={false}
+                                        menuPortalTarget={document.body}
+                                        styles={{ control: (base) => ({ ...base, minHeight: '32px', height: '32px' }) }}
+                                     />
+                                 </div>
+                            </div>
+                            <div className="p-5">
+                                 <div className="h-64">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <BarChart data={monthly} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                                            <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#9ca3af' }} dy={10} />
+                                            <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#9ca3af' }} />
+                                            <ReTooltip 
+                                                cursor={{ fill: '#f9fafb' }}
+                                                contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} 
+                                            />
+                                            <Bar dataKey="count" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={24} />
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                 </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Eligibility Table Card */}
+                    <div className="card bg-white shadow-sm border border-gray-100 rounded-xl overflow-hidden">
+                         <div className="p-5 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                             <h2 className="font-semibold text-lg flex items-center gap-2 text-gray-800">
+                                  <Layers size={20} className="text-indigo-500" />
+                                  Eligibility Sertifikasi
+                             </h2>
+                             <div className="w-full sm:w-44">
+                                 <Select
+                                      className="text-xs"
+                                      classNamePrefix="react-select"
+                                      options={statusFilterOptions}
+                                      value={statusFilter}
+                                      onChange={(opt) => setStatusFilter(opt || statusFilterOptions[0])}
+                                      isSearchable={false}
+                                      menuPortalTarget={document.body}
+                                      styles={{ control: (base) => ({ ...base, minHeight: '32px', height: '32px' }) }}
+                                 />
+                             </div>
+                         </div>
+                         
+                         <div className="overflow-x-auto">
+                              <table className="table table-md w-full">
+                                   <thead className="bg-gray-50 text-gray-600 text-xs uppercase tracking-wider font-semibold border-b border-gray-100">
+                                       <tr>
+                                           <th className="w-12 text-center">No</th>
+                                           <th>Sertifikasi</th>
+                                           <th className="text-center">Level</th>
+                                           <th className="text-center">Subbidang</th>
+                                           <th className="text-center">Status</th>
+                                           <th className="text-center">Sisa Waktu</th>
+                                       </tr>
+                                   </thead>
+                                   <tbody className="text-sm divide-y divide-gray-50">
+                                       {eligLoading ? (
+                                            Array.from({length: 3}).map((_, i) => (
+                                                <tr key={i}><td colSpan={6} className="p-4"><div className="skeleton h-8 w-full"></div></td></tr>
+                                            ))
+                                       ) : eligData.length === 0 ? (
+                                           <tr><td colSpan={6} className="text-center py-8 text-gray-400">Tidak ada data ditemukan</td></tr>
+                                       ) : (
+                                            eligData.map((e, idx) => (
+                                                <tr key={idx} className="hover:bg-gray-50 transition-colors cursor-pointer group border-transparent"
+                                                    onClick={() => {
+                                                         const eid = getCurrentEmployeeId();
+                                                         if(eid) navigate(`/employee/${eid}?tab=eligibility`);
+                                                    }}
+                                                >
+                                                     <td className="w-12 text-gray-400 text-center font-mono text-xs">{(eligPage - 1) * eligRowsPerPage + idx + 1}</td>
+                                                     <td>
+                                                          <div className="font-medium text-gray-800 line-clamp-1">{e.certificationName}</div>
+                                                          <div className="text-[11px] text-gray-400 font-mono mt-0.5">{e.certificationCode}</div>
+                                                     </td>
+                                                     <td className="text-center">
+                                                          <span className="inline-flex items-center justify-center px-2 py-1 rounded-md text-xs font-semibold bg-gray-100 text-gray-700 border border-gray-200 min-w-[40px]">
+                                                              {e.certificationLevelLevel ?? e.certificationLevel?.level ?? "-"}
+                                                          </span>
+                                                     </td>
+                                                     <td className="text-center">
+                                                          <span className="inline-flex items-center justify-center px-2.5 py-1 rounded-md text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100">
+                                                              {e.subFieldCode || "-"}
+                                                          </span>
+                                                     </td>
+                                                     <td className="text-center">
+                                                         <span className={statusBadgeClass(e.status)}>
+                                                             {statusLabel(e.status)}
+                                                         </span>
+                                                     </td>
+                                                     <td className="text-center text-gray-500 text-xs font-mono">{e.sisaWaktu || "-"}</td>
+                                                </tr>
+                                            ))
+                                       )}
+                                   </tbody>
+                              </table>
+                         </div>
+                         {eligTotalElements > 0 && (
+                              <div className="p-4 border-t border-gray-100">
+                                   <PaginationSimple
+                                      page={eligPage}
+                                      totalPages={eligTotalPages}
+                                      totalElements={eligTotalElements}
+                                      rowsPerPage={eligRowsPerPage}
+                                      onPageChange={setEligPage}
+                                      onRowsPerPageChange={(n) => { setEligRowsPerPage(n); setEligPage(1); }}
+                                   />
+                              </div>
+                         )}
+                    </div>
+                </div>
+
+                {/* Right Column (Batches) */}
+                <div className="w-full xl:w-80 2xl:w-96 space-y-6 flex-shrink-0">
+                     {/* Ongoing Batches */}
+                     <div className="card bg-white shadow-sm border border-gray-100 rounded-xl overflow-hidden">
+                           <div className="p-4 border-b border-gray-100 bg-blue-50/50 flex items-center justify-between">
+                                <h2 className="font-semibold text-sm flex items-center gap-2 text-gray-800">
+                                     <Clock size={16} className="text-blue-600"/>
+                                     Batch Berjalan
+                                </h2>
+                                <span className="text-[10px] font-medium text-blue-600 bg-blue-100 px-2 py-0.5 rounded-full">{batchTotalElements}</span>
+                           </div>
+                           <div className="max-h-[400px] overflow-y-auto p-3 space-y-3 custom-scrollbar">
+                                {batches.length === 0 && !loadingBatch ? (
+                                     <div className="text-center py-8">
+                                         <div className="text-gray-300 mb-2"><Clock size={32} className="mx-auto"/></div>
+                                         <div className="text-xs text-gray-400">Tidak ada batch berjalan saat ini</div>
+                                     </div>
+                                ) : (
+                                     batches.map((b) => (
+                                          <div key={b.id} onClick={() => navigate(`/batch/${b.id}`)} 
+                                               className="border border-gray-100 rounded-lg p-3 hover:border-blue-200 hover:shadow-sm cursor-pointer transition-all bg-white group relative overflow-hidden"
+                                          >
+                                               <div className="flex justify-between items-start mb-1.5 gap-2">
+                                                   <div className="font-semibold text-xs text-gray-800 line-clamp-2 leading-snug group-hover:text-blue-600 transition-colors">
+                                                       {b.name || b.batchName}
+                                                   </div>
+                                                   {/* <span className="badge badge-xs text-[9px] h-4 px-1 badge-ghost whitespace-nowrap flex-shrink-0">{b.type}</span> */}
+                                               </div>
+                                               <div className="text-[10px] text-gray-500 flex items-center gap-2 mb-3">
+                                                    <span className="flex items-center gap-1 bg-gray-50 px-1.5 py-0.5 rounded text-gray-600">
+                                                        <Calendar size={10}/> {formatShortIdDate(b.startDate)}
+                                                    </span>
+                                                    <span className="text-gray-300">•</span>
+                                                    <span className="text-gray-400 truncate max-w-[120px]">{b.type}</span>
+                                               </div>
+                                               <QuotaBar filled={getFilledForBar(b)} quota={toNum(b.quota)} />
+                                          </div>
+                                     ))
+                                )}
+                           </div>
+                      </div>
+
+                      {/* Finished Batches */}
+                      <div className="card bg-white shadow-sm border border-gray-100 rounded-xl overflow-hidden">
+                           <div className="p-4 border-b border-gray-100 bg-green-50/50 flex items-center justify-between">
+                                <h2 className="font-semibold text-sm flex items-center gap-2 text-gray-800">
+                                     <CheckCircle2 size={16} className="text-green-600"/>
+                                     Batch Selesai
+                                </h2>
+                                <span className="text-[10px] font-medium text-green-600 bg-green-100 px-2 py-0.5 rounded-full">{finishedTotalElements}</span>
+                           </div>
+                           <div className="max-h-[400px] overflow-y-auto p-3 space-y-3 custom-scrollbar">
+                                {finishedBatches.length === 0 ? (
+                                     <div className="text-center py-8">
+                                         <div className="text-gray-300 mb-2"><CheckCircle2 size={32} className="mx-auto"/></div>
+                                         <div className="text-xs text-gray-400">Belum ada batch selesai</div>
+                                     </div>
+                                ) : (
+                                     finishedBatches.map((b) => (
+                                          <div key={b.id} onClick={() => navigate(`/batch/${b.id}`)} 
+                                               className="border border-gray-100 rounded-lg p-3 hover:border-green-200 hover:shadow-sm cursor-pointer transition-all bg-white group"
+                                          >
+                                               <div className="flex justify-between items-start mb-1.5 gap-2">
+                                                   <div className="font-semibold text-xs text-gray-800 line-clamp-2 leading-snug group-hover:text-green-600 transition-colors">
+                                                       {b.name || b.batchName}
+                                                   </div>
+                                               </div>
+                                               <div className="text-[10px] text-gray-500 flex items-center gap-2 mb-2">
+                                                    <span className="flex items-center gap-1 bg-gray-50 px-1.5 py-0.5 rounded text-gray-600">
+                                                        <Calendar size={10}/> {formatShortIdDate(b.endDate)}
+                                                    </span>
+                                                    <span className="text-gray-300">•</span>
+                                                    <span className="text-gray-400 truncate max-w-[120px]">{b.type}</span>
+                                               </div>
+                                               
+                                               <div className="flex items-center gap-1 text-[10px] bg-gray-50 rounded p-1.5">
+                                                    <div className="flex-1 text-center border-r border-gray-200 last:border-0">
+                                                        <div className="text-green-600 font-bold">{toNum(b.totalPassed ?? b.passed)}</div>
+                                                        <div className="text-[9px] text-gray-400">Lulus</div>
+                                                    </div>
+                                                    <div className="flex-1 text-center border-r border-gray-200 last:border-0">
+                                                        <div className="text-red-500 font-bold">{Math.max(toNum(b.totalParticipants)-toNum(b.totalPassed ?? b.passed), 0)}</div>
+                                                        <div className="text-[9px] text-gray-400">Gagal</div>
+                                                    </div>
+                                                    <div className="flex-1 text-center">
+                                                        <div className="text-gray-700 font-bold">{toNum(b.totalParticipants)}</div>
+                                                        <div className="text-[9px] text-gray-400">Total</div>
+                                                    </div>
+                                               </div>
+                                          </div>
+                                     ))
+                                )}
+                           </div>
+                      </div>
+                 </div>
             </div>
         </div>
     );
