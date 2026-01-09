@@ -8,7 +8,7 @@ import com.bankmega.certification.entity.Employee;
 import com.bankmega.certification.entity.EmployeeCertification;
 import com.bankmega.certification.entity.EmployeeCertificationHistory.ActionType;
 import com.bankmega.certification.entity.Institution;
-import com.bankmega.certification.event.EmployeeCertificationChangedEvent;
+
 import com.bankmega.certification.repository.CertificationRuleRepository;
 import com.bankmega.certification.repository.EmployeeCertificationRepository;
 import com.bankmega.certification.repository.EmployeeEligibilityRepository;
@@ -20,7 +20,7 @@ import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
-import org.springframework.context.ApplicationEventPublisher;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -48,7 +48,7 @@ public class EmployeeCertificationService {
     private final EmployeeEligibilityRepository eligibilityRepo;
     private final FileStorageService fileStorageService;
     private final EmployeeCertificationHistoryService historyService;
-    private final ApplicationEventPublisher eventPublisher;
+    private final EmployeeEligibilityService eligibilityService;
 
     @PersistenceContext
     private EntityManager em;
@@ -229,19 +229,19 @@ public class EmployeeCertificationService {
         }
     }
 
-    private void publishChangedEvent(EmployeeCertification ec) {
+    private void refreshEligibilityFor(EmployeeCertification ec) {
         if (ec == null || ec.getEmployee() == null || ec.getEmployee().getId() == null)
             return;
-        eventPublisher.publishEvent(new EmployeeCertificationChangedEvent(ec.getEmployee().getId()));
+        eligibilityService.refreshEligibilityForEmployee(ec.getEmployee().getId());
     }
 
-    private void publishChangedEventsForEmployeeIds(Collection<Long> employeeIds) {
+    private void refreshEligibilityForEmployees(Collection<Long> employeeIds) {
         if (employeeIds == null || employeeIds.isEmpty())
             return;
         employeeIds.stream()
                 .filter(Objects::nonNull)
                 .distinct()
-                .forEach(id -> eventPublisher.publishEvent(new EmployeeCertificationChangedEvent(id)));
+                .forEach(eligibilityService::refreshEligibilityForEmployee);
     }
 
     @Transactional
@@ -288,7 +288,7 @@ public class EmployeeCertificationService {
         historyService.snapshot(saved, ActionType.CREATED);
 
         maybeResetCounters(saved);
-        publishChangedEvent(saved);
+        refreshEligibilityFor(saved);
 
         return toResponse(saved);
     }
@@ -341,7 +341,7 @@ public class EmployeeCertificationService {
         historyService.snapshot(saved, ActionType.UPDATED);
 
         maybeResetCounters(saved);
-        publishChangedEvent(saved);
+        refreshEligibilityFor(saved);
 
         return toResponse(saved);
     }
@@ -362,7 +362,7 @@ public class EmployeeCertificationService {
         EmployeeCertification saved = repo.save(ec);
         historyService.snapshot(saved, ActionType.DELETED);
 
-        publishChangedEvent(saved);
+        refreshEligibilityFor(saved);
     }
 
     @Transactional
@@ -398,7 +398,7 @@ public class EmployeeCertificationService {
         EmployeeCertification saved = repo.save(ec);
         historyService.snapshot(saved, actionType);
 
-        publishChangedEvent(saved);
+        refreshEligibilityFor(saved);
 
         return saved;
     }
@@ -682,7 +682,7 @@ public class EmployeeCertificationService {
             batchSave(changed);
             total += changed.size();
 
-            publishChangedEventsForEmployeeIds(
+            refreshEligibilityForEmployees(
                     changed.stream()
                             .map(c -> c.getEmployee().getId())
                             .collect(Collectors.toSet()));
@@ -722,7 +722,7 @@ public class EmployeeCertificationService {
             batchSave(changed);
             total += changed.size();
 
-            publishChangedEventsForEmployeeIds(
+            refreshEligibilityForEmployees(
                     changed.stream()
                             .map(c -> c.getEmployee().getId())
                             .collect(Collectors.toSet()));
@@ -762,7 +762,7 @@ public class EmployeeCertificationService {
             batchSave(changed);
             total += changed.size();
 
-            publishChangedEventsForEmployeeIds(
+            refreshEligibilityForEmployees(
                     changed.stream()
                             .map(c -> c.getEmployee().getId())
                             .collect(Collectors.toSet()));
@@ -793,7 +793,7 @@ public class EmployeeCertificationService {
         batchSave(changed);
 
         if (!changed.isEmpty()) {
-            publishChangedEvent(changed.get(0));
+            refreshEligibilityFor(changed.get(0));
         }
 
         return changed.size();

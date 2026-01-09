@@ -221,13 +221,15 @@ public class PasswordResetService {
         if (user == null)
             return null;
 
-        if (user.getEmail() != null && !user.getEmail().isBlank()) {
-            return user.getEmail().trim();
-        }
+        // For employee-linked users, prioritize employee email
         if (user.getEmployee() != null &&
                 user.getEmployee().getEmail() != null &&
                 !user.getEmployee().getEmail().isBlank()) {
             return user.getEmployee().getEmail().trim();
+        }
+        // For non-employee users (superadmin/PIC), use user's own email
+        if (user.getEmail() != null && !user.getEmail().isBlank()) {
+            return user.getEmail().trim();
         }
         return null;
     }

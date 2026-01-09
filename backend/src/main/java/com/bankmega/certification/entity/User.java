@@ -78,4 +78,16 @@ public class User {
     @Builder.Default
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<PicCertificationScope> picCertificationScopes = new HashSet<>();
+
+    /**
+     * Returns the resolved email for this user:
+     * - If user is linked to an employee, returns employee's email
+     * - If user has no employee (superadmin/PIC), returns user's own email
+     */
+    public String getResolvedEmail() {
+        if (employee != null && employee.getEmail() != null && !employee.getEmail().isBlank()) {
+            return employee.getEmail().trim();
+        }
+        return email != null ? email.trim() : null;
+    }
 }

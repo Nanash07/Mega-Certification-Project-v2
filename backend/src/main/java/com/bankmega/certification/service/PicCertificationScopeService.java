@@ -90,7 +90,7 @@ public class PicCertificationScopeService {
                 return PicCertificationScopeResponse.builder()
                                 .userId(user.getId())
                                 .username(user.getUsername())
-                                .email(user.getEmail())
+                                .email(user.getResolvedEmail())
                                 .createdAt(user.getCreatedAt())
                                 .updatedAt(user.getUpdatedAt())
                                 .certifications(certs)

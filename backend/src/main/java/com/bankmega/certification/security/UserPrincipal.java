@@ -30,7 +30,7 @@ public class UserPrincipal implements UserDetails {
         this.id = user.getId();
         this.username = user.getUsername();
         this.password = user.getPassword();
-        this.email = user.getEmail();
+        this.email = user.getResolvedEmail();
         this.role = user.getRole();
         this.isActive = user.getIsActive();
 

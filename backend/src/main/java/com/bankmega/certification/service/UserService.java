@@ -52,7 +52,7 @@ public class UserService {
         return UserResponse.builder()
                 .id(user.getId())
                 .username(user.getUsername())
-                .email(user.getEmail())
+                .email(user.getResolvedEmail())
                 .roleId(user.getRole() != null ? user.getRole().getId() : null)
                 .roleName(user.getRole() != null ? user.getRole().getName() : null)
                 .employeeId(user.getEmployee() != null ? user.getEmployee().getId() : null)

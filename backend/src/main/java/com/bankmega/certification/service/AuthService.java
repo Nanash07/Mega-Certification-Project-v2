@@ -58,7 +58,7 @@ public class AuthService {
         return LoginResponse.builder()
                 .id(user.getId())
                 .username(user.getUsername())
-                .email(user.getEmail())
+                .email(user.getResolvedEmail())
                 .role(roleName)
                 .employeeId(employeeId)
                 .isActive(user.getIsActive())
