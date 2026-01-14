@@ -55,11 +55,11 @@ export default function EmployeeExceptionPage() {
     const [subOptions, setSubOptions] = useState([]);
 
     const [filterEmployee, setFilterEmployee] = useState(null);
-    const [filterJob, setFilterJob] = useState([]);
-    const [filterCert, setFilterCert] = useState([]);
-    const [filterLevel, setFilterLevel] = useState([]);
-    const [filterSub, setFilterSub] = useState([]);
-    const [filterStatus, setFilterStatus] = useState([]);
+    const [filterJob, setFilterJob] = useState(null);
+    const [filterCert, setFilterCert] = useState(null);
+    const [filterLevel, setFilterLevel] = useState(null);
+    const [filterSub, setFilterSub] = useState(null);
+    const [filterStatus, setFilterStatus] = useState(null);
 
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [showEditModal, setShowEditModal] = useState(false);
@@ -109,7 +109,7 @@ export default function EmployeeExceptionPage() {
     }
 
     function buildParamsForQuery() {
-        let certCodesFilter = filterCert.map((f) => f.value);
+        let certCodesFilter = filterCert ? [filterCert.value] : [];
 
         if (isPic && picCertCodes && picCertCodes.size > 0) {
             if (certCodesFilter.length > 0) {
@@ -121,11 +121,11 @@ export default function EmployeeExceptionPage() {
 
         return {
             employeeIds: filterEmployee ? [filterEmployee.value] : [],
-            jobIds: filterJob.map((f) => f.value),
+            jobIds: filterJob ? [filterJob.value] : [],
             certCodes: certCodesFilter,
-            levels: filterLevel.map((f) => f.value),
-            subCodes: filterSub.map((f) => f.value),
-            statuses: filterStatus.map((f) => f.value),
+            levels: filterLevel ? [filterLevel.value] : [],
+            subCodes: filterSub ? [filterSub.value] : [],
+            statuses: filterStatus ? [filterStatus.value] : [],
         };
     }
 
@@ -220,11 +220,11 @@ export default function EmployeeExceptionPage() {
 
     const clearFilter = () => {
         setFilterEmployee(null);
-        setFilterJob([]);
-        setFilterCert([]);
-        setFilterLevel([]);
-        setFilterSub([]);
-        setFilterStatus([]);
+        setFilterJob(null);
+        setFilterCert(null);
+        setFilterLevel(null);
+        setFilterSub(null);
+        setFilterStatus(null);
         setPage(1);
         load();
         toast.success("Filter dibersihkan");
@@ -351,10 +351,10 @@ export default function EmployeeExceptionPage() {
                             <Briefcase size={12} /> Jabatan
                         </label>
                         <Select
-                            isMulti
                             options={jobOptions}
                             value={filterJob}
                             onChange={setFilterJob}
+                            isClearable
                             placeholder="Semua Jabatan"
                             className="text-xs"
                             classNamePrefix="react-select"
@@ -366,10 +366,10 @@ export default function EmployeeExceptionPage() {
                             <Award size={12} /> Sertifikasi
                         </label>
                         <Select
-                            isMulti
                             options={certOptions}
                             value={filterCert}
                             onChange={setFilterCert}
+                            isClearable
                             placeholder="Semua Sertifikasi"
                             className="text-xs"
                             classNamePrefix="react-select"
@@ -381,10 +381,10 @@ export default function EmployeeExceptionPage() {
                             <Layers size={12} /> Level
                         </label>
                         <Select
-                            isMulti
                             options={levelOptions}
                             value={filterLevel}
                             onChange={setFilterLevel}
+                            isClearable
                             placeholder="Semua Level"
                             className="text-xs"
                             classNamePrefix="react-select"
@@ -396,10 +396,10 @@ export default function EmployeeExceptionPage() {
                             <Grid3X3 size={12} /> Sub Bidang
                         </label>
                         <Select
-                            isMulti
                             options={subOptions}
                             value={filterSub}
                             onChange={setFilterSub}
+                            isClearable
                             placeholder="Semua Sub Bidang"
                             className="text-xs"
                             classNamePrefix="react-select"
@@ -411,13 +411,13 @@ export default function EmployeeExceptionPage() {
                             <Filter size={12} /> Status
                         </label>
                         <Select
-                            isMulti
                             options={[
                                 { value: true, label: "Active" },
                                 { value: false, label: "Nonactive" },
                             ]}
                             value={filterStatus}
                             onChange={setFilterStatus}
+                            isClearable
                             placeholder="Semua Status"
                             className="text-xs"
                             classNamePrefix="react-select"

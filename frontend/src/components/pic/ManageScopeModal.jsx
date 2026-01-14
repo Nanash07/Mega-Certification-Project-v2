@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Select from "react-select";
 import toast from "react-hot-toast";
+import { X, Save, Shield, Award } from "lucide-react";
 import { fetchCertifications } from "../../services/certificationService";
 import { assignPicScope } from "../../services/picScopeService";
 
@@ -10,9 +11,32 @@ export default function ManageScopeModal({ open, onClose, user, onSaved }) {
     const [loading, setLoading] = useState(false);
 
     // Hanya atur z-index menu react-select supaya muncul di atas modal
-    const selectStyles = {
-        menuPortal: (base) => ({ ...base, zIndex: 9999 }),
-    };
+    const selectStyles = useMemo(
+        () => ({
+            menuPortal: (base) => ({ ...base, zIndex: 999999 }),
+            menu: (base) => ({ ...base, zIndex: 999999 }),
+            control: (base, state) => ({
+                ...base,
+                minHeight: "36px",
+                fontSize: "0.875rem",
+                borderRadius: "0.5rem",
+                borderColor: "#d1d5db",
+                boxShadow: state.isFocused ? "0 0 0 1px var(--fallback-p,oklch(var(--p)/1))" : "none",
+                "&:hover": {
+                    borderColor: "var(--fallback-p,oklch(var(--p)/1))",
+                },
+            }),
+            option: (base, state) => ({
+                ...base,
+                padding: "8px 12px",
+                fontSize: "0.875rem",
+                backgroundColor: state.isFocused ? "#f3f4f6" : "white",
+                color: "#1f2937",
+                cursor: "pointer",
+            }),
+        }),
+        []
+    );
 
     useEffect(() => {
         if (!open || !user) return;
@@ -69,48 +93,76 @@ export default function ManageScopeModal({ open, onClose, user, onSaved }) {
     if (!open || !user) return null;
 
     return (
-        <dialog open={open} className="modal modal-open">
-            <div className="modal-box">
-                {/* ukuran default DaisyUI */}
-                <h3 className="font-bold text-lg mb-3">
-                    Kelola Scope — <span className="text-primary">{user.username}</span>
-                </h3>
+        <dialog className="modal modal-open" open={open}>
+            <div className="modal-box bg-base-100 shadow-2xl border border-gray-100 rounded-2xl">
+                {/* Header */}
+                <div className="flex items-center justify-between pb-4 border-b border-gray-100">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center">
+                            <Shield size={20} className="text-purple-600" />
+                        </div>
+                        <div>
+                            <h3 className="font-bold text-lg">Kelola Scope PIC</h3>
+                            <p className="text-xs text-gray-500">
+                                Atur akses sertifikasi untuk <span className="font-semibold text-primary">{user.username}</span>
+                            </p>
+                        </div>
+                    </div>
+                    <button className="btn btn-sm btn-circle btn-ghost" onClick={onClose}>
+                        <X size={18} />
+                    </button>
+                </div>
 
-                <div className="mb-4">
-                    <label className="block mb-1">Sertifikasi yang diizinkan</label>
-                    <Select
-                        isMulti
-                        options={options}
-                        value={selected}
-                        onChange={setSelected}
-                        styles={selectStyles}
-                        placeholder="Pilih certifications…"
-                        menuPortalTarget={typeof document !== "undefined" ? document.body : undefined}
-                    />
-                    <div className="text-xs opacity-70 mt-2">
-                        Dipilih: <b>{selected.length}</b>
+                {/* Content */}
+                <div className="py-5 text-sm">
+                    <div className="flex flex-col gap-1">
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <Award size={14} /> Sertifikasi yang diizinkan
+                        </label>
+                        <Select
+                            isMulti
+                            options={options}
+                            value={selected}
+                            onChange={setSelected}
+                            styles={selectStyles}
+                            placeholder="Pilih sertifikasi..."
+                            menuPortalTarget={typeof document !== "undefined" ? document.body : undefined}
+                            className="text-sm"
+                        />
+                        <div className="text-xs text-gray-400 mt-1">
+                            Total Dipilih: <b className="text-gray-600">{selected.length}</b>
+                        </div>
                     </div>
                 </div>
 
-                <div className="modal-action">
-                    <button className="btn" onClick={onClose} disabled={loading}>
+                {/* Footer */}
+                <div className="flex justify-end gap-2 pt-4 border-t border-gray-100">
+                    <button
+                        type="button"
+                        className="btn btn-sm btn-ghost rounded-lg"
+                        onClick={onClose}
+                        disabled={loading}
+                    >
                         Batal
                     </button>
                     <button
-                        className="btn btn-primary"
+                        type="button"
+                        className="btn btn-sm btn-primary rounded-lg gap-1"
                         onClick={handleSave}
                         disabled={loading || !isDirty}
                         title={!isDirty ? "Tidak ada perubahan" : "Simpan perubahan"}
                     >
-                        {loading ? <span className="loading loading-spinner" /> : "Simpan"}
+                        {loading ? <span className="loading loading-spinner loading-xs" /> : <Save size={14} />}
+                        {loading ? "Menyimpan..." : "Simpan Perubahan"}
                     </button>
                 </div>
             </div>
 
-            {/* backdrop close */}
-            <form method="dialog" className="modal-backdrop" onClick={onClose}>
+            {/* Backdrop */}
+            <form method="dialog" className="modal-backdrop bg-black/50" onClick={onClose}>
                 <button>close</button>
             </form>
         </dialog>
     );
 }
+

@@ -26,10 +26,10 @@ export default function EmployeeResignedPage() {
     const TABLE_COLS = 12;
 
     const [filterEmployee, setFilterEmployee] = useState(null);
-    const [regionalIds, setRegionalIds] = useState([]);
-    const [divisionIds, setDivisionIds] = useState([]);
-    const [unitIds, setUnitIds] = useState([]);
-    const [jobPositionIds, setJobPositionIds] = useState([]);
+    const [regionalIds, setRegionalIds] = useState(null);
+    const [divisionIds, setDivisionIds] = useState(null);
+    const [unitIds, setUnitIds] = useState(null);
+    const [jobPositionIds, setJobPositionIds] = useState(null);
 
     const [regionalOptions, setRegionalOptions] = useState([]);
     const [divisionOptions, setDivisionOptions] = useState([]);
@@ -72,10 +72,10 @@ export default function EmployeeResignedPage() {
                 page: page - 1,
                 size: rowsPerPage,
                 employeeIds: filterEmployee ? [filterEmployee.value] : [],
-                regionalIds: regionalIds.map((i) => i.value),
-                divisionIds: divisionIds.map((i) => i.value),
-                unitIds: unitIds.map((i) => i.value),
-                jobPositionIds: jobPositionIds.map((i) => i.value),
+                regionalIds: regionalIds ? [regionalIds.value] : [],
+                divisionIds: divisionIds ? [divisionIds.value] : [],
+                unitIds: unitIds ? [unitIds.value] : [],
+                jobPositionIds: jobPositionIds ? [jobPositionIds.value] : [],
             };
 
             const res = await fetchResignedEmployees(params);
@@ -96,10 +96,10 @@ export default function EmployeeResignedPage() {
 
     function resetFilter() {
         setFilterEmployee(null);
-        setRegionalIds([]);
-        setDivisionIds([]);
-        setUnitIds([]);
-        setJobPositionIds([]);
+        setRegionalIds(null);
+        setDivisionIds(null);
+        setUnitIds(null);
+        setJobPositionIds(null);
         setPage(1);
         toast.success("Filter dibersihkan");
     }
@@ -140,10 +140,10 @@ export default function EmployeeResignedPage() {
                             <Filter size={12} /> Regional
                         </label>
                         <Select
-                            isMulti
                             options={regionalOptions}
                             value={regionalIds}
                             onChange={setRegionalIds}
+                            isClearable
                             placeholder="Filter Regional"
                             className="text-xs"
                             classNamePrefix="react-select"
@@ -154,10 +154,10 @@ export default function EmployeeResignedPage() {
                             <Filter size={12} /> Division
                         </label>
                         <Select
-                            isMulti
                             options={divisionOptions}
                             value={divisionIds}
                             onChange={setDivisionIds}
+                            isClearable
                             placeholder="Filter Division"
                             className="text-xs"
                             classNamePrefix="react-select"
@@ -168,10 +168,10 @@ export default function EmployeeResignedPage() {
                             <Filter size={12} /> Unit
                         </label>
                         <Select
-                            isMulti
                             options={unitOptions}
                             value={unitIds}
                             onChange={setUnitIds}
+                            isClearable
                             placeholder="Filter Unit"
                             className="text-xs"
                             classNamePrefix="react-select"
@@ -182,10 +182,10 @@ export default function EmployeeResignedPage() {
                             <Filter size={12} /> Jabatan
                         </label>
                         <Select
-                            isMulti
                             options={jobOptions}
                             value={jobPositionIds}
                             onChange={setJobPositionIds}
+                            isClearable
                             placeholder="Filter Jabatan"
                             className="text-xs"
                             classNamePrefix="react-select"

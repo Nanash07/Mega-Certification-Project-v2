@@ -18,7 +18,25 @@ export default function EditCertificationModal({ open, data, onClose, onSaved })
         () => ({
             menuPortal: (base) => ({ ...base, zIndex: 999999 }),
             menu: (base) => ({ ...base, zIndex: 999999 }),
-            control: (base) => ({ ...base, borderRadius: "0.5rem", minHeight: "2.5rem" }),
+            control: (base, state) => ({
+                ...base,
+                minHeight: "36px",
+                fontSize: "0.875rem",
+                borderRadius: "0.5rem",
+                borderColor: "#d1d5db",
+                boxShadow: state.isFocused ? "0 0 0 1px var(--fallback-p,oklch(var(--p)/1))" : "none",
+                "&:hover": {
+                    borderColor: "var(--fallback-p,oklch(var(--p)/1))",
+                },
+            }),
+            option: (base, state) => ({
+                ...base,
+                padding: "8px 12px",
+                fontSize: "0.875rem",
+                backgroundColor: state.isFocused ? "#f3f4f6" : "white",
+                color: "#1f2937",
+                cursor: "pointer",
+            }),
         }),
         []
     );

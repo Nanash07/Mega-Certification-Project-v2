@@ -45,11 +45,11 @@ export default function EmployeeCertificationPage() {
     const [subFieldOptions, setSubFieldOptions] = useState([]);
 
     const [filterEmployee, setFilterEmployee] = useState(null);
-    const [filterCertCode, setFilterCertCode] = useState([]);
-    const [filterLevel, setFilterLevel] = useState([]);
-    const [filterSubField, setFilterSubField] = useState([]);
-    const [filterInstitution, setFilterInstitution] = useState([]);
-    const [filterStatus, setFilterStatus] = useState([]);
+    const [filterCertCode, setFilterCertCode] = useState(null);
+    const [filterLevel, setFilterLevel] = useState(null);
+    const [filterSubField, setFilterSubField] = useState(null);
+    const [filterInstitution, setFilterInstitution] = useState(null);
+    const [filterStatus, setFilterStatus] = useState(null);
 
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [editData, setEditData] = useState(null);
@@ -96,11 +96,12 @@ export default function EmployeeCertificationPage() {
             page: page - 1,
             size: rowsPerPage,
             employeeIds: filterEmployee ? [filterEmployee.value] : [],
-            certCodes: filterCertCode.map((f) => f.value),
-            levels: filterLevel.map((f) => f.value),
-            subCodes: filterSubField.map((f) => f.value),
-            institutionIds: filterInstitution.map((f) => f.value),
-            statuses: filterStatus.map((f) => f.value),
+            employeeIds: filterEmployee ? [filterEmployee.value] : [],
+            certCodes: filterCertCode ? [filterCertCode.value] : [],
+            levels: filterLevel ? [filterLevel.value] : [],
+            subCodes: filterSubField ? [filterSubField.value] : [],
+            institutionIds: filterInstitution ? [filterInstitution.value] : [],
+            statuses: filterStatus ? [filterStatus.value] : [],
         };
     }
 
@@ -180,11 +181,11 @@ export default function EmployeeCertificationPage() {
         try {
             const params = {
                 employeeIds: filterEmployee ? [filterEmployee.value] : [],
-                certCodes: filterCertCode.map((f) => f.value),
-                levels: filterLevel.map((f) => f.value),
-                subCodes: filterSubField.map((f) => f.value),
-                institutionIds: filterInstitution.map((f) => f.value),
-                statuses: filterStatus.map((f) => f.value),
+                certCodes: filterCertCode ? [filterCertCode.value] : [],
+                levels: filterLevel ? [filterLevel.value] : [],
+                subCodes: filterSubField ? [filterSubField.value] : [],
+                institutionIds: filterInstitution ? [filterInstitution.value] : [],
+                statuses: filterStatus ? [filterStatus.value] : [],
             };
 
             const blob = await exportCertifications(params);
@@ -203,11 +204,11 @@ export default function EmployeeCertificationPage() {
 
     function resetFilter() {
         setFilterEmployee(null);
-        setFilterCertCode([]);
-        setFilterLevel([]);
-        setFilterSubField([]);
-        setFilterInstitution([]);
-        setFilterStatus([]);
+        setFilterCertCode(null);
+        setFilterLevel(null);
+        setFilterSubField(null);
+        setFilterInstitution(null);
+        setFilterStatus(null);
         setPage(1);
         toast.success("Filter dibersihkan");
     }
@@ -291,10 +292,10 @@ export default function EmployeeCertificationPage() {
                             <Filter size={12} /> Cert Code
                         </label>
                         <Select
-                            isMulti
                             options={certCodeOptions}
                             value={filterCertCode}
                             onChange={setFilterCertCode}
+                            isClearable
                             placeholder="Filter Cert Code"
                             className="text-xs"
                             classNamePrefix="react-select"
@@ -305,10 +306,10 @@ export default function EmployeeCertificationPage() {
                             <Filter size={12} /> Jenjang
                         </label>
                         <Select
-                            isMulti
                             options={levelOptions}
                             value={filterLevel}
                             onChange={setFilterLevel}
+                            isClearable
                             placeholder="Filter Jenjang"
                             className="text-xs"
                             classNamePrefix="react-select"
@@ -319,10 +320,10 @@ export default function EmployeeCertificationPage() {
                             <Filter size={12} /> Sub Field
                         </label>
                         <Select
-                            isMulti
                             options={subFieldOptions}
                             value={filterSubField}
                             onChange={setFilterSubField}
+                            isClearable
                             placeholder="Filter Sub Field"
                             className="text-xs"
                             classNamePrefix="react-select"
@@ -333,10 +334,10 @@ export default function EmployeeCertificationPage() {
                             <Filter size={12} /> Lembaga
                         </label>
                         <Select
-                            isMulti
                             options={institutionOptions}
                             value={filterInstitution}
                             onChange={setFilterInstitution}
+                            isClearable
                             placeholder="Filter Lembaga"
                             className="text-xs"
                             classNamePrefix="react-select"
@@ -347,7 +348,6 @@ export default function EmployeeCertificationPage() {
                             <Filter size={12} /> Status
                         </label>
                         <Select
-                            isMulti
                             options={[
                                 { value: "PENDING", label: "Pending" },
                                 { value: "ACTIVE", label: "Active" },
@@ -358,6 +358,7 @@ export default function EmployeeCertificationPage() {
                             ]}
                             value={filterStatus}
                             onChange={setFilterStatus}
+                            isClearable
                             placeholder="Filter Status"
                             className="text-xs"
                             classNamePrefix="react-select"

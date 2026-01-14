@@ -48,9 +48,9 @@ export default function CertificationRulePage() {
     const [levelOptions, setLevelOptions] = useState([]);
     const [subOptions, setSubOptions] = useState([]);
 
-    const [filterCert, setFilterCert] = useState([]);
-    const [filterLevel, setFilterLevel] = useState([]);
-    const [filterSub, setFilterSub] = useState([]);
+    const [filterCert, setFilterCert] = useState(null);
+    const [filterLevel, setFilterLevel] = useState(null);
+    const [filterSub, setFilterSub] = useState(null);
     const [filterStatus, setFilterStatus] = useState({ value: "all", label: "Semua" });
 
     const [picCertCodes, setPicCertCodes] = useState(null);
@@ -89,9 +89,9 @@ export default function CertificationRulePage() {
                 status: filterStatus?.value || "all",
             };
 
-            if (filterCert.length > 0) params.certIds = filterCert.map((f) => f.value);
-            if (filterLevel.length > 0) params.levelIds = filterLevel.map((f) => f.value);
-            if (filterSub.length > 0) params.subIds = filterSub.map((f) => f.value);
+            if (filterCert) params.certIds = [filterCert.value];
+            if (filterLevel) params.levelIds = [filterLevel.value];
+            if (filterSub) params.subIds = [filterSub.value];
 
             const res = await fetchCertificationRulesPaged(params);
             let content = res.content || [];
@@ -187,9 +187,9 @@ export default function CertificationRulePage() {
     }
 
     function resetFilter() {
-        setFilterCert([]);
-        setFilterLevel([]);
-        setFilterSub([]);
+        setFilterCert(null);
+        setFilterLevel(null);
+        setFilterSub(null);
         setFilterStatus({ value: "all", label: "Semua" });
         setPage(1);
         toast.success("Filter dibersihkan");
@@ -237,7 +237,6 @@ export default function CertificationRulePage() {
                             value={filterCert}
                             onChange={setFilterCert}
                             isClearable
-                            isMulti
                             placeholder="Filter Sertifikasi"
                             className="text-xs"
                             classNamePrefix="react-select"
@@ -252,7 +251,6 @@ export default function CertificationRulePage() {
                             value={filterLevel}
                             onChange={setFilterLevel}
                             isClearable
-                            isMulti
                             placeholder="Filter Level"
                             className="text-xs"
                             classNamePrefix="react-select"
@@ -267,7 +265,6 @@ export default function CertificationRulePage() {
                             value={filterSub}
                             onChange={setFilterSub}
                             isClearable
-                            isMulti
                             placeholder="Filter Sub Bidang"
                             className="text-xs"
                             classNamePrefix="react-select"

@@ -31,11 +31,11 @@ export default function EmployeePage() {
     const TABLE_COLS = 11;
 
     const [filterEmployee, setFilterEmployee] = useState(null);
-    const [regionalIds, setRegionalIds] = useState([]);
-    const [divisionIds, setDivisionIds] = useState([]);
-    const [unitIds, setUnitIds] = useState([]);
-    const [jobPositionIds, setJobPositionIds] = useState([]);
-    const [statuses, setStatuses] = useState([]);
+    const [regionalIds, setRegionalIds] = useState(null);
+    const [divisionIds, setDivisionIds] = useState(null);
+    const [unitIds, setUnitIds] = useState(null);
+    const [jobPositionIds, setJobPositionIds] = useState(null);
+    const [statuses, setStatuses] = useState(null);
 
     const [regionalOptions, setRegionalOptions] = useState([]);
     const [divisionOptions, setDivisionOptions] = useState([]);
@@ -88,11 +88,11 @@ export default function EmployeePage() {
                 page: page - 1,
                 size: rowsPerPage,
                 employeeIds: filterEmployee ? [filterEmployee.value] : [],
-                regionalIds: regionalIds.map((i) => i.value),
-                divisionIds: divisionIds.map((i) => i.value),
-                unitIds: unitIds.map((i) => i.value),
-                jobPositionIds: jobPositionIds.map((i) => i.value),
-                statuses: statuses.map((i) => i.value),
+                regionalIds: regionalIds ? [regionalIds.value] : [],
+                divisionIds: divisionIds ? [divisionIds.value] : [],
+                unitIds: unitIds ? [unitIds.value] : [],
+                jobPositionIds: jobPositionIds ? [jobPositionIds.value] : [],
+                statuses: statuses ? [statuses.value] : [],
             };
 
             const res = await fetchEmployees(params);
@@ -113,11 +113,11 @@ export default function EmployeePage() {
 
     function resetFilter() {
         setFilterEmployee(null);
-        setRegionalIds([]);
-        setDivisionIds([]);
-        setUnitIds([]);
-        setJobPositionIds([]);
-        setStatuses([]);
+        setRegionalIds(null);
+        setDivisionIds(null);
+        setUnitIds(null);
+        setJobPositionIds(null);
+        setStatuses(null);
         setPage(1);
         toast.success("Filter dibersihkan");
     }
@@ -192,10 +192,10 @@ export default function EmployeePage() {
                             <Filter size={12} /> Regional
                         </label>
                         <Select
-                            isMulti
                             options={regionalOptions}
                             value={regionalIds}
                             onChange={setRegionalIds}
+                            isClearable
                             placeholder="Filter Regional"
                             className="text-xs"
                             classNamePrefix="react-select"
@@ -206,10 +206,10 @@ export default function EmployeePage() {
                             <Filter size={12} /> Division
                         </label>
                         <Select
-                            isMulti
                             options={divisionOptions}
                             value={divisionIds}
                             onChange={setDivisionIds}
+                            isClearable
                             placeholder="Filter Division"
                             className="text-xs"
                             classNamePrefix="react-select"
@@ -220,10 +220,10 @@ export default function EmployeePage() {
                             <Filter size={12} /> Unit
                         </label>
                         <Select
-                            isMulti
                             options={unitOptions}
                             value={unitIds}
                             onChange={setUnitIds}
+                            isClearable
                             placeholder="Filter Unit"
                             className="text-xs"
                             classNamePrefix="react-select"
@@ -234,10 +234,10 @@ export default function EmployeePage() {
                             <Filter size={12} /> Jabatan
                         </label>
                         <Select
-                            isMulti
                             options={jobOptions}
                             value={jobPositionIds}
                             onChange={setJobPositionIds}
+                            isClearable
                             placeholder="Filter Jabatan"
                             className="text-xs"
                             classNamePrefix="react-select"
@@ -248,10 +248,10 @@ export default function EmployeePage() {
                             <Filter size={12} /> Status
                         </label>
                         <Select
-                            isMulti
                             options={statusOptions}
                             value={statuses}
                             onChange={setStatuses}
+                            isClearable
                             placeholder="Filter Status"
                             className="text-xs"
                             classNamePrefix="react-select"

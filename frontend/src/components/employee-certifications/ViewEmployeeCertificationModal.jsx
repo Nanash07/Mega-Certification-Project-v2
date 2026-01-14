@@ -73,7 +73,7 @@ export default function ViewEmployeeCertificationModal({ open, certId, onClose, 
                                 className="max-h-full max-w-full object-contain rounded-lg shadow-md"
                                 onError={(e) => {
                                     e.target.onerror = null;
-                                    e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200' viewBox='0 0 200 200'%3E%3Crect fill='%23f3f4f6' width='200' height='200'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%239ca3af' font-size='14'%3EGambar tidak tersedia%3C/text%3E%3C/svg%3E";
+                                    e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200' viewBox='0 0 200 200'%3E%3Crect fill='%23f9fafb' width='200' height='200' rx='10' ry='10'/%3E%3Cpath d='M100 80v40m-20-20h40' stroke='%23d1d5db' stroke-width='2'/%3E%3Ctext x='50%25' y='65%25' dominant-baseline='middle' text-anchor='middle' fill='%239ca3af' font-family='sans-serif' font-size='14'%3EPreview Tidak Tersedia%3C/text%3E%3C/svg%3E";
                                 }}
                             />
                         </div>

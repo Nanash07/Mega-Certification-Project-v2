@@ -1,5 +1,8 @@
-import { useEffect, useState } from "react";
+// src/components/certification-rules/CreateCertificationRuleModal.jsx
+import { useEffect, useState, useMemo } from "react";
+import Select from "react-select";
 import toast from "react-hot-toast";
+import { X, Save, FileCheck, Award, Layers, Grid3X3, Clock, Calendar, RefreshCw, ShieldCheck } from "lucide-react";
 import { createCertificationRule } from "../../services/certificationRuleService";
 import { fetchCertifications } from "../../services/certificationService";
 import { fetchCertificationLevels } from "../../services/certificationLevelService";
@@ -23,6 +26,33 @@ export default function CreateCertificationRuleModal({ open, onClose, onSaved })
     const [levels, setLevels] = useState([]);
     const [subs, setSubs] = useState([]);
     const [refreshments, setRefreshments] = useState([]);
+
+    const selectStyles = useMemo(
+        () => ({
+            menuPortal: (base) => ({ ...base, zIndex: 999999 }),
+            menu: (base) => ({ ...base, zIndex: 999999 }),
+            control: (base, state) => ({
+                ...base,
+                minHeight: "36px",
+                fontSize: "0.875rem",
+                borderRadius: "0.5rem",
+                borderColor: "#d1d5db",
+                boxShadow: state.isFocused ? "0 0 0 1px var(--fallback-p,oklch(var(--p)/1))" : "none",
+                "&:hover": {
+                    borderColor: "var(--fallback-p,oklch(var(--p)/1))",
+                },
+            }),
+            option: (base, state) => ({
+                ...base,
+                padding: "8px 12px",
+                fontSize: "0.875rem",
+                backgroundColor: state.isFocused ? "#f3f4f6" : "white",
+                color: "#1f2937",
+                cursor: "pointer",
+            }),
+        }),
+        []
+    );
 
     useEffect(() => {
         if (open) {
@@ -67,130 +97,170 @@ export default function CreateCertificationRuleModal({ open, onClose, onSaved })
 
     if (!open) return null;
 
+    const certOptions = certs.map((c) => ({ value: c.id, label: `${c.code} - ${c.name}` }));
+    const levelOptions = levels.map((l) => ({ value: l.id, label: `${l.name} (Level ${l.level})` }));
+    const subFieldOptions = subs.map((s) => ({ value: s.id, label: `${s.name} (${s.code})` }));
+    const refreshmentOptions = refreshments.map((r) => ({ value: r.id, label: r.name }));
+
     return (
-        <dialog open className="modal">
-            <div className="modal-box max-w-2xl">
-                <h3 className="font-bold text-lg">Tambah Aturan Sertifikasi</h3>
-                <form className="mt-4 space-y-3" onSubmit={onSubmit}>
-                    {/* Sertifikasi */}
-                    <div>
-                        <label className="label pb-1">Sertifikasi</label>
-                        <select
-                            className="select select-bordered w-full"
-                            value={form.certificationId}
-                            onChange={(e) => setField("certificationId", e.target.value)}
-                            required
-                        >
-                            <option value="">-- Pilih Sertifikasi --</option>
-                            {certs.map((c) => (
-                                <option key={c.id} value={c.id}>
-                                    {c.code} - {c.name}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-
-                    {/* Jenjang + Sub Bidang */}
-                    <div className="grid grid-cols-2 gap-3">
-                        <div>
-                            <label className="label pb-1">Jenjang</label>
-                            <select
-                                className="select select-bordered w-full"
-                                value={form.certificationLevelId}
-                                onChange={(e) => setField("certificationLevelId", e.target.value)}
-                            >
-                                <option value="">-- Tidak ada --</option>
-                                {levels.map((l) => (
-                                    <option key={l.id} value={l.id}>
-                                        {l.name} (Level {l.level})
-                                    </option>
-                                ))}
-                            </select>
+        <dialog className="modal modal-open" open={open}>
+            <div className="modal-box max-w-3xl bg-base-100 shadow-2xl border border-gray-100 rounded-2xl">
+                {/* Header */}
+                <div className="flex items-center justify-between pb-4 border-b border-gray-100">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                            <FileCheck size={20} className="text-primary" />
                         </div>
                         <div>
-                            <label className="label pb-1">Sub Bidang</label>
-                            <select
-                                className="select select-bordered w-full"
-                                value={form.subFieldId}
-                                onChange={(e) => setField("subFieldId", e.target.value)}
-                            >
-                                <option value="">-- Tidak ada --</option>
-                                {subs.map((s) => (
-                                    <option key={s.id} value={s.id}>
-                                        {s.name} ({s.code})
-                                    </option>
-                                ))}
-                            </select>
+                            <h3 className="font-bold text-lg">Tambah Aturan Sertifikasi</h3>
+                            <p className="text-xs text-gray-500">Buat aturan baru untuk sertifikasi pegawai</p>
                         </div>
                     </div>
+                    <button className="btn btn-sm btn-circle btn-ghost" onClick={onClose}>
+                        <X size={18} />
+                    </button>
+                </div>
 
-                    {/* Masa berlaku & Reminder */}
-                    <div className="grid grid-cols-2 gap-3">
-                        <div>
-                            <label className="label pb-1">Masa Berlaku (bulan)</label>
+                {/* Content */}
+                <div className="py-5 text-sm">
+                    <form id="create-rule-form" onSubmit={onSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        
+                        {/* Sertifikasi */}
+                        <div className="md:col-span-2 flex flex-col gap-1">
+                            <label className="font-medium text-gray-600 flex items-center gap-1">
+                                <Award size={14} /> Sertifikasi
+                            </label>
+                            <Select
+                                options={certOptions}
+                                value={certOptions.find(o => o.value === form.certificationId) || null}
+                                onChange={(opt) => setField("certificationId", opt ? opt.value : "")}
+                                styles={selectStyles}
+                                placeholder="-- Pilih Sertifikasi --"
+                                menuPortalTarget={typeof document !== "undefined" ? document.body : undefined}
+                                required
+                            />
+                        </div>
+
+                        {/* Jenjang */}
+                        <div className="flex flex-col gap-1">
+                            <label className="font-medium text-gray-600 flex items-center gap-1">
+                                <Layers size={14} /> Jenjang
+                            </label>
+                            <Select
+                                options={levelOptions}
+                                value={levelOptions.find(o => o.value === form.certificationLevelId) || null}
+                                onChange={(opt) => setField("certificationLevelId", opt ? opt.value : "")}
+                                styles={selectStyles}
+                                placeholder="Pilih Jenjang (Opsional)"
+                                menuPortalTarget={typeof document !== "undefined" ? document.body : undefined}
+                                isClearable
+                            />
+                        </div>
+
+                        {/* Sub Bidang */}
+                        <div className="flex flex-col gap-1">
+                            <label className="font-medium text-gray-600 flex items-center gap-1">
+                                <Grid3X3 size={14} /> Sub Bidang
+                            </label>
+                            <Select
+                                options={subFieldOptions}
+                                value={subFieldOptions.find(o => o.value === form.subFieldId) || null}
+                                onChange={(opt) => setField("subFieldId", opt ? opt.value : "")}
+                                styles={selectStyles}
+                                placeholder="Pilih Sub Bidang (Opsional)"
+                                menuPortalTarget={typeof document !== "undefined" ? document.body : undefined}
+                                isClearable
+                            />
+                        </div>
+
+                        {/* Masa Berlaku */}
+                        <div className="flex flex-col gap-1">
+                            <label className="font-medium text-gray-600 flex items-center gap-1">
+                                <Calendar size={14} /> Masa Berlaku (bulan)
+                            </label>
                             <input
                                 type="number"
-                                className="input input-bordered w-full"
+                                className="input input-bordered input-sm w-full rounded-lg"
                                 value={form.validityMonths}
                                 onChange={(e) => setField("validityMonths", e.target.value)}
                                 min={0}
                                 required
+                                placeholder="Contoh: 24"
                             />
                         </div>
-                        <div>
-                            <label className="label pb-1">Reminder (bulan sebelum)</label>
+
+                        {/* Reminder */}
+                        <div className="flex flex-col gap-1">
+                            <label className="font-medium text-gray-600 flex items-center gap-1">
+                                <Clock size={14} /> Reminder (bulan sebelum)
+                            </label>
                             <input
                                 type="number"
-                                className="input input-bordered w-full"
+                                className="input input-bordered input-sm w-full rounded-lg"
                                 value={form.reminderMonths}
                                 onChange={(e) => setField("reminderMonths", e.target.value)}
                                 min={0}
                                 required
+                                placeholder="Contoh: 3"
                             />
                         </div>
-                    </div>
 
-                    {/* Refreshment + Wajib */}
-                    <div className="grid grid-cols-2 gap-3">
-                        <div>
-                            <label className="label pb-1">Refreshment</label>
-                            <select
-                                className="select select-bordered w-full"
-                                value={form.refreshmentTypeId}
-                                onChange={(e) => setField("refreshmentTypeId", e.target.value)}
-                            >
-                                <option value="">-- Tidak ada --</option>
-                                {refreshments.map((r) => (
-                                    <option key={r.id} value={r.id}>
-                                        {r.name}
-                                    </option>
-                                ))}
-                            </select>
+                        {/* Refreshment */}
+                        <div className="flex flex-col gap-1">
+                            <label className="font-medium text-gray-600 flex items-center gap-1">
+                                <RefreshCw size={14} /> Refreshment
+                            </label>
+                            <Select
+                                options={refreshmentOptions}
+                                value={refreshmentOptions.find(o => o.value === form.refreshmentTypeId) || null}
+                                onChange={(opt) => setField("refreshmentTypeId", opt ? opt.value : "")}
+                                styles={selectStyles}
+                                placeholder="Pilih Tipe Refreshment (Opsional)"
+                                menuPortalTarget={typeof document !== "undefined" ? document.body : undefined}
+                                isClearable
+                            />
                         </div>
-                        <div>
-                            <label className="label pb-1">Wajib Setelah Masuk (bulan)</label>
+
+                        {/* Wajib Setelah Masuk */}
+                        <div className="flex flex-col gap-1">
+                            <label className="font-medium text-gray-600 flex items-center gap-1">
+                                <ShieldCheck size={14} /> Wajib Setelah Masuk (bulan)
+                            </label>
                             <input
                                 type="number"
-                                className="input input-bordered w-full"
+                                className="input input-bordered input-sm w-full rounded-lg"
                                 value={form.wajibSetelahMasuk}
                                 onChange={(e) => setField("wajibSetelahMasuk", e.target.value)}
                                 min={0}
+                                placeholder="Opsional"
                             />
                         </div>
-                    </div>
+                    </form>
+                </div>
 
-                    {/* Actions */}
-                    <div className="modal-action">
-                        <button type="button" className="btn" onClick={onClose} disabled={submitting}>
-                            Batal
-                        </button>
-                        <button className={`btn btn-primary ${submitting ? "loading" : ""}`} disabled={submitting}>
-                            Simpan
-                        </button>
-                    </div>
-                </form>
+                {/* Footer */}
+                <div className="flex justify-end gap-2 pt-4 border-t border-gray-100">
+                    <button
+                        type="button"
+                        className="btn btn-sm btn-ghost rounded-lg"
+                        onClick={onClose}
+                        disabled={submitting}
+                    >
+                        Batal
+                    </button>
+                    <button
+                        type="submit"
+                        form="create-rule-form"
+                        className="btn btn-sm btn-primary rounded-lg gap-1"
+                        disabled={submitting}
+                    >
+                        {submitting ? <span className="loading loading-spinner loading-xs" /> : <Save size={14} />}
+                        {submitting ? "Menyimpan..." : "Simpan"}
+                    </button>
+                </div>
             </div>
-            <form method="dialog" className="modal-backdrop">
+
+            <form method="dialog" className="modal-backdrop bg-black/50">
                 <button onClick={onClose}>close</button>
             </form>
         </dialog>

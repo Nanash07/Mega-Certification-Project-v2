@@ -74,10 +74,10 @@ export default function UploadCertificationModal({ open, onClose, certId, onUplo
                     <div
                         className={`border-2 border-dashed rounded-xl p-6 text-center transition-all cursor-pointer ${
                             dragActive
-                                ? "border-primary bg-primary/5"
+                                ? "border-primary bg-primary/10 scale-[1.02] shadow-lg"
                                 : file
                                 ? "border-success bg-success/5"
-                                : "border-gray-300 hover:border-primary hover:bg-primary/5"
+                                : "border-gray-300 hover:border-primary hover:bg-primary/5 hover:shadow-sm"
                         }`}
                         onDragEnter={handleDrag}
                         onDragLeave={handleDrag}

@@ -1,7 +1,10 @@
 // src/pages/auth/ResetPassword.jsx
 import React, { useEffect, useState } from "react";
 import { useSearchParams, useNavigate, Link } from "react-router-dom";
+import { Lock, Eye, EyeOff, Loader2, ArrowLeft, KeyRound } from "lucide-react";
 import { resetPassword, validateResetToken } from "../../services/authService";
+
+const currentYear = new Date().getFullYear();
 
 const ResetPassword = () => {
     const [searchParams] = useSearchParams();
@@ -10,6 +13,8 @@ const ResetPassword = () => {
     const [token, setToken] = useState("");
     const [newPassword, setNewPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
+    const [showPassword, setShowPassword] = useState(false);
+    
     const [loading, setLoading] = useState(false);
     const [checkingToken, setCheckingToken] = useState(true);
     const [error, setError] = useState("");
@@ -20,7 +25,6 @@ const ResetPassword = () => {
         const t = searchParams.get("token");
 
         if (!t) {
-            // Kalau token gak ada di URL, langsung lempar ke halaman invalid
             navigate("/reset-password/invalid", { replace: true });
             return;
         }
@@ -37,7 +41,6 @@ const ResetPassword = () => {
                 setCheckingToken(false);
             } catch (e) {
                 console.error("validateResetToken error:", e);
-                // Kalau gagal validasi (misal network error), tetap anggap invalid
                 navigate("/reset-password/invalid", { replace: true });
             }
         };
@@ -84,12 +87,10 @@ const ResetPassword = () => {
 
     if (checkingToken) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-base-300">
-                <div className="card w-full max-w-md bg-base-100 shadow-xl rounded-2xl">
-                    <div className="card-body items-center">
-                        <span className="loading loading-spinner loading-lg mb-3" />
-                        <p className="text-sm text-base-content/70">Memeriksa token reset password...</p>
-                    </div>
+            <div className="min-h-screen flex items-center justify-center bg-gray-50">
+                <div className="flex flex-col items-center gap-4">
+                    <Loader2 size={40} className="text-primary animate-spin" />
+                    <p className="text-gray-500 font-medium">Memeriksa token reset password...</p>
                 </div>
             </div>
         );
@@ -98,66 +99,106 @@ const ResetPassword = () => {
     const disabled = loading || !token;
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-base-300">
-            <div className="card w-full max-w-md bg-base-100 shadow-xl rounded-2xl">
-                <div className="card-body">
-                    <h2 className="text-center text-2xl font-bold mb-2 text-primary">Reset Password</h2>
+        <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4 font-sans">
+            <div className="w-full max-w-md bg-white shadow-sm border border-gray-100 rounded-2xl overflow-hidden">
+                <div className="p-8">
+                    {/* HEADER */}
+                    <div className="text-center mb-8">
+                        <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-primary/10 text-primary mb-4">
+                            <KeyRound size={28} />
+                        </div>
+                        <h1 className="text-xl font-bold text-gray-900">Reset Password</h1>
+                        <p className="text-gray-500 text-sm mt-2">
+                           Silakan buat password baru untuk akun Anda.
+                        </p>
+                    </div>
 
-                    <p className="text-xs text-base-content/70 text-center mb-4">
-                        Silakan masukkan password baru Anda.
-                    </p>
-
-                    <form onSubmit={handleSubmit} className="space-y-3">
-                        <div>
-                            <label className="label">
-                                <span className="label-text font-semibold pb-1">Password Baru</span>
-                            </label>
-                            <input
-                                type="password"
-                                className="input input-bordered w-full"
-                                placeholder="Minimal 6 karakter"
-                                value={newPassword}
-                                onChange={(e) => setNewPassword(e.target.value)}
-                                required
-                            />
+                    <form onSubmit={handleSubmit} className="space-y-5">
+                        {/* PASSWORD FIELD */}
+                        <div className="space-y-1.5">
+                            <label className="text-sm font-medium text-gray-700 block">Password Baru</label>
+                            <div className="relative group">
+                                <input
+                                    type={showPassword ? "text" : "password"}
+                                    className="input input-bordered w-full pl-4 pr-10 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary transition-all bg-white"
+                                    placeholder="Minimal 6 karakter"
+                                    value={newPassword}
+                                    onChange={(e) => setNewPassword(e.target.value)}
+                                    required
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 transition-colors"
+                                >
+                                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                </button>
+                            </div>
                         </div>
 
-                        <div>
-                            <label className="label">
-                                <span className="label-text font-semibold pb-1">Konfirmasi Password Baru</span>
-                            </label>
-                            <input
-                                type="password"
-                                className="input input-bordered w-full"
-                                placeholder="Ulangi password baru"
-                                value={confirmPassword}
-                                onChange={(e) => setConfirmPassword(e.target.value)}
-                                required
-                            />
+                         {/* CONFIRM PASSWORD FIELD */}
+                         <div className="space-y-1.5">
+                            <label className="text-sm font-medium text-gray-700 block">Konfirmasi Password</label>
+                            <div className="relative group">
+                                <input
+                                    type={showPassword ? "text" : "password"}
+                                    className="input input-bordered w-full px-4 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary transition-all bg-white"
+
+                                    placeholder="Ulangi password baru"
+                                    value={confirmPassword}
+                                    onChange={(e) => setConfirmPassword(e.target.value)}
+                                    required
+                                />
+                            </div>
                         </div>
+
 
                         <button
                             type="submit"
-                            className="btn btn-primary btn-block rounded-xl font-bold text-lg"
+                            className="btn btn-primary w-full rounded-lg font-bold shadow-sm hover:shadow-md transition-all border-none"
                             disabled={disabled}
                         >
-                            {loading ? "Menyimpan..." : "Ubah Password"}
+                            {loading ? (
+                                <>
+                                    <Loader2 size={18} className="animate-spin mr-2" />
+                                    Menyimpan...
+                                </>
+                            ) : (
+                                "Ubah Password"
+                            )}
                         </button>
 
-                        {message && <div className="text-success text-center text-xs mt-2">{message}</div>}
+                         {/* SUCCESS MESSAGE */}
+                         {message && (
+                            <div role="alert" className="alert alert-success p-3 rounded-lg text-sm flex items-start">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="stroke-current shrink-0 h-5 w-5" fill="none" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                <span>{message}</span>
+                            </div>
+                        )}
 
-                        {error && <div className="text-error text-center text-xs mt-2">{error}</div>}
+                        {/* ERROR MESSAGE */}
+                        {error && (
+                            <div role="alert" className="alert alert-error p-3 rounded-lg text-sm flex items-start">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="stroke-current shrink-0 h-5 w-5" fill="none" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                <span>{error}</span>
+                            </div>
+                        )}
                     </form>
 
-                    <div className="mt-4 flex justify-center">
-                        <Link to="/login" className="link link-primary text-sm">
+                     {/* LINK BACK TO LOGIN */}
+                     <div className="mt-8 text-center border-t border-gray-100 pt-6">
+                        <Link to="/login" className="inline-flex items-center text-sm font-medium text-gray-500 hover:text-primary transition-colors gap-2 group">
+                            <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
                             Kembali ke Login
                         </Link>
                     </div>
+                </div>
 
-                    <span className="text-xs text-base-content/60 mt-6 block text-center">
-                        © {new Date().getFullYear()} Bank Mega. All rights reserved.
-                    </span>
+                 {/* FOOTER */}
+                 <div className="bg-gray-50/50 p-4 text-center border-t border-gray-100">
+                    <p className="text-xs text-gray-400">
+                        © {currentYear} PT Bank Mega Tbk.
+                    </p>
                 </div>
             </div>
         </div>
