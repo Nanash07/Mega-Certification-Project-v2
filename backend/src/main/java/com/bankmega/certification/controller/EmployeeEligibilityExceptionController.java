@@ -93,7 +93,7 @@ public class EmployeeEligibilityExceptionController {
 
         List<Long> allowedCertIds = resolveAllowedCertIds(authentication, userIdFromPrincipal);
         if (allowedCertIds != null && allowedCertIds.isEmpty()) {
-            return ResponseEntity.ok(Page.empty(pageable));
+            return ResponseEntity.ok(Page.empty(java.util.Objects.requireNonNull(pageable)));
         }
 
         List<String> effectiveStatuses = (statuses != null && !statuses.isEmpty()) ? statuses

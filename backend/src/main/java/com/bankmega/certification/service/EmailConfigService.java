@@ -61,7 +61,7 @@ public class EmailConfigService {
                 .active(true)
                 .build();
 
-        repository.save(config);
+        repository.save(Objects.requireNonNull(config));
         return mapToResponse(config);
     }
 
@@ -137,7 +137,7 @@ public class EmailConfigService {
             MimeMessage message = sender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
-            String fromAddr = Objects.toString(sender.getUsername(), "no-reply@megacert.local");
+            String fromAddr = Objects.requireNonNull(Objects.toString(sender.getUsername(), "no-reply@megacert.local"));
             helper.setFrom(fromAddr);
             helper.setTo(to);
 

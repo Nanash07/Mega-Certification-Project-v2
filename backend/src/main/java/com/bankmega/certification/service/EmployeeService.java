@@ -46,7 +46,7 @@ public class EmployeeService {
                         String search,
                         Pageable pageable) {
 
-                Specification<Employee> spec = Specification.where(EmployeeSpecification.activePageOnly())
+                Specification<Employee> spec = EmployeeSpecification.activePageOnly()
                                 .and(EmployeeSpecification.byEmployeeIds(employeeIds))
                                 .and(EmployeeSpecification.byRegionalIds(regionalIds))
                                 .and(EmployeeSpecification.byDivisionIds(divisionIds))
@@ -74,7 +74,7 @@ public class EmployeeService {
                         String search,
                         Pageable pageable) {
 
-                Specification<Employee> spec = Specification.where(EmployeeSpecification.resignedPageOnly())
+                Specification<Employee> spec = EmployeeSpecification.resignedPageOnly()
                                 .and(EmployeeSpecification.byEmployeeIds(employeeIds))
                                 .and(EmployeeSpecification.byRegionalIds(regionalIds))
                                 .and(EmployeeSpecification.byDivisionIds(divisionIds))
@@ -94,7 +94,7 @@ public class EmployeeService {
 
         @Transactional(readOnly = true)
         public long countActive(Long regionalId, Long divisionId, Long unitId) {
-                Specification<Employee> spec = Specification.where(EmployeeSpecification.activePageOnly())
+                Specification<Employee> spec = EmployeeSpecification.activePageOnly()
                                 .and(EmployeeSpecification.byRegionalId(regionalId))
                                 .and(EmployeeSpecification.byDivisionId(divisionId))
                                 .and(EmployeeSpecification.byUnitId(unitId));
@@ -104,7 +104,7 @@ public class EmployeeService {
 
         @Transactional(readOnly = true)
         public EmployeeResponse getById(Long id) {
-                Employee emp = repo.findById(id)
+                Employee emp = repo.findById(Objects.requireNonNull(id))
                                 .orElseThrow(() -> new NotFoundException("Employee not found with id " + id));
                 return toResponse(emp);
         }
@@ -210,13 +210,13 @@ public class EmployeeService {
         }
 
         private Employee mapRequestToEntity(Employee emp, EmployeeRequest req) {
-                Regional reg = regionalRepo.findById(req.getRegionalId())
+                Regional reg = regionalRepo.findById(Objects.requireNonNull(req.getRegionalId()))
                                 .orElseThrow(() -> new NotFoundException("Regional not found: " + req.getRegionalId()));
-                Division div = divisionRepo.findById(req.getDivisionId())
+                Division div = divisionRepo.findById(Objects.requireNonNull(req.getDivisionId()))
                                 .orElseThrow(() -> new NotFoundException("Division not found: " + req.getDivisionId()));
-                Unit unit = unitRepo.findById(req.getUnitId())
+                Unit unit = unitRepo.findById(Objects.requireNonNull(req.getUnitId()))
                                 .orElseThrow(() -> new NotFoundException("Unit not found: " + req.getUnitId()));
-                JobPosition job = jobPositionRepo.findById(req.getJobPositionId())
+                JobPosition job = jobPositionRepo.findById(Objects.requireNonNull(req.getJobPositionId()))
                                 .orElseThrow(() -> new NotFoundException(
                                                 "JobPosition not found: " + req.getJobPositionId()));
 

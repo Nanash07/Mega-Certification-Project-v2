@@ -99,7 +99,8 @@ public class BatchSpecification {
         return (root, query, cb) -> {
             if (regionalId == null && divisionId == null && unitId == null)
                 return cb.conjunction();
-            query.distinct(true);
+            if (query != null)
+                query.distinct(true);
 
             Join<Object, Object> eb = root.join("participants", JoinType.LEFT);
             Join<Object, Object> e = eb.join("employee", JoinType.LEFT);
@@ -121,7 +122,8 @@ public class BatchSpecification {
         return (root, query, cb) -> {
             if (employeeId == null)
                 return cb.conjunction();
-            query.distinct(true);
+            if (query != null)
+                query.distinct(true);
 
             Join<Object, Object> eb = root.join("participants", JoinType.INNER);
             Join<Object, Object> e = eb.join("employee", JoinType.INNER);

@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -43,7 +44,7 @@ public class JobPositionService {
     }
 
     public JobPositionResponse getById(Long id) {
-        JobPosition jp = repo.findById(id)
+        JobPosition jp = repo.findById(Objects.requireNonNull(id))
                 .orElseThrow(() -> new NotFoundException("Job Position not found: " + id));
         return mapToResponse(jp);
     }
@@ -51,18 +52,18 @@ public class JobPositionService {
     @Transactional
     public JobPositionResponse createOrGet(JobPositionRequest req) {
         JobPosition jp = repo.findByNameIgnoreCase(req.getName())
-                .orElseGet(() -> repo.save(JobPosition.builder()
+                .orElseGet(() -> repo.save(Objects.requireNonNull(JobPosition.builder()
                         .name(req.getName())
                         .isActive(true)
                         .createdAt(Instant.now())
                         .updatedAt(Instant.now())
-                        .build()));
+                        .build())));
         return mapToResponse(jp);
     }
 
     @Transactional
     public JobPositionResponse toggle(Long id) {
-        JobPosition jp = repo.findById(id)
+        JobPosition jp = repo.findById(Objects.requireNonNull(id))
                 .orElseThrow(() -> new NotFoundException("Job Position not found: " + id));
 
         if (Boolean.TRUE.equals(jp.getIsActive())) {

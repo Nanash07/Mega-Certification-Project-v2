@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -35,14 +36,14 @@ public class PicCertificationScopeService {
         }
 
         public PicCertificationScopeResponse getByUser(Long userId) {
-                User user = userRepo.findById(userId)
+                User user = userRepo.findById(Objects.requireNonNull(userId))
                                 .orElseThrow(() -> new NotFoundException("User not found: " + userId));
                 return mapUserToResponse(user);
         }
 
         @Transactional
         public PicCertificationScopeResponse updateScope(Long userId, PicCertificationScopeRequest req) {
-                User user = userRepo.findById(userId)
+                User user = userRepo.findById(Objects.requireNonNull(userId))
                                 .orElseThrow(() -> new NotFoundException("User not found: " + userId));
 
                 List<PicCertificationScope> existing = scopeRepo.findByUser_Id(user.getId());
@@ -63,13 +64,13 @@ public class PicCertificationScopeService {
                 newIds.stream()
                                 .filter(id -> !existingIds.contains(id))
                                 .forEach(certId -> {
-                                        Certification c = certRepo.findById(certId)
+                                        Certification c = certRepo.findById(Objects.requireNonNull(certId))
                                                         .orElseThrow(() -> new NotFoundException(
                                                                         "Certification not found: " + certId));
-                                        scopeRepo.save(PicCertificationScope.builder()
+                                        scopeRepo.save(Objects.requireNonNull(PicCertificationScope.builder()
                                                         .user(user)
                                                         .certification(c)
-                                                        .build());
+                                                        .build()));
                                 });
 
                 return mapUserToResponse(user);

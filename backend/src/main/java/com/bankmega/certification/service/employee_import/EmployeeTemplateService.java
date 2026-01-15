@@ -29,7 +29,7 @@ public class EmployeeTemplateService {
 
             return ResponseEntity.ok()
                     .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=employee_template.xlsx")
-                    .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                    .contentType(java.util.Objects.requireNonNull(MediaType.APPLICATION_OCTET_STREAM))
                     .body(bos.toByteArray());
         } catch (Exception e) {
             throw new RuntimeException("Gagal membuat template: " + e.getMessage(), e);

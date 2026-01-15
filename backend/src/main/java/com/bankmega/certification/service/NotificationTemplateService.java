@@ -51,7 +51,7 @@ public class NotificationTemplateService {
     // ================== UPDATE TEMPLATE ==================
     @Transactional
     public NotificationTemplate updateTemplate(Long id, String title, String body, String updatedBy) {
-        NotificationTemplate template = repository.findById(id)
+        NotificationTemplate template = repository.findById(java.util.Objects.requireNonNull(id))
                 .orElseThrow(() -> new NotFoundException("Template tidak ditemukan dengan ID: " + id));
 
         log.info("✏️ Update template {} oleh {}", template.getCode(), updatedBy);

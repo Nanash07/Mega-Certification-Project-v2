@@ -42,7 +42,6 @@ public class NotificationService {
     private final EmployeeCertificationRepository employeeCertificationRepository;
     private final EmployeeBatchRepository employeeBatchRepository;
     private final BatchRepository batchRepository;
-    private final EmailConfigService emailConfigService;
     private final NotificationTemplateService templateService;
     private final JavaMailSenderImpl reusableMailSender;
 
@@ -71,7 +70,7 @@ public class NotificationService {
                 .sentAt(LocalDateTime.now())
                 .build();
 
-        notificationRepository.save(notif);
+        notificationRepository.save(java.util.Objects.requireNonNull(notif));
 
         if (!isBlank(email)) {
             sendEmailAsync(email, title, messageEmailHtml);
@@ -98,13 +97,13 @@ public class NotificationService {
             String type,
             Pageable pageable) {
 
-        Specification<Notification> spec = Specification.where(NotificationSpecification.byUser(userId))
+        Specification<Notification> spec = NotificationSpecification.byUser(userId)
                 .and(NotificationSpecification.unreadOnly(unread))
                 .and(NotificationSpecification.createdFrom(from))
                 .and(NotificationSpecification.createdTo(to))
                 .and(NotificationSpecification.byType(type));
 
-        return notificationRepository.findAll(spec, pageable);
+        return notificationRepository.findAll(spec, java.util.Objects.requireNonNull(pageable));
     }
 
     public Page<Notification> searchSentNotifications(
@@ -116,7 +115,7 @@ public class NotificationService {
             String type,
             Pageable pageable) {
 
-        Specification<Notification> spec = Specification.where(NotificationSpecification.unreadOnly(unread))
+        Specification<Notification> spec = NotificationSpecification.unreadOnly(unread)
                 .and(NotificationSpecification.createdFrom(from))
                 .and(NotificationSpecification.createdTo(to))
                 .and(NotificationSpecification.byType(type));
@@ -126,7 +125,7 @@ public class NotificationService {
             spec = spec.and(NotificationSpecification.visibleToPic(certIds));
         }
 
-        return notificationRepository.findAll(spec, pageable);
+        return notificationRepository.findAll(spec, java.util.Objects.requireNonNull(pageable));
     }
 
     private Set<Long> resolvePicAllowedCertificationIds(Long userId) {
@@ -161,10 +160,11 @@ public class NotificationService {
                 final MimeMessage message = reusableMailSender.createMimeMessage();
                 final MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
-                final String fromAddr = Objects.toString(getUsernameSafe(), "no-reply@megacert.local");
+                final String fromAddr = java.util.Objects
+                        .requireNonNull(Objects.toString(getUsernameSafe(), "no-reply@megacert.local"));
                 helper.setFrom(fromAddr);
-                helper.setTo(to);
-                helper.setSubject(subject);
+                helper.setTo(java.util.Objects.requireNonNull(to));
+                helper.setSubject(java.util.Objects.requireNonNull(subject));
 
                 final String html = "<div style='font-family:Arial,sans-serif;line-height:1.6;font-size:14px'>"
                         + htmlContent
@@ -389,7 +389,7 @@ public class NotificationService {
     }
 
     public void markAsRead(Long notificationId, Long currentUserId) {
-        notificationRepository.findById(notificationId).ifPresent(n -> {
+        notificationRepository.findById(java.util.Objects.requireNonNull(notificationId)).ifPresent(n -> {
             if (!Objects.equals(n.getUserId(), currentUserId)) {
                 throw new AccessDeniedException("Tidak boleh mengubah notifikasi user lain");
             }

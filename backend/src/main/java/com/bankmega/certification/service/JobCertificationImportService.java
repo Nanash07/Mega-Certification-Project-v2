@@ -20,6 +20,7 @@ import org.springframework.http.MediaType;
 
 import java.io.IOException;
 import java.util.*;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -90,8 +91,8 @@ public class JobCertificationImportService {
                                     .name(jobName.trim())
                                     .build();
                         } else {
-                            job = jobPositionRepo.save(
-                                    JobPosition.builder().name(jobName.trim()).build());
+                            job = jobPositionRepo.save(Objects.requireNonNull(
+                                    JobPosition.builder().name(jobName.trim()).build()));
                             newJobs++;
                         }
                     } else {
@@ -109,7 +110,7 @@ public class JobCertificationImportService {
                                     .certificationRule(rule)
                                     .isActive(!"INACTIVE".equalsIgnoreCase(status))
                                     .build();
-                            mappingRepo.save(mapping);
+                            mappingRepo.save(Objects.requireNonNull(mapping));
                         }
                         inserted++;
                     } else {
@@ -147,7 +148,7 @@ public class JobCertificationImportService {
                     .totalErrors(errors)
                     .dryRun(false)
                     .build();
-            logRepo.save(log);
+            logRepo.save(Objects.requireNonNull(log));
         }
 
         return JobCertImportResponse.builder()
@@ -236,7 +237,7 @@ public class JobCertificationImportService {
                 bytes = out.toByteArray();
             }
 
-            ByteArrayResource resource = new ByteArrayResource(bytes);
+            ByteArrayResource resource = new ByteArrayResource(Objects.requireNonNull(bytes));
 
             return ResponseEntity.ok()
                     .header(HttpHeaders.CONTENT_DISPOSITION,

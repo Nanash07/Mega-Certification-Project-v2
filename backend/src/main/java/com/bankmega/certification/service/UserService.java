@@ -140,7 +140,7 @@ public class UserService {
             throw new ConflictException("Username wajib diisi");
         }
 
-        Role role = roleRepo.findById(req.getRoleId())
+        Role role = roleRepo.findById(Objects.requireNonNull(req.getRoleId()))
                 .orElseThrow(() -> new NotFoundException("Role tidak ditemukan dengan id " + req.getRoleId()));
 
         // 🔐 PIC tidak boleh create user dengan role SUPERADMIN / PIC
@@ -148,7 +148,7 @@ public class UserService {
 
         Employee emp = null;
         if (req.getEmployeeId() != null) {
-            emp = empRepo.findById(req.getEmployeeId())
+            emp = empRepo.findById(Objects.requireNonNull(req.getEmployeeId()))
                     .orElseThrow(
                             () -> new NotFoundException("Employee tidak ditemukan dengan id " + req.getEmployeeId()));
         }
@@ -170,7 +170,7 @@ public class UserService {
                 .build();
 
         try {
-            return toResponse(userRepo.save(user));
+            return toResponse(userRepo.save(Objects.requireNonNull(user)));
         } catch (DataIntegrityViolationException e) {
             // unik tetap ditahan oleh DB di username
             throw new ConflictException("Username sudah digunakan: " + username);
@@ -222,7 +222,7 @@ public class UserService {
         if (req.getRoleId() != null) {
             Long currentRoleId = user.getRole() != null ? user.getRole().getId() : null;
             if (!Objects.equals(currentRoleId, req.getRoleId())) {
-                Role role = roleRepo.findById(req.getRoleId())
+                Role role = roleRepo.findById(Objects.requireNonNull(req.getRoleId()))
                         .orElseThrow(() -> new NotFoundException("Role tidak ditemukan dengan id " + req.getRoleId()));
 
                 // 🔐 PIC tidak boleh ubah role menjadi SUPERADMIN/PIC
@@ -237,7 +237,7 @@ public class UserService {
         if (req.getEmployeeId() != null) {
             Long currentEmpId = user.getEmployee() != null ? user.getEmployee().getId() : null;
             if (!Objects.equals(currentEmpId, req.getEmployeeId())) {
-                Employee emp = empRepo.findById(req.getEmployeeId())
+                Employee emp = empRepo.findById(Objects.requireNonNull(req.getEmployeeId()))
                         .orElseThrow(() -> new NotFoundException(
                                 "Employee tidak ditemukan dengan id " + req.getEmployeeId()));
                 user.setEmployee(emp);
@@ -414,7 +414,7 @@ public class UserService {
                 User primary = sameUsername.get(0);
                 boolean needUpdate = false;
                 if (primary.getEmployee() == null || !Objects.equals(primary.getEmployee().getId(), e.getId())) {
-                    primary.setEmployee(empRepo.getReferenceById(e.getId()));
+                    primary.setEmployee(empRepo.getReferenceById(Objects.requireNonNull(e.getId())));
                     needUpdate = true;
                 }
                 if (primary.getDeletedAt() != null) {
@@ -456,7 +456,7 @@ public class UserService {
                     .email(e.getEmail()) // boleh null/duplikat
                     .password(hashBulk(nip))
                     .role(rolePegawai)
-                    .employee(empRepo.getReferenceById(e.getId()))
+                    .employee(empRepo.getReferenceById(Objects.requireNonNull(e.getId())))
                     .isActive(true)
                     .isFirstLogin(true)
                     .createdAt(now)
@@ -562,7 +562,7 @@ public class UserService {
         int n = 0;
         for (int i = 0; i < list.size(); i += BATCH_SIZE) {
             int end = Math.min(i + BATCH_SIZE, list.size());
-            userRepo.saveAll(list.subList(i, end));
+            userRepo.saveAll(Objects.requireNonNull(list.subList(i, end)));
             em.flush();
             em.clear();
             n += (end - i);

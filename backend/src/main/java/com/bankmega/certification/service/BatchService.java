@@ -378,10 +378,10 @@ public class BatchService {
 
         CertificationRule rule = null;
         if (type == Batch.BatchType.CERTIFICATION || type == Batch.BatchType.EXTENSION) {
-            rule = certificationRuleRepository.findById(request.getCertificationRuleId())
+            rule = certificationRuleRepository.findById(Objects.requireNonNull(request.getCertificationRuleId()))
                     .orElseThrow(() -> new NotFoundException("CertificationRule not found"));
         } else if (request.getCertificationRuleId() != null) {
-            rule = certificationRuleRepository.findById(request.getCertificationRuleId())
+            rule = certificationRuleRepository.findById(Objects.requireNonNull(request.getCertificationRuleId()))
                     .orElseThrow(() -> new NotFoundException("CertificationRule not found"));
         }
 

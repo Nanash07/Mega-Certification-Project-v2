@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -79,7 +80,7 @@ public class JobCertificationMappingService {
                                 .and(JobCertificationMappingSpecification
                                                 .byAllowedCertificationIds(allowedCertificationIds));
 
-                return mappingRepo.findAll(spec, pageable).map(this::toResponse);
+                return mappingRepo.findAll(spec, Objects.requireNonNull(pageable)).map(this::toResponse);
         }
 
         // 🔹 Create baru
@@ -91,10 +92,10 @@ public class JobCertificationMappingService {
                         throw new IllegalArgumentException("Mapping sudah ada untuk kombinasi ini");
                 }
 
-                JobPosition job = jobPositionRepo.findById(req.getJobPositionId())
+                JobPosition job = jobPositionRepo.findById(Objects.requireNonNull(req.getJobPositionId()))
                                 .orElseThrow(() -> new IllegalArgumentException("Job Position tidak ditemukan"));
 
-                CertificationRule rule = ruleRepo.findById(req.getCertificationRuleId())
+                CertificationRule rule = ruleRepo.findById(Objects.requireNonNull(req.getCertificationRuleId()))
                                 .orElseThrow(() -> new IllegalArgumentException("Certification Rule tidak ditemukan"));
 
                 JobCertificationMapping mapping = JobCertificationMapping.builder()
@@ -105,7 +106,7 @@ public class JobCertificationMappingService {
                                 .updatedAt(Instant.now())
                                 .build();
 
-                return toResponse(mappingRepo.save(mapping));
+                return toResponse(mappingRepo.save(Objects.requireNonNull(mapping)));
         }
 
         // 🔹 Update mapping
@@ -115,15 +116,16 @@ public class JobCertificationMappingService {
                                 .orElseThrow(() -> new IllegalArgumentException("Mapping tidak ditemukan"));
 
                 if (req.getJobPositionId() != null) {
-                        mapping.setJobPosition(jobPositionRepo.findById(req.getJobPositionId())
+                        mapping.setJobPosition(jobPositionRepo.findById(Objects.requireNonNull(req.getJobPositionId()))
                                         .orElseThrow(() -> new IllegalArgumentException(
                                                         "Job Position tidak ditemukan")));
                 }
 
                 if (req.getCertificationRuleId() != null) {
-                        mapping.setCertificationRule(ruleRepo.findById(req.getCertificationRuleId())
-                                        .orElseThrow(() -> new IllegalArgumentException(
-                                                        "Certification Rule tidak ditemukan")));
+                        mapping.setCertificationRule(
+                                        ruleRepo.findById(Objects.requireNonNull(req.getCertificationRuleId()))
+                                                        .orElseThrow(() -> new IllegalArgumentException(
+                                                                        "Certification Rule tidak ditemukan")));
                 }
 
                 if (req.getIsActive() != null) {

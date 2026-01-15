@@ -77,7 +77,7 @@ public class EmployeeCertificationHistoryService {
 
                                 .build();
 
-                historyRepo.save(history);
+                historyRepo.save(java.util.Objects.requireNonNull(history));
         }
 
         // ================== CHANGE DETECTION ==================

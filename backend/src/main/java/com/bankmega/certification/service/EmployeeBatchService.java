@@ -177,7 +177,7 @@ public class EmployeeBatchService {
                             .createdAt(Instant.now())
                             .updatedAt(Instant.now())
                             .build();
-                    return toResponse(repo.save(eb));
+                    return toResponse(repo.save(java.util.Objects.requireNonNull(eb)));
                 });
     }
 

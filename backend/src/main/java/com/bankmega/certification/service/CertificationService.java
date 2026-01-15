@@ -45,7 +45,7 @@ public class CertificationService {
                 .name(req.getName())
                 .build();
 
-        return toResponse(repo.save(cert));
+        return toResponse(repo.save(java.util.Objects.requireNonNull(cert)));
     }
 
     public CertificationResponse update(Long id, CertificationRequest req) {

@@ -40,12 +40,12 @@ public class EmployeeSpecification {
 
     /** Active page: belum dihapus dari sistem DAN bukan resign */
     public static Specification<Employee> activePageOnly() {
-        return Specification.where(notDeleted()).and(statusNot("RESIGN"));
+        return notDeleted().and(statusNot("RESIGN"));
     }
 
     /** Resigned page: belum dihapus dari sistem DAN status resign */
     public static Specification<Employee> resignedPageOnly() {
-        return Specification.where(notDeleted()).and(statusIs("RESIGN"));
+        return notDeleted().and(statusIs("RESIGN"));
     }
 
     // ===== Search + multi filters =====

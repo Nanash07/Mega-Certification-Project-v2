@@ -17,6 +17,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -29,7 +30,7 @@ public class FileStorageService {
     // ================== SAVE ==================
     public String save(Long certificationId, MultipartFile file) {
         try {
-            EmployeeCertification ec = certificationRepo.findById(certificationId)
+            EmployeeCertification ec = certificationRepo.findById(Objects.requireNonNull(certificationId))
                     .orElseThrow(() -> new RuntimeException("Certification not found"));
 
             String nip = ec.getEmployee().getNip();
@@ -78,7 +79,7 @@ public class FileStorageService {
             }
 
             Path filePath = storagePath.resolve(newFileName.toString());
-            file.transferTo(filePath.toFile());
+            file.transferTo(Objects.requireNonNull(filePath.toFile()));
 
             ec.setFileUrl(newFileName.toString()); // simpan hanya nama file
             ec.setFileName(originalName);
@@ -94,7 +95,7 @@ public class FileStorageService {
 
     // ================== DELETE ==================
     public void deleteCertificate(Long certificationId) {
-        EmployeeCertification ec = certificationRepo.findById(certificationId)
+        EmployeeCertification ec = certificationRepo.findById(Objects.requireNonNull(certificationId))
                 .orElseThrow(() -> new RuntimeException("Certification not found"));
 
         if (ec.getFileUrl() != null) {
@@ -115,7 +116,7 @@ public class FileStorageService {
 
     // ================== SERVE FILE (Preview / Download) ==================
     public ResponseEntity<Resource> serveFile(Long certificationId, boolean download) {
-        EmployeeCertification ec = certificationRepo.findById(certificationId)
+        EmployeeCertification ec = certificationRepo.findById(Objects.requireNonNull(certificationId))
                 .orElseThrow(() -> new RuntimeException("Certification not found"));
 
         if (ec.getFileUrl() == null) {
@@ -124,7 +125,7 @@ public class FileStorageService {
 
         try {
             Path filePath = Paths.get(STORAGE_DIR).resolve(ec.getFileUrl());
-            Resource resource = new UrlResource(filePath.toUri());
+            Resource resource = new UrlResource(Objects.requireNonNull(filePath.toUri()));
 
             if (!resource.exists()) {
                 throw new RuntimeException("File tidak ditemukan");
@@ -137,8 +138,8 @@ public class FileStorageService {
                     : "inline; filename=\"" + fileNameToUse + "\"";
 
             return ResponseEntity.ok()
-                    .contentType(MediaType.parseMediaType(
-                            ec.getFileType() != null ? ec.getFileType() : "image/jpeg"))
+                    .contentType(MediaType.parseMediaType(Objects.requireNonNull(
+                            ec.getFileType() != null ? ec.getFileType() : "image/jpeg")))
                     .header(HttpHeaders.CONTENT_DISPOSITION, contentDisposition)
                     .body(resource);
 

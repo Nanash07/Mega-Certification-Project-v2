@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -132,19 +133,20 @@ public class CertificationRuleService {
         // 🔹 Create
         @Transactional
         public CertificationRuleResponse create(CertificationRuleRequest req) {
-                Certification cert = certificationRepo.findById(req.getCertificationId())
+                Certification cert = certificationRepo.findById(Objects.requireNonNull(req.getCertificationId()))
                                 .orElseThrow(() -> new RuntimeException("Certification not found"));
 
                 CertificationLevel level = req.getCertificationLevelId() != null
-                                ? levelRepo.findById(req.getCertificationLevelId()).orElse(null)
+                                ? levelRepo.findById(Objects.requireNonNull(req.getCertificationLevelId())).orElse(null)
                                 : null;
 
                 SubField subField = req.getSubFieldId() != null
-                                ? subFieldRepo.findById(req.getSubFieldId()).orElse(null)
+                                ? subFieldRepo.findById(Objects.requireNonNull(req.getSubFieldId())).orElse(null)
                                 : null;
 
                 RefreshmentType refreshmentType = req.getRefreshmentTypeId() != null
-                                ? refreshmentRepo.findById(req.getRefreshmentTypeId()).orElse(null)
+                                ? refreshmentRepo.findById(Objects.requireNonNull(req.getRefreshmentTypeId()))
+                                                .orElse(null)
                                 : null;
 
                 CertificationRule entity = CertificationRule.builder()
@@ -160,7 +162,7 @@ public class CertificationRuleService {
                                 .updatedAt(Instant.now())
                                 .build();
 
-                CertificationRule saved = ruleRepo.save(entity);
+                CertificationRule saved = ruleRepo.save(Objects.requireNonNull(entity));
                 historyService.snapshot(saved, CertificationRuleHistory.ActionType.CREATED);
 
                 return toResponse(saved);
@@ -174,18 +176,18 @@ public class CertificationRuleService {
 
                 if (req.getCertificationLevelId() != null) {
                         existing.setCertificationLevel(
-                                        levelRepo.findById(req.getCertificationLevelId())
+                                        levelRepo.findById(Objects.requireNonNull(req.getCertificationLevelId()))
                                                         .orElseThrow(() -> new RuntimeException(
                                                                         "Certification Level not found")));
                 }
                 if (req.getSubFieldId() != null) {
                         existing.setSubField(
-                                        subFieldRepo.findById(req.getSubFieldId())
+                                        subFieldRepo.findById(Objects.requireNonNull(req.getSubFieldId()))
                                                         .orElseThrow(() -> new RuntimeException("SubField not found")));
                 }
                 if (req.getRefreshmentTypeId() != null) {
                         existing.setRefreshmentType(
-                                        refreshmentRepo.findById(req.getRefreshmentTypeId())
+                                        refreshmentRepo.findById(Objects.requireNonNull(req.getRefreshmentTypeId()))
                                                         .orElseThrow(() -> new RuntimeException(
                                                                         "Refreshment Type not found")));
                 }

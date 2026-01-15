@@ -65,7 +65,7 @@ public class JobCertificationMappingHistoryService {
                                         .actionAt(Instant.now())
                                         .build();
 
-                        historyRepo.save(h);
+                        historyRepo.save(java.util.Objects.requireNonNull(h));
                         log.info(
                                         "History mapping tersimpan: [{} - {}] action={}",
                                         h.getJobName(),

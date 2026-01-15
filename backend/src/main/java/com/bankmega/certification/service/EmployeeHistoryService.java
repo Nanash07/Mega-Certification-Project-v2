@@ -112,7 +112,7 @@ public class EmployeeHistoryService {
                 if (batchBuffer.isEmpty())
                         return;
                 try {
-                        historyRepo.saveAll(batchBuffer);
+                        historyRepo.saveAll(java.util.Objects.requireNonNull(batchBuffer));
                         historyRepo.flush();
                         batchBuffer.clear();
                 } catch (Exception e) {

@@ -58,7 +58,7 @@ public class SubFieldService {
                 .certification(cert)
                 .build();
 
-        return toResponse(repo.save(sf));
+        return toResponse(repo.save(java.util.Objects.requireNonNull(sf)));
     }
 
     public SubFieldResponse update(Long id, SubFieldRequest req) {

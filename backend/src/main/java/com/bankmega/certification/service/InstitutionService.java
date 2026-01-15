@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -29,7 +30,7 @@ public class InstitutionService {
                 .updatedAt(LocalDateTime.now())
                 .build();
 
-        return toResponse(institutionRepository.save(institution));
+        return toResponse(institutionRepository.save(Objects.requireNonNull(institution)));
     }
 
     public List<InstitutionResponse> getAll() {
@@ -39,14 +40,14 @@ public class InstitutionService {
     }
 
     public InstitutionResponse getById(Long id) {
-        Institution institution = institutionRepository.findById(id)
+        Institution institution = institutionRepository.findById(Objects.requireNonNull(id))
                 .orElseThrow(() -> new IllegalArgumentException("Institution tidak ditemukan"));
         return toResponse(institution);
     }
 
     @Transactional
     public InstitutionResponse update(Long id, InstitutionRequest req) {
-        Institution institution = institutionRepository.findById(id)
+        Institution institution = institutionRepository.findById(Objects.requireNonNull(id))
                 .orElseThrow(() -> new IllegalArgumentException("Institution tidak ditemukan"));
 
         institution.setName(req.getName());
@@ -60,9 +61,9 @@ public class InstitutionService {
 
     @Transactional
     public void delete(Long id) {
-        Institution institution = institutionRepository.findById(id)
+        Institution institution = institutionRepository.findById(Objects.requireNonNull(id))
                 .orElseThrow(() -> new IllegalArgumentException("Institution tidak ditemukan"));
-        institutionRepository.delete(institution);
+        institutionRepository.delete(Objects.requireNonNull(institution));
     }
 
     private InstitutionResponse toResponse(Institution i) {

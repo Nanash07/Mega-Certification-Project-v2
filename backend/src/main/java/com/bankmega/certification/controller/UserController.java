@@ -68,7 +68,7 @@ public class UserController {
         boolean callerIsPic = isPic(auth);
         UserResponse created = service.create(req, callerIsPic);
         return ResponseEntity
-                .created(URI.create("/api/users/" + created.getId()))
+                .created(java.util.Objects.requireNonNull(URI.create("/api/users/" + created.getId())))
                 .body(created);
     }
 

@@ -48,6 +48,9 @@ public class NotificationSpecification {
             if (certificationIds == null || certificationIds.isEmpty()) {
                 return cb.disjunction();
             }
+            if (query == null) {
+                return cb.conjunction();
+            }
 
             Subquery<Long> ecSub = query.subquery(Long.class);
             Root<EmployeeCertification> ec = ecSub.from(EmployeeCertification.class);

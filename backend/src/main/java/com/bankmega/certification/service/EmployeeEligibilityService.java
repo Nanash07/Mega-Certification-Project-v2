@@ -16,7 +16,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.io.ByteArrayOutputStream;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -31,8 +30,6 @@ public class EmployeeEligibilityService {
     private final JobCertificationMappingRepository jobCertMappingRepo;
     private final EmployeeEligibilityExceptionRepository exceptionRepo;
     private final EmployeeRepository employeeRepo;
-
-    private static final DateTimeFormatter DF = DateTimeFormatter.ofPattern("dd-MMM-yyyy");
 
     private EmployeeEligibilityResponse toResponse(EmployeeEligibility e) {
         if (e == null)
@@ -125,7 +122,7 @@ public class EmployeeEligibilityService {
             pageable = PageRequest.of(
                     pageable.getPageNumber(),
                     pageable.getPageSize(),
-                    defaultSort());
+                    java.util.Objects.requireNonNull(defaultSort()));
         }
 
         return eligibilityRepo.findAll(spec, pageable).map(this::toResponse);
@@ -155,7 +152,7 @@ public class EmployeeEligibilityService {
                 regionalId, divisionId, unitId, certificationId, levelId, subFieldId,
                 allowedCertificationIds);
 
-        List<EmployeeEligibility> rows = eligibilityRepo.findAll(spec, defaultSort());
+        List<EmployeeEligibility> rows = eligibilityRepo.findAll(spec, java.util.Objects.requireNonNull(defaultSort()));
         List<EmployeeEligibilityResponse> data = rows.stream().map(this::toResponse).toList();
 
         return buildEligibilityExcel(data);
@@ -269,7 +266,7 @@ public class EmployeeEligibilityService {
 
     @Transactional(readOnly = true)
     public List<EmployeeEligibilityResponse> getByEmployeeId(Long employeeId) {
-        Employee emp = employeeRepo.findById(employeeId)
+        Employee emp = employeeRepo.findById(java.util.Objects.requireNonNull(employeeId))
                 .orElseThrow(() -> new RuntimeException("Employee not found"));
         if (isResigned(emp))
             return List.of();
@@ -282,14 +279,14 @@ public class EmployeeEligibilityService {
 
     @Transactional(readOnly = true)
     public EmployeeEligibilityResponse getById(Long id) {
-        return eligibilityRepo.findById(id)
+        return eligibilityRepo.findById(java.util.Objects.requireNonNull(id))
                 .map(this::toResponse)
                 .orElseThrow(() -> new RuntimeException("Eligibility not found"));
     }
 
     @Transactional
     public EmployeeEligibilityResponse toggleActive(Long id) {
-        EmployeeEligibility eligibility = eligibilityRepo.findById(id)
+        EmployeeEligibility eligibility = eligibilityRepo.findById(java.util.Objects.requireNonNull(id))
                 .orElseThrow(() -> new RuntimeException("Eligibility not found"));
 
         eligibility.setIsActive(!Boolean.TRUE.equals(eligibility.getIsActive()));
@@ -300,7 +297,7 @@ public class EmployeeEligibilityService {
 
     @Transactional
     public void softDelete(Long id) {
-        EmployeeEligibility eligibility = eligibilityRepo.findById(id)
+        EmployeeEligibility eligibility = eligibilityRepo.findById(java.util.Objects.requireNonNull(id))
                 .orElseThrow(() -> new RuntimeException("Eligibility not found"));
         eligibility.setIsActive(false);
         eligibility.setDeletedAt(Instant.now());
@@ -358,7 +355,7 @@ public class EmployeeEligibilityService {
 
     @Transactional
     public void refreshEligibilityForEmployee(Long employeeId) {
-        Employee employee = employeeRepo.findById(employeeId)
+        Employee employee = employeeRepo.findById(java.util.Objects.requireNonNull(employeeId))
                 .orElseThrow(() -> new RuntimeException("Employee not found"));
 
         if (isResigned(employee)) {

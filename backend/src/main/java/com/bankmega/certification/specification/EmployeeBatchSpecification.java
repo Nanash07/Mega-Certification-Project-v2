@@ -70,7 +70,7 @@ public class EmployeeBatchSpecification {
     // Fetch join supaya gak N+1; skip untuk count query
     public static Specification<EmployeeBatch> withOrgFetch() {
         return (root, query, cb) -> {
-            if (query.getResultType() != Long.class && query.getResultType() != long.class) {
+            if (query != null && query.getResultType() != Long.class && query.getResultType() != long.class) {
                 Fetch<Object, Object> emp = root.fetch("employee", JoinType.LEFT);
                 emp.fetch("jobPosition", JoinType.LEFT);
                 emp.fetch("division", JoinType.LEFT);

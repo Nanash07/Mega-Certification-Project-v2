@@ -19,6 +19,7 @@ import java.io.ByteArrayOutputStream;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -84,7 +85,7 @@ public class EmployeeEligibilityExceptionService {
                         pageable = PageRequest.of(
                                         pageable.getPageNumber(),
                                         pageable.getPageSize(),
-                                        defaultSort());
+                                        Objects.requireNonNull(defaultSort()));
                 }
 
                 return exceptionRepo.findAll(spec, pageable).map(this::toResponse);
@@ -105,7 +106,8 @@ public class EmployeeEligibilityExceptionService {
                                 employeeIds, jobIds, certCodes, levels, subCodes, statuses, search,
                                 allowedCertificationIds);
 
-                List<EmployeeEligibilityException> rows = exceptionRepo.findAll(spec, defaultSort());
+                List<EmployeeEligibilityException> rows = exceptionRepo.findAll(spec,
+                                Objects.requireNonNull(defaultSort()));
                 List<EmployeeEligibilityExceptionResponse> data = rows.stream().map(this::toResponse).toList();
 
                 return buildExceptionExcel(data);
@@ -233,7 +235,7 @@ public class EmployeeEligibilityExceptionService {
 
         @Transactional(readOnly = true)
         public List<EmployeeEligibilityExceptionResponse> getByEmployee(Long employeeId) {
-                var emp = employeeRepo.findById(employeeId)
+                var emp = employeeRepo.findById(Objects.requireNonNull(employeeId))
                                 .orElseThrow(() -> new RuntimeException("Employee not found"));
                 if (isResigned(emp))
                         return List.of();
@@ -244,12 +246,12 @@ public class EmployeeEligibilityExceptionService {
 
         @Transactional
         public EmployeeEligibilityExceptionResponse create(Long employeeId, Long certificationRuleId, String notes) {
-                var employee = employeeRepo.findById(employeeId)
+                var employee = employeeRepo.findById(Objects.requireNonNull(employeeId))
                                 .orElseThrow(() -> new RuntimeException("Employee not found"));
                 if (isResigned(employee))
                         throw new RuntimeException("Tidak bisa membuat exception untuk pegawai RESIGN/non-aktif");
 
-                var rule = ruleRepo.findById(certificationRuleId)
+                var rule = ruleRepo.findById(Objects.requireNonNull(certificationRuleId))
                                 .orElseThrow(() -> new RuntimeException("Certification rule not found"));
 
                 exceptionRepo.findFirstByEmployeeIdAndCertificationRuleIdAndDeletedAtIsNull(employeeId,
@@ -278,7 +280,7 @@ public class EmployeeEligibilityExceptionService {
                                         .createdAt(Instant.now())
                                         .updatedAt(Instant.now())
                                         .build();
-                        saved = exceptionRepo.save(exception);
+                        saved = exceptionRepo.save(Objects.requireNonNull(exception));
                 }
 
                 eligibilityService.refreshEligibilityForEmployee(employeeId);
@@ -287,7 +289,7 @@ public class EmployeeEligibilityExceptionService {
 
         @Transactional
         public EmployeeEligibilityExceptionResponse updateNotes(Long id, String notes) {
-                var exception = exceptionRepo.findById(id)
+                var exception = exceptionRepo.findById(Objects.requireNonNull(id))
                                 .orElseThrow(() -> new RuntimeException("Exception not found"));
                 exception.setNotes(notes);
                 exception.setUpdatedAt(Instant.now());
@@ -296,7 +298,7 @@ public class EmployeeEligibilityExceptionService {
 
         @Transactional
         public EmployeeEligibilityExceptionResponse toggleActive(Long id) {
-                var exception = exceptionRepo.findById(id)
+                var exception = exceptionRepo.findById(Objects.requireNonNull(id))
                                 .orElseThrow(() -> new RuntimeException("Exception not found"));
 
                 if (!Boolean.TRUE.equals(exception.getIsActive())) {
@@ -316,7 +318,7 @@ public class EmployeeEligibilityExceptionService {
 
         @Transactional
         public void softDelete(Long id) {
-                var exception = exceptionRepo.findById(id)
+                var exception = exceptionRepo.findById(Objects.requireNonNull(id))
                                 .orElseThrow(() -> new RuntimeException("Exception not found"));
                 exception.setIsActive(false);
                 exception.setDeletedAt(Instant.now());

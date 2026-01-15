@@ -5,7 +5,6 @@ import com.bankmega.certification.dto.EmployeeCertificationRequest;
 import com.bankmega.certification.dto.EmployeeCertificationResponse;
 import com.bankmega.certification.entity.PicCertificationScope;
 import com.bankmega.certification.repository.PicCertificationScopeRepository;
-import com.bankmega.certification.service.EmployeeCertificationHistoryService;
 import com.bankmega.certification.service.EmployeeCertificationService;
 import com.bankmega.certification.service.FileStorageService;
 import lombok.RequiredArgsConstructor;
@@ -34,7 +33,6 @@ public class EmployeeCertificationController {
 
     private final EmployeeCertificationService service;
     private final FileStorageService fileStorageService;
-    private final EmployeeCertificationHistoryService historyService;
     private final PicCertificationScopeRepository scopeRepo;
 
     private boolean isPic(Authentication auth) {
@@ -106,7 +104,7 @@ public class EmployeeCertificationController {
         Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortParams[0]));
 
         if (allowedCertIds != null && allowedCertIds.isEmpty()) {
-            return new PageImpl<>(List.of(), pageable, 0);
+            return new PageImpl<>(java.util.Objects.requireNonNull(List.of()), pageable, 0);
         }
 
         return service.getPagedFiltered(

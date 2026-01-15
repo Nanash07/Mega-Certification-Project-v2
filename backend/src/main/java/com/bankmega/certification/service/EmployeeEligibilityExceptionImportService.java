@@ -103,7 +103,7 @@ public class EmployeeEligibilityExceptionImportService {
             throw new IllegalArgumentException("Invalid file format", e);
         }
 
-        int processed = 0, created = 0, reactivated = 0, updated = 0, deactivated = 0, skipped = 0, errors = 0;
+        int processed = 0, created = 0, reactivated = 0, updated = 0, deactivated = 0, errors = 0;
         List<String> errorDetails = new ArrayList<>();
         Set<Long> affectedEmployeeIds = new LinkedHashSet<>();
 
@@ -175,7 +175,7 @@ public class EmployeeEligibilityExceptionImportService {
                                 .createdAt(now)
                                 .updatedAt(now)
                                 .build();
-                        exceptionRepo.save(nu);
+                        exceptionRepo.save(java.util.Objects.requireNonNull(nu));
                     }
                     continue;
                 }
@@ -225,8 +225,6 @@ public class EmployeeEligibilityExceptionImportService {
                         ex.setUpdatedAt(now);
                         exceptionRepo.save(ex);
                     }
-                } else {
-                    skipped++;
                 }
 
             } catch (Exception e) {
@@ -251,7 +249,7 @@ public class EmployeeEligibilityExceptionImportService {
                     .dryRun(false)
                     .createdAt(Instant.now())
                     .build();
-            logRepo.save(log);
+            logRepo.save(java.util.Objects.requireNonNull(log));
 
             // auto refresh eligibility setelah import confirm
             for (Long empId : affectedEmployeeIds) {
@@ -379,7 +377,7 @@ public class EmployeeEligibilityExceptionImportService {
                 bytes = out.toByteArray();
             }
 
-            ByteArrayResource resource = new ByteArrayResource(bytes);
+            ByteArrayResource resource = new ByteArrayResource(java.util.Objects.requireNonNull(bytes));
 
             return ResponseEntity.ok()
                     .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=exception_template.xlsx")

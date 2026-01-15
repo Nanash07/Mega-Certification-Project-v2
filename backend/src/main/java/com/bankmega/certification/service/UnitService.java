@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -40,7 +41,7 @@ public class UnitService {
     }
 
     public UnitResponse getById(Long id) {
-        Unit u = repo.findById(id)
+        Unit u = repo.findById(Objects.requireNonNull(id))
                 .orElseThrow(() -> new NotFoundException("Unit not found: " + id));
         return mapToResponse(u);
     }
@@ -48,18 +49,18 @@ public class UnitService {
     @Transactional
     public UnitResponse createOrGet(UnitRequest req) {
         Unit u = repo.findByNameIgnoreCase(req.getName())
-                .orElseGet(() -> repo.save(Unit.builder()
+                .orElseGet(() -> repo.save(Objects.requireNonNull(Unit.builder()
                         .name(req.getName())
                         .isActive(true)
                         .createdAt(Instant.now())
                         .updatedAt(Instant.now())
-                        .build()));
+                        .build())));
         return mapToResponse(u);
     }
 
     @Transactional
     public UnitResponse toggle(Long id) {
-        Unit u = repo.findById(id)
+        Unit u = repo.findById(Objects.requireNonNull(id))
                 .orElseThrow(() -> new NotFoundException("Unit not found: " + id));
 
         if (Boolean.TRUE.equals(u.getIsActive())) {

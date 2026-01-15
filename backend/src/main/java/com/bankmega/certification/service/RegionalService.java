@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -46,7 +47,7 @@ public class RegionalService {
 
     // Get by ID
     public RegionalResponse getById(Long id) {
-        Regional r = repo.findById(id)
+        Regional r = repo.findById(Objects.requireNonNull(id))
                 .orElseThrow(() -> new NotFoundException("Regional not found: " + id));
         return mapToResponse(r);
     }
@@ -55,19 +56,19 @@ public class RegionalService {
     @Transactional
     public RegionalResponse createOrGet(RegionalRequest req) {
         Regional r = repo.findByNameIgnoreCase(req.getName())
-                .orElseGet(() -> repo.save(Regional.builder()
+                .orElseGet(() -> repo.save(Objects.requireNonNull(Regional.builder()
                         .name(req.getName())
                         .isActive(true)
                         .createdAt(Instant.now())
                         .updatedAt(Instant.now())
-                        .build()));
+                        .build())));
         return mapToResponse(r);
     }
 
     // Toggle aktif/nonaktif
     @Transactional
     public RegionalResponse toggle(Long id) {
-        Regional r = repo.findById(id)
+        Regional r = repo.findById(Objects.requireNonNull(id))
                 .orElseThrow(() -> new NotFoundException("Regional not found: " + id));
 
         if (Boolean.TRUE.equals(r.getIsActive())) {

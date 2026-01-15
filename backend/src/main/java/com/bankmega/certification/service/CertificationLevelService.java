@@ -45,7 +45,7 @@ public class CertificationLevelService {
                 .name(req.getName())
                 .build();
 
-        return toResponse(repo.save(lvl));
+        return toResponse(repo.save(java.util.Objects.requireNonNull(lvl)));
     }
 
     public CertificationLevelResponse update(Long id, CertificationLevelRequest req) {

@@ -254,7 +254,7 @@ public class BatchController {
             Pageable pageable) {
 
         if (employeeId == null) {
-            return ResponseEntity.ok(Page.empty(pageable));
+            return ResponseEntity.ok(Page.empty(java.util.Objects.requireNonNull(pageable)));
         }
 
         Page<BatchResponse> result = batchService.search(

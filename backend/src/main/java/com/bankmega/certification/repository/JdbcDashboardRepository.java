@@ -21,16 +21,8 @@ public class JdbcDashboardRepository implements DashboardRepository {
 
     private void add(MapSqlParameterSource p, String key, Object val) {
         if (val != null) {
-            p.addValue(key, val);
+            p.addValue(java.util.Objects.requireNonNull(key), val);
         }
-    }
-
-    private Long toLong(Object o) {
-        return o == null ? null : ((Number) o).longValue();
-    }
-
-    private Integer toInt(Object o) {
-        return o == null ? null : ((Number) o).intValue();
     }
 
     /** WHERE untuk employee alias (e) */
@@ -86,31 +78,6 @@ public class JdbcDashboardRepository implements DashboardRepository {
         }
 
         return cond.isEmpty() ? "" : " AND " + String.join(" AND ", cond);
-    }
-
-    /** versi raw (tanpa "AND ") untuk blok OR */
-    private String whereEmployeeRaw(String alias, DashboardFilters f, MapSqlParameterSource p) {
-        List<String> cond = new ArrayList<>();
-
-        // 🔹 scope khusus dashboard pegawai
-        if (f.getEmployeeId() != null) {
-            add(p, "employeeId", f.getEmployeeId());
-            cond.add(alias + ".id = :employeeId");
-        }
-
-        if (f.getRegionalId() != null) {
-            add(p, "regionalId", f.getRegionalId());
-            cond.add(alias + ".regional_id = :regionalId");
-        }
-        if (f.getDivisionId() != null) {
-            add(p, "divisionId", f.getDivisionId());
-            cond.add(alias + ".division_id = :divisionId");
-        }
-        if (f.getUnitId() != null) {
-            add(p, "unitId", f.getUnitId());
-            cond.add(alias + ".unit_id = :UnitId");
-        }
-        return String.join(" AND ", cond);
     }
 
     private MapSqlParameterSource baseParams(DashboardFilters f) {
@@ -198,7 +165,8 @@ public class JdbcDashboardRepository implements DashboardRepository {
                 FROM joined j;
                 """.formatted(empWhere, ruleWhere, ruleWhere, ruleWhere, ruleWhere);
 
-        Map<String, Object> r = jdbc.queryForMap(sql, p);
+        Map<String, Object> r = jdbc.queryForMap(java.util.Objects.requireNonNull(sql),
+                java.util.Objects.requireNonNull(p));
 
         return new SummaryCounts(
                 ((Number) r.get("employee_count")).longValue(),

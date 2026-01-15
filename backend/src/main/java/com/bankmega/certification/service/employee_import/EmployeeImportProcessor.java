@@ -59,12 +59,12 @@ public class EmployeeImportProcessor {
     @PostConstruct
     public void initRole() {
         pegawaiRole = roleRepo.findByNameIgnoreCase("Pegawai")
-                .orElseGet(() -> roleRepo.save(
+                .orElseGet(() -> roleRepo.save(Objects.requireNonNull(
                         Role.builder()
                                 .name("Pegawai")
                                 .createdAt(Instant.now())
                                 .updatedAt(Instant.now())
-                                .build()));
+                                .build())));
     }
 
     @Transactional(readOnly = true)
@@ -411,7 +411,7 @@ public class EmployeeImportProcessor {
     }
 
     private void saveImportLog(User user, MultipartFile file, ImportPlan plan) {
-        logRepo.save(EmployeeImportLog.builder()
+        logRepo.save(Objects.requireNonNull(EmployeeImportLog.builder()
                 .user(user)
                 .fileName(file.getOriginalFilename())
                 .totalProcessed(plan.processed)
@@ -422,7 +422,7 @@ public class EmployeeImportProcessor {
                 .totalErrors(plan.errors)
                 .dryRun(false)
                 .createdAt(Instant.now())
-                .build());
+                .build()));
     }
 
     private boolean profileChanged(Employee emp, String name, String email, String gender) {
@@ -473,22 +473,25 @@ public class EmployeeImportProcessor {
 
     private Regional resolveRegional(String name, boolean createIfMissing) {
         return resolveCached(name, regionalCache, regionalRepo::findByNameIgnoreCase,
-                n -> createIfMissing ? regionalRepo.save(Regional.builder().name(n).build()) : null);
+                n -> createIfMissing ? regionalRepo.save(Objects.requireNonNull(Regional.builder().name(n).build()))
+                        : null);
     }
 
     private Division resolveDivision(String name, boolean createIfMissing) {
         return resolveCached(name, divisionCache, divisionRepo::findByNameIgnoreCase,
-                n -> createIfMissing ? divisionRepo.save(Division.builder().name(n).build()) : null);
+                n -> createIfMissing ? divisionRepo.save(Objects.requireNonNull(Division.builder().name(n).build()))
+                        : null);
     }
 
     private Unit resolveUnit(String name, boolean createIfMissing) {
         return resolveCached(name, unitCache, unitRepo::findByNameIgnoreCase,
-                n -> createIfMissing ? unitRepo.save(Unit.builder().name(n).build()) : null);
+                n -> createIfMissing ? unitRepo.save(Objects.requireNonNull(Unit.builder().name(n).build())) : null);
     }
 
     private JobPosition resolveJob(String name, boolean createIfMissing) {
         return resolveCached(name, jobCache, jobRepo::findByNameIgnoreCase,
-                n -> createIfMissing ? jobRepo.save(JobPosition.builder().name(n).build()) : null);
+                n -> createIfMissing ? jobRepo.save(Objects.requireNonNull(JobPosition.builder().name(n).build()))
+                        : null);
     }
 
     private <T> T resolveCached(

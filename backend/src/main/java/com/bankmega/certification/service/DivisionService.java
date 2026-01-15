@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -40,7 +41,7 @@ public class DivisionService {
     }
 
     public DivisionResponse getById(Long id) {
-        Division d = repo.findById(id)
+        Division d = repo.findById(Objects.requireNonNull(id))
                 .orElseThrow(() -> new NotFoundException("Division not found: " + id));
         return mapToResponse(d);
     }
@@ -48,18 +49,18 @@ public class DivisionService {
     @Transactional
     public DivisionResponse createOrGet(DivisionRequest req) {
         Division d = repo.findByNameIgnoreCase(req.getName())
-                .orElseGet(() -> repo.save(Division.builder()
+                .orElseGet(() -> repo.save(Objects.requireNonNull(Division.builder()
                         .name(req.getName())
                         .isActive(true)
                         .createdAt(Instant.now())
                         .updatedAt(Instant.now())
-                        .build()));
+                        .build())));
         return mapToResponse(d);
     }
 
     @Transactional
     public DivisionResponse toggle(Long id) {
-        Division d = repo.findById(id)
+        Division d = repo.findById(Objects.requireNonNull(id))
                 .orElseThrow(() -> new NotFoundException("Division not found: " + id));
 
         if (Boolean.TRUE.equals(d.getIsActive())) {

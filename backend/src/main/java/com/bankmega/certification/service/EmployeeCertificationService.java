@@ -199,7 +199,7 @@ public class EmployeeCertificationService {
             return;
         for (int i = 0; i < list.size(); i += BATCH_SIZE) {
             int end = Math.min(i + BATCH_SIZE, list.size());
-            repo.saveAll(list.subList(i, end));
+            repo.saveAll(Objects.requireNonNull(list.subList(i, end)));
             em.flush();
             em.clear();
         }
@@ -246,16 +246,16 @@ public class EmployeeCertificationService {
 
     @Transactional
     public EmployeeCertificationResponse create(EmployeeCertificationRequest req, List<Long> allowedCertIds) {
-        Employee employee = employeeRepo.findById(req.getEmployeeId())
+        Employee employee = employeeRepo.findById(Objects.requireNonNull(req.getEmployeeId()))
                 .orElseThrow(() -> new RuntimeException("Employee not found"));
 
-        CertificationRule rule = ruleRepo.findById(req.getCertificationRuleId())
+        CertificationRule rule = ruleRepo.findById(Objects.requireNonNull(req.getCertificationRuleId()))
                 .orElseThrow(() -> new RuntimeException("Certification Rule not found"));
 
         assertRuleInScope(rule, allowedCertIds);
 
         Institution institution = (req.getInstitutionId() != null)
-                ? institutionRepo.findById(req.getInstitutionId()).orElse(null)
+                ? institutionRepo.findById(Objects.requireNonNull(req.getInstitutionId())).orElse(null)
                 : null;
 
         repo.findFirstByEmployeeIdAndCertificationRuleIdAndDeletedAtIsNull(employee.getId(), rule.getId())
@@ -284,7 +284,7 @@ public class EmployeeCertificationService {
         updateValidity(ec);
         updateStatus(ec);
 
-        EmployeeCertification saved = repo.save(ec);
+        EmployeeCertification saved = repo.save(Objects.requireNonNull(ec));
         historyService.snapshot(saved, ActionType.CREATED);
 
         maybeResetCounters(saved);
@@ -308,7 +308,7 @@ public class EmployeeCertificationService {
 
         if (req.getCertificationRuleId() != null &&
                 !Objects.equals(ec.getCertificationRule().getId(), req.getCertificationRuleId())) {
-            CertificationRule rule = ruleRepo.findById(req.getCertificationRuleId())
+            CertificationRule rule = ruleRepo.findById(Objects.requireNonNull(req.getCertificationRuleId()))
                     .orElseThrow(() -> new RuntimeException("Certification Rule not found"));
             assertRuleInScope(rule, allowedCertIds);
             ec.setCertificationRule(rule);
@@ -317,7 +317,8 @@ public class EmployeeCertificationService {
         }
 
         if (req.getInstitutionId() != null) {
-            Institution institution = institutionRepo.findById(req.getInstitutionId()).orElse(null);
+            Institution institution = institutionRepo.findById(Objects.requireNonNull(req.getInstitutionId()))
+                    .orElse(null);
             ec.setInstitution(institution);
         }
 
@@ -472,7 +473,7 @@ public class EmployeeCertificationService {
                 certDateStart, certDateEnd, validUntilStart, validUntilEnd,
                 allowedCertIds);
 
-        return repo.findAll(spec, pageable).map(this::toResponse);
+        return repo.findAll(spec, Objects.requireNonNull(pageable)).map(this::toResponse);
     }
 
     @Transactional(readOnly = true)

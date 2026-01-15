@@ -178,7 +178,7 @@ public class PasswordResetService {
             MimeMessage message = reusableMailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
-            String fromAddr = Objects.toString(getUsernameSafe(), "no-reply@megacert.local");
+            String fromAddr = Objects.requireNonNull(Objects.toString(getUsernameSafe(), "no-reply@megacert.local"));
             helper.setFrom(fromAddr);
             helper.setTo(to);
             helper.setSubject(subject);

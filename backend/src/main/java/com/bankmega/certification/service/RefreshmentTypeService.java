@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -23,7 +24,7 @@ public class RefreshmentTypeService {
     }
 
     public RefreshmentTypeResponse getById(Long id) {
-        RefreshmentType type = repo.findById(id)
+        RefreshmentType type = repo.findById(Objects.requireNonNull(id))
                 .orElseThrow(() -> new NotFoundException("Refreshment type not found with id " + id));
         return toResponse(type);
     }
@@ -37,11 +38,11 @@ public class RefreshmentTypeService {
                 .name(req.getName())
                 .build();
 
-        return toResponse(repo.save(type));
+        return toResponse(repo.save(Objects.requireNonNull(type)));
     }
 
     public RefreshmentTypeResponse update(Long id, RefreshmentTypeRequest req) {
-        RefreshmentType type = repo.findById(id)
+        RefreshmentType type = repo.findById(Objects.requireNonNull(id))
                 .orElseThrow(() -> new NotFoundException("Refreshment type not found with id " + id));
 
         type.setName(req.getName());
@@ -50,9 +51,9 @@ public class RefreshmentTypeService {
     }
 
     public void delete(Long id) {
-        RefreshmentType type = repo.findById(id)
+        RefreshmentType type = repo.findById(Objects.requireNonNull(id))
                 .orElseThrow(() -> new NotFoundException("Refreshment type not found with id " + id));
-        repo.delete(type);
+        repo.delete(Objects.requireNonNull(type));
     }
 
     private RefreshmentTypeResponse toResponse(RefreshmentType type) {

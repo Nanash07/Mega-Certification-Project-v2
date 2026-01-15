@@ -49,10 +49,11 @@ public class EmployeeHistorySpecification {
             } else if (startDate != null) {
                 return cb.greaterThanOrEqualTo(root.get("actionAt"),
                         startDate.atStartOfDay().toInstant(java.time.ZoneOffset.UTC));
-            } else {
+            } else if (endDate != null) {
                 return cb.lessThanOrEqualTo(root.get("actionAt"),
                         endDate.plusDays(1).atStartOfDay().toInstant(java.time.ZoneOffset.UTC));
             }
+            return cb.conjunction();
         };
     }
 
