@@ -3,6 +3,8 @@ package com.bankmega.certification.service;
 import com.bankmega.certification.dto.UserRequest;
 import com.bankmega.certification.dto.UserResponse;
 import com.bankmega.certification.entity.Employee;
+import com.bankmega.certification.entity.EmployeePosition;
+import com.bankmega.certification.entity.JobPosition;
 import com.bankmega.certification.entity.Role;
 import com.bankmega.certification.entity.User;
 import com.bankmega.certification.exception.ConflictException;
@@ -49,15 +51,23 @@ public class UserService {
 
     // ===================== MAPPER =====================
     private static UserResponse toResponse(User user) {
+        Employee emp = user.getEmployee();
+        EmployeePosition primary = emp != null ? emp.getPrimaryPosition() : null;
+        JobPosition jp = primary != null && primary.getJobPosition() != null
+                ? primary.getJobPosition()
+                : null;
+
         return UserResponse.builder()
                 .id(user.getId())
                 .username(user.getUsername())
                 .email(user.getResolvedEmail())
                 .roleId(user.getRole() != null ? user.getRole().getId() : null)
                 .roleName(user.getRole() != null ? user.getRole().getName() : null)
-                .employeeId(user.getEmployee() != null ? user.getEmployee().getId() : null)
-                .employeeNip(user.getEmployee() != null ? user.getEmployee().getNip() : null)
-                .employeeName(user.getEmployee() != null ? user.getEmployee().getName() : null)
+                .employeeId(emp != null ? emp.getId() : null)
+                .employeeNip(emp != null ? emp.getNip() : null)
+                .employeeName(emp != null ? emp.getName() : null)
+                .employeeJobPositionId(jp != null ? jp.getId() : null)
+                .employeeJobPositionName(jp != null ? jp.getName() : null)
                 .isActive(user.getIsActive())
                 .isFirstLogin(user.getIsFirstLogin())
                 .createdAt(user.getCreatedAt() != null ? FORMATTER.format(user.getCreatedAt()) : null)

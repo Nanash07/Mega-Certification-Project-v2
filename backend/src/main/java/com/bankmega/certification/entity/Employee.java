@@ -7,7 +7,9 @@ import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.Instant;
-import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
 
 @Entity
 @Table(name = "employees")
@@ -39,31 +41,8 @@ public class Employee {
     @Column(length = 10)
     private String gender;
 
-    // 🔗 langsung ke Regional
-    @ManyToOne
-    @JoinColumn(name = "regional_id")
-    private Regional regional;
-
-    // 🔗 langsung ke Division
-    @ManyToOne
-    @JoinColumn(name = "division_id")
-    private Division division;
-
-    // 🔗 langsung ke Unit
-    @ManyToOne
-    @JoinColumn(name = "unit_id")
-    private Unit unit;
-
-    // 🔗 langsung ke Job Position
-    @ManyToOne
-    @JoinColumn(name = "job_position_id")
-    private JobPosition jobPosition;
-
-    @Column(name = "effective_date")
-    private LocalDate effectiveDate;
-
     @Column(name = "status", nullable = false)
-    private String status; // ACTIVE / RESIGN / MUTASI
+    private String status;
 
     @CreatedDate
     @Column(name = "created_at", updatable = false)
@@ -75,4 +54,34 @@ public class Employee {
 
     @Column(name = "deleted_at")
     private Instant deletedAt;
+
+    @OneToMany(mappedBy = "employee", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @Builder.Default
+    private List<EmployeePosition> positions = new ArrayList<>();
+
+    public EmployeePosition getPrimaryPosition() {
+        if (positions == null)
+            return null;
+        return positions.stream()
+                .filter(p -> p.getPositionType() == EmployeePosition.PositionType.PRIMARY && p.getDeletedAt() == null)
+                .findFirst().orElse(null);
+    }
+
+    public EmployeePosition getSecondaryPosition() {
+        if (positions == null)
+            return null;
+        return positions.stream()
+                .filter(p -> p.getPositionType() == EmployeePosition.PositionType.SECONDARY && p.getDeletedAt() == null)
+                .findFirst().orElse(null);
+    }
+
+    public List<JobPosition> getAllActiveJobPositions() {
+        if (positions == null)
+            return List.of();
+        return positions.stream()
+                .filter(p -> p.getDeletedAt() == null && Boolean.TRUE.equals(p.getIsActive()))
+                .map(EmployeePosition::getJobPosition)
+                .filter(Objects::nonNull)
+                .toList();
+    }
 }

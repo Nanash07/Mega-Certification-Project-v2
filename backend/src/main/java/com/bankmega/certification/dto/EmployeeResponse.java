@@ -30,6 +30,20 @@ public class EmployeeResponse {
     private LocalDate effectiveDate;
     private String status;
 
+    private Long regionalId2;
+    private String regionalName2;
+
+    private Long divisionId2;
+    private String divisionName2;
+
+    private Long unitId2;
+    private String unitName2;
+
+    private Long jobPositionId2;
+    private String jobName2;
+
+    private LocalDate effectiveDate2;
+
     private Instant createdAt;
     private Instant updatedAt;
     private Instant deletedAt;

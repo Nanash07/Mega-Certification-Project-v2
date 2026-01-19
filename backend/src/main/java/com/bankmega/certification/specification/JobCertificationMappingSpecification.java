@@ -11,11 +11,7 @@ public class JobCertificationMappingSpecification {
         return (root, query, cb) -> cb.isNull(root.get("deletedAt"));
     }
 
-    public static Specification<JobCertificationMapping> byEmployeeIds(List<Long> employeeIds) {
-        return (root, query, cb) -> (employeeIds == null || employeeIds.isEmpty())
-                ? cb.conjunction()
-                : root.get("employee").get("id").in(employeeIds);
-    }
+    // Removed invalid byEmployeeIds method
 
     public static Specification<JobCertificationMapping> byJobIds(List<Long> jobIds) {
         return (root, query, cb) -> (jobIds == null || jobIds.isEmpty())

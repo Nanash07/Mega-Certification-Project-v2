@@ -17,6 +17,8 @@ public class UserResponse {
     private Long employeeId;
     private String employeeNip;
     private String employeeName;
+    private Long employeeJobPositionId;
+    private String employeeJobPositionName;
 
     private Boolean isActive;
     private Boolean isFirstLogin;

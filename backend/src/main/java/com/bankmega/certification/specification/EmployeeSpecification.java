@@ -56,11 +56,19 @@ public class EmployeeSpecification {
                 return cb.conjunction();
             }
             String like = "%" + search.toLowerCase() + "%";
+
+            var positions = root.join("positions", jakarta.persistence.criteria.JoinType.LEFT);
+            if (query != null)
+                query.distinct(true);
+
             return cb.or(
                     cb.like(cb.lower(root.get("nip")), like),
                     cb.like(cb.lower(root.get("name")), like),
                     cb.like(cb.lower(root.get("email")), like),
-                    cb.like(cb.lower(root.get("jobPosition").get("name")), like));
+                    cb.and(
+                            cb.isNull(positions.get("deletedAt")),
+                            cb.isTrue(positions.get("isActive")),
+                            cb.like(cb.lower(positions.get("jobPosition").get("name")), like)));
         };
     }
 
@@ -71,46 +79,116 @@ public class EmployeeSpecification {
     }
 
     public static Specification<Employee> byRegionalIds(List<Long> ids) {
-        return (root, query, cb) -> (ids == null || ids.isEmpty())
-                ? cb.conjunction()
-                : root.get("regional").get("id").in(ids);
+        return (root, query, cb) -> {
+            if (ids == null || ids.isEmpty())
+                return cb.conjunction();
+
+            var positions = root.join("positions", jakarta.persistence.criteria.JoinType.LEFT);
+            if (query != null)
+                query.distinct(true);
+
+            return cb.and(
+                    cb.isNull(positions.get("deletedAt")),
+                    cb.isTrue(positions.get("isActive")),
+                    positions.get("regional").get("id").in(ids));
+        };
     }
 
     public static Specification<Employee> byDivisionIds(List<Long> ids) {
-        return (root, query, cb) -> (ids == null || ids.isEmpty())
-                ? cb.conjunction()
-                : root.get("division").get("id").in(ids);
+        return (root, query, cb) -> {
+            if (ids == null || ids.isEmpty())
+                return cb.conjunction();
+
+            var positions = root.join("positions", jakarta.persistence.criteria.JoinType.LEFT);
+            if (query != null)
+                query.distinct(true);
+
+            return cb.and(
+                    cb.isNull(positions.get("deletedAt")),
+                    cb.isTrue(positions.get("isActive")),
+                    positions.get("division").get("id").in(ids));
+        };
     }
 
     public static Specification<Employee> byUnitIds(List<Long> ids) {
-        return (root, query, cb) -> (ids == null || ids.isEmpty())
-                ? cb.conjunction()
-                : root.get("unit").get("id").in(ids);
+        return (root, query, cb) -> {
+            if (ids == null || ids.isEmpty())
+                return cb.conjunction();
+
+            var positions = root.join("positions", jakarta.persistence.criteria.JoinType.LEFT);
+            if (query != null)
+                query.distinct(true);
+
+            return cb.and(
+                    cb.isNull(positions.get("deletedAt")),
+                    cb.isTrue(positions.get("isActive")),
+                    positions.get("unit").get("id").in(ids));
+        };
     }
 
     public static Specification<Employee> byJobPositionIds(List<Long> ids) {
-        return (root, query, cb) -> (ids == null || ids.isEmpty())
-                ? cb.conjunction()
-                : root.get("jobPosition").get("id").in(ids);
+        return (root, query, cb) -> {
+            if (ids == null || ids.isEmpty())
+                return cb.conjunction();
+
+            var positions = root.join("positions", jakarta.persistence.criteria.JoinType.LEFT);
+            if (query != null)
+                query.distinct(true);
+
+            return cb.and(
+                    cb.isNull(positions.get("deletedAt")),
+                    cb.isTrue(positions.get("isActive")),
+                    positions.get("jobPosition").get("id").in(ids));
+        };
     }
 
     // ===== Single-id filter (buat dashboard count) =====
 
     public static Specification<Employee> byRegionalId(Long id) {
-        return (root, query, cb) -> (id == null)
-                ? cb.conjunction()
-                : cb.equal(root.get("regional").get("id"), id);
+        return (root, query, cb) -> {
+            if (id == null)
+                return cb.conjunction();
+
+            var positions = root.join("positions", jakarta.persistence.criteria.JoinType.LEFT);
+            if (query != null)
+                query.distinct(true);
+
+            return cb.and(
+                    cb.isNull(positions.get("deletedAt")),
+                    cb.isTrue(positions.get("isActive")),
+                    cb.equal(positions.get("regional").get("id"), id));
+        };
     }
 
     public static Specification<Employee> byDivisionId(Long id) {
-        return (root, query, cb) -> (id == null)
-                ? cb.conjunction()
-                : cb.equal(root.get("division").get("id"), id);
+        return (root, query, cb) -> {
+            if (id == null)
+                return cb.conjunction();
+
+            var positions = root.join("positions", jakarta.persistence.criteria.JoinType.LEFT);
+            if (query != null)
+                query.distinct(true);
+
+            return cb.and(
+                    cb.isNull(positions.get("deletedAt")),
+                    cb.isTrue(positions.get("isActive")),
+                    cb.equal(positions.get("division").get("id"), id));
+        };
     }
 
     public static Specification<Employee> byUnitId(Long id) {
-        return (root, query, cb) -> (id == null)
-                ? cb.conjunction()
-                : cb.equal(root.get("unit").get("id"), id);
+        return (root, query, cb) -> {
+            if (id == null)
+                return cb.conjunction();
+
+            var positions = root.join("positions", jakarta.persistence.criteria.JoinType.LEFT);
+            if (query != null)
+                query.distinct(true);
+
+            return cb.and(
+                    cb.isNull(positions.get("deletedAt")),
+                    cb.isTrue(positions.get("isActive")),
+                    cb.equal(positions.get("unit").get("id"), id));
+        };
     }
 }

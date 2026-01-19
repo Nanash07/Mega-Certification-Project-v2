@@ -2,6 +2,7 @@ package com.bankmega.certification.service;
 
 import com.bankmega.certification.dto.EmployeeEligibilityExceptionResponse;
 import com.bankmega.certification.entity.EmployeeEligibilityException;
+import com.bankmega.certification.entity.EmployeePosition;
 import com.bankmega.certification.repository.CertificationRuleRepository;
 import com.bankmega.certification.repository.EmployeeEligibilityExceptionRepository;
 import com.bankmega.certification.repository.EmployeeRepository;
@@ -36,15 +37,17 @@ public class EmployeeEligibilityExceptionService {
 
                 var emp = e.getEmployee();
                 var rule = e.getCertificationRule();
+                EmployeePosition primary = emp != null ? emp.getPrimaryPosition() : null;
+                String jobTitle = primary != null && primary.getJobPosition() != null
+                                ? primary.getJobPosition().getName()
+                                : null;
 
                 return EmployeeEligibilityExceptionResponse.builder()
                                 .id(e.getId())
                                 .employeeId(emp != null ? emp.getId() : null)
                                 .employeeName(emp != null ? emp.getName() : null)
                                 .nip(emp != null ? emp.getNip() : null)
-                                .jobPositionTitle(emp != null && emp.getJobPosition() != null
-                                                ? emp.getJobPosition().getName()
-                                                : null)
+                                .jobPositionTitle(jobTitle)
                                 .certificationRuleId(rule != null ? rule.getId() : null)
                                 .certificationCode(rule != null ? rule.getCertification().getCode() : null)
                                 .certificationName(rule != null ? rule.getCertification().getName() : null)

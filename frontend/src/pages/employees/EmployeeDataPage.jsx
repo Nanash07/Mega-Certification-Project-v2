@@ -28,7 +28,7 @@ export default function EmployeePage() {
     const [totalPages, setTotalPages] = useState(0);
     const [totalElements, setTotalElements] = useState(0);
 
-    const TABLE_COLS = 11;
+    const TABLE_COLS = 12;
 
     const [filterEmployee, setFilterEmployee] = useState(null);
     const [regionalIds, setRegionalIds] = useState(null);
@@ -275,6 +275,7 @@ export default function EmployeePage() {
                                 <th className="w-12">No</th>
                                 <th>NIP</th>
                                 <th>Nama</th>
+                                <th className="w-24">Tipe</th>
                                 <th className="w-24">Status</th>
                                 <th>Email</th>
                                 <th>Gender</th>
@@ -288,13 +289,13 @@ export default function EmployeePage() {
                         <tbody className="text-xs">
                             {loading ? (
                                 <tr>
-                                    <td colSpan={TABLE_COLS} className="text-center py-16">
+                                    <td colSpan={12} className="text-center py-16">
                                         <span className="loading loading-dots loading-lg text-primary" />
                                     </td>
                                 </tr>
                             ) : rows.length === 0 ? (
                                 <tr>
-                                    <td colSpan={TABLE_COLS} className="text-center py-16">
+                                    <td colSpan={12} className="text-center py-16">
                                         <div className="flex flex-col items-center text-gray-400">
                                             <Users size={48} className="mb-3 opacity-30" />
                                             <p className="text-sm">Tidak ada data pegawai</p>
@@ -302,46 +303,92 @@ export default function EmployeePage() {
                                     </td>
                                 </tr>
                             ) : (
-                                rows.map((e, idx) => (
-                                    <tr key={e.id} className="hover">
-                                        <td>{startIdx + idx}</td>
-                                        <td>{e.nip}</td>
-                                        <td className="font-medium">{e.name}</td>
-                                        <td>
-                                            <span
-                                                className={`badge badge-sm text-white ${
-                                                    e.status === "ACTIVE"
-                                                        ? "badge-success"
-                                                        : e.status === "INACTIVE"
-                                                        ? "badge-neutral"
-                                                        : e.status === "RESIGN"
-                                                        ? "badge-error"
-                                                        : "badge-ghost"
-                                                }`}
-                                            >
-                                                {formatStatusLabel(e.status)}
-                                            </span>
-                                        </td>
-                                        <td>{e.email}</td>
-                                        <td>{e.gender}</td>
-                                        <td>{e.regionalName || "-"}</td>
-                                        <td>{e.divisionName || "-"}</td>
-                                        <td>{e.unitName || "-"}</td>
-                                        <td>{e.jobName || "-"}</td>
-                                        <td>
-                                            {e.effectiveDate
-                                                ? new Date(e.effectiveDate)
-                                                      .toLocaleDateString("id-ID", {
+                                rows.map((e, idx) => {
+                                    const primaryRow = (
+                                        <tr
+                                            key={`${e.id}-primary`}
+                                            className="hover cursor-pointer"
+                                            onClick={() => navigate(`/employee/${e.id}`)}
+                                        >
+                                            <td>{startIdx + idx}</td>
+                                            <td>{e.nip}</td>
+                                            <td className="font-medium">{e.name}</td>
+                                            <td>
+                                                <span className="badge badge-primary badge-sm text-white">
+                                                    UTAMA
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <span
+                                                    className={`badge badge-sm text-white ${
+                                                        e.status === "ACTIVE"
+                                                            ? "badge-success"
+                                                            : e.status === "INACTIVE"
+                                                            ? "badge-neutral"
+                                                            : e.status === "RESIGN"
+                                                            ? "badge-error"
+                                                            : "badge-ghost"
+                                                    }`}
+                                                >
+                                                    {formatStatusLabel(e.status)}
+                                                </span>
+                                            </td>
+                                            <td>{e.email}</td>
+                                            <td>{e.gender}</td>
+                                            <td>{e.regionalName || "-"}</td>
+                                            <td>{e.divisionName || "-"}</td>
+                                            <td>{e.unitName || "-"}</td>
+                                            <td className="font-medium">{e.jobName || "-"}</td>
+                                            <td>
+                                                {e.effectiveDate
+                                                    ? new Date(e.effectiveDate).toLocaleDateString("id-ID", {
                                                           day: "2-digit",
                                                           month: "short",
                                                           year: "numeric",
                                                       })
-                                                      .replace(/\./g, "")
-                                                      .replace(/(\b[a-z])/g, (x) => x.toUpperCase())
-                                                : "-"}
-                                        </td>
-                                    </tr>
-                                ))
+                                                    : "-"}
+                                            </td>
+                                        </tr>
+                                    );
+
+                                    if (e.jobPositionId2) {
+                                        const secondaryRow = (
+                                            <tr
+                                                key={`${e.id}-secondary`}
+                                                className="hover cursor-pointer bg-base-50"
+                                                onClick={() => navigate(`/employee/${e.id}`)}
+                                            >
+                                                <td></td>
+                                                <td className="opacity-50 text-xs"></td>
+                                                <td className="opacity-50 text-xs"></td>
+                                                <td>
+                                                    <span className="badge badge-secondary badge-sm text-white">
+                                                        KEDUA
+                                                    </span>
+                                                </td>
+                                                <td></td>
+                                                <td></td>
+                                                <td></td>
+                                                <td>{e.regionalName2 || "-"}</td>
+                                                <td>{e.divisionName2 || "-"}</td>
+                                                <td>{e.unitName2 || "-"}</td>
+                                                <td className="font-medium">{e.jobName2 || "-"}</td>
+                                                <td>
+                                                    {e.effectiveDate2
+                                                        ? new Date(e.effectiveDate2).toLocaleDateString("id-ID", {
+                                                              day: "2-digit",
+                                                              month: "short",
+                                                              year: "numeric",
+                                                          })
+                                                        : "-"}
+                                                </td>
+                                            </tr>
+                                        );
+                                        return [primaryRow, secondaryRow];
+                                    }
+
+                                    return primaryRow;
+                                })
                             )}
                         </tbody>
                     </table>

@@ -16,7 +16,8 @@ public class EmployeeTemplateService {
             Row header = sheet.createRow(0);
             String[] cols = {
                     "Regional", "Division", "Unit", "JobTitle",
-                    "NIP", "Name", "Gender", "Email", "EffectiveDate (yyyy-MM-dd)"
+                    "NIP", "Name", "Gender", "Email", "EffectiveDate (yyyy-MM-dd)",
+                    "Regional2", "Division2", "Unit2", "JobTitle2", "EffectiveDate2 (yyyy-MM-dd)"
             };
             for (int i = 0; i < cols.length; i++) {
                 Cell cell = header.createCell(i);

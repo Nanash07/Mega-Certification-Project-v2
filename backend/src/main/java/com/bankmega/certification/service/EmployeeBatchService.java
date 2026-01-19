@@ -40,11 +40,12 @@ public class EmployeeBatchService {
     // ================== MAPPER ==================
     private EmployeeBatchResponse toResponse(EmployeeBatch eb) {
         Employee emp = eb.getEmployee();
+        EmployeePosition primary = emp != null ? emp.getPrimaryPosition() : null;
 
-        JobPosition jp = (emp != null) ? emp.getJobPosition() : null;
-        Division div = (emp != null) ? emp.getDivision() : null;
-        Regional reg = (emp != null) ? emp.getRegional() : null;
-        Unit unit = (emp != null) ? emp.getUnit() : null;
+        JobPosition jp = primary != null ? primary.getJobPosition() : null;
+        Division div = primary != null ? primary.getDivision() : null;
+        Regional reg = primary != null ? primary.getRegional() : null;
+        Unit unit = primary != null ? primary.getUnit() : null;
 
         return EmployeeBatchResponse.builder()
                 .id(eb.getId())
@@ -73,11 +74,16 @@ public class EmployeeBatchService {
 
     private EmployeeEligibilityResponse toEligibilityResponse(EmployeeEligibility e) {
         Employee emp = e.getEmployee();
+        EmployeePosition primary = emp != null ? emp.getPrimaryPosition() : null;
+        String jobTitle = primary != null && primary.getJobPosition() != null
+                ? primary.getJobPosition().getName()
+                : null;
+
         return EmployeeEligibilityResponse.builder()
                 .employeeId(emp != null ? emp.getId() : null)
                 .nip(emp != null ? emp.getNip() : null)
                 .employeeName(emp != null ? emp.getName() : null)
-                .jobPositionTitle(emp != null && emp.getJobPosition() != null ? emp.getJobPosition().getName() : null)
+                .jobPositionTitle(jobTitle)
                 .certificationRuleId(e.getCertificationRule() != null ? e.getCertificationRule().getId() : null)
                 .certificationCode(
                         e.getCertificationRule() != null && e.getCertificationRule().getCertification() != null

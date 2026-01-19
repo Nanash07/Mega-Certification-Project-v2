@@ -25,7 +25,7 @@ public class JdbcDashboardRepository implements DashboardRepository {
         }
     }
 
-    /** WHERE untuk employee alias (e) */
+    /** WHERE untuk employee alias (e) - sekarang join positions juga */
     private String whereEmployee(String alias, DashboardFilters f, MapSqlParameterSource p) {
         List<String> cond = new ArrayList<>();
 
@@ -35,17 +35,23 @@ public class JdbcDashboardRepository implements DashboardRepository {
             cond.add(alias + ".id = :employeeId");
         }
 
+        // Filter by regional - query dari positions
         if (f.getRegionalId() != null) {
             add(p, "regionalId", f.getRegionalId());
-            cond.add(alias + ".regional_id = :regionalId");
+            cond.add("EXISTS (SELECT 1 FROM employee_positions ep WHERE ep.employee_id = "
+                    + alias + ".id AND ep.regional_id = :regionalId AND ep.deleted_at IS NULL)");
         }
+        // Filter by division - query dari positions
         if (f.getDivisionId() != null) {
             add(p, "divisionId", f.getDivisionId());
-            cond.add(alias + ".division_id = :divisionId");
+            cond.add("EXISTS (SELECT 1 FROM employee_positions ep WHERE ep.employee_id = "
+                    + alias + ".id AND ep.division_id = :divisionId AND ep.deleted_at IS NULL)");
         }
+        // Filter by unit - query dari positions
         if (f.getUnitId() != null) {
             add(p, "unitId", f.getUnitId());
-            cond.add(alias + ".unit_id = :unitId");
+            cond.add("EXISTS (SELECT 1 FROM employee_positions ep WHERE ep.employee_id = "
+                    + alias + ".id AND ep.unit_id = :unitId AND ep.deleted_at IS NULL)");
         }
         return cond.isEmpty() ? "" : " AND " + String.join(" AND ", cond);
     }

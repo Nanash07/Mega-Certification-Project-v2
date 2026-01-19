@@ -37,6 +37,7 @@ public class EmployeeImportProcessor {
     private final UnitRepository unitRepo;
     private final JobPositionRepository jobRepo;
     private final EmployeeRepository empRepo;
+    private final EmployeePositionRepository positionRepo;
     private final EmployeeImportLogRepository logRepo;
 
     private final EmployeeHistoryService historyService;
@@ -186,6 +187,11 @@ public class EmployeeImportProcessor {
                 Unit unit = resolveUnit(r.unitName, !dryRun);
                 JobPosition job = resolveJob(r.jobName, !dryRun);
 
+                Regional regional2 = resolveRegional(r.regionalName2, !dryRun);
+                Division division2 = resolveDivision(r.divisionName2, !dryRun);
+                Unit unit2 = resolveUnit(r.unitName2, !dryRun);
+                JobPosition job2 = resolveJob(r.jobName2, !dryRun);
+
                 Employee existing = existingByNip.get(r.nip);
 
                 if (existing == null) {
@@ -194,15 +200,20 @@ public class EmployeeImportProcessor {
                             .name(r.name)
                             .gender(r.gender)
                             .email(r.email)
-                            .regional(regional)
-                            .division(division)
-                            .unit(unit)
-                            .jobPosition(job)
+                            // Legacy fields removed
                             .status("ACTIVE")
-                            .effectiveDate(r.effectiveDate)
+                            // effectiveDate removed from Employee entity
+                            // syncPrimaryPosition handles effectiveDate in positions.
                             .createdAt(Instant.now())
                             .updatedAt(Instant.now())
                             .build();
+
+                    if (!dryRun) {
+                        emp = empRepo.save(Objects.requireNonNull(emp));
+                        createPositions(emp, regional, division, unit, job, r.effectiveDate,
+                                regional2, division2, unit2, job2, r.effectiveDate2);
+                    }
+
                     plan.newEmployees.add(emp);
                     plan.createdOrRehiredForAccount.add(emp);
                     plan.created++;
@@ -213,32 +224,41 @@ public class EmployeeImportProcessor {
 
                 if (wasResign) {
                     if (!dryRun) {
-                        String oldJobTitle = existing.getJobPosition() != null ? existing.getJobPosition().getName()
+                        EmployeePosition primary = existing.getPrimaryPosition();
+                        String oldJobTitle = primary != null && primary.getJobPosition() != null
+                                ? primary.getJobPosition().getName()
                                 : null;
-                        String oldUnitName = existing.getUnit() != null ? existing.getUnit().getName() : null;
-                        String oldDivisionName = existing.getDivision() != null ? existing.getDivision().getName()
+                        String oldUnitName = primary != null && primary.getUnit() != null ? primary.getUnit().getName()
                                 : null;
-                        String oldRegionalName = existing.getRegional() != null ? existing.getRegional().getName()
+                        String oldDivisionName = primary != null && primary.getDivision() != null
+                                ? primary.getDivision().getName()
+                                : null;
+                        String oldRegionalName = primary != null && primary.getRegional() != null
+                                ? primary.getRegional().getName()
                                 : null;
 
-                        boolean orgChanged = !sameEntity(existing.getRegional(), regional)
-                                || !sameEntity(existing.getDivision(), division)
-                                || !sameEntity(existing.getUnit(), unit)
-                                || !sameEntity(existing.getJobPosition(), job);
+                        // Check changes against PRIMARY
+                        boolean orgChanged = false;
+                        if (primary != null) {
+                            orgChanged = !sameEntity(primary.getRegional(), regional)
+                                    || !sameEntity(primary.getDivision(), division)
+                                    || !sameEntity(primary.getUnit(), unit)
+                                    || !sameEntity(primary.getJobPosition(), job);
+                        } else {
+                            // If no primary (weird for legacy data?), assume changed if new values present
+                            orgChanged = (regional != null || division != null || unit != null || job != null);
+                        }
 
                         existing.setStatus("ACTIVE");
-
                         existing.setName(r.name);
                         existing.setEmail(r.email);
                         existing.setGender(r.gender);
-                        existing.setRegional(regional);
-                        existing.setDivision(division);
-                        existing.setUnit(unit);
-                        existing.setJobPosition(job);
-                        if (r.effectiveDate != null)
-                            existing.setEffectiveDate(r.effectiveDate);
+                        // Do not set legacy fields
 
                         existing.setUpdatedAt(Instant.now());
+
+                        updatePositions(existing, regional, division, unit, job, r.effectiveDate,
+                                regional2, division2, unit2, job2, r.effectiveDate2);
 
                         EmployeeHistory.EmployeeActionType type = orgChanged
                                 ? EmployeeHistory.EmployeeActionType.MUTASI
@@ -265,22 +285,28 @@ public class EmployeeImportProcessor {
 
                 if (mutasi) {
                     if (!dryRun) {
-                        String oldJobTitle = existing.getJobPosition() != null ? existing.getJobPosition().getName()
+                        EmployeePosition primary = existing.getPrimaryPosition();
+                        String oldJobTitle = primary != null && primary.getJobPosition() != null
+                                ? primary.getJobPosition().getName()
                                 : null;
-                        String oldUnitName = existing.getUnit() != null ? existing.getUnit().getName() : null;
-                        String oldDivisionName = existing.getDivision() != null ? existing.getDivision().getName()
+                        String oldUnitName = primary != null && primary.getUnit() != null ? primary.getUnit().getName()
                                 : null;
-                        String oldRegionalName = existing.getRegional() != null ? existing.getRegional().getName()
+                        String oldDivisionName = primary != null && primary.getDivision() != null
+                                ? primary.getDivision().getName()
+                                : null;
+                        String oldRegionalName = primary != null && primary.getRegional() != null
+                                ? primary.getRegional().getName()
                                 : null;
 
-                        existing.setRegional(regional);
-                        existing.setDivision(division);
-                        existing.setUnit(unit);
-                        existing.setJobPosition(job);
-                        if (r.effectiveDate != null)
-                            existing.setEffectiveDate(r.effectiveDate);
+                        // Do not set legacy fields
 
                         existing.setUpdatedAt(Instant.now());
+
+                        updatePositions(existing, regional, division, unit, job, r.effectiveDate,
+                                regional2, division2, unit2, job2, r.effectiveDate2);
+
+                        // We need effective date for history... use request effective date or primary's
+                        LocalDate effDate = r.effectiveDate;
 
                         historyService.snapshotWithOldValues(
                                 existing,
@@ -289,18 +315,23 @@ public class EmployeeImportProcessor {
                                 oldDivisionName,
                                 oldRegionalName,
                                 EmployeeHistory.EmployeeActionType.MUTASI,
-                                existing.getEffectiveDate());
+                                effDate);
                     }
                     plan.mutatedEmployees.add(existing);
                     plan.mutated++;
                 } else if (changedProfile) {
                     if (!dryRun) {
-                        String oldJobTitle = existing.getJobPosition() != null ? existing.getJobPosition().getName()
+                        EmployeePosition primary = existing.getPrimaryPosition();
+                        String oldJobTitle = primary != null && primary.getJobPosition() != null
+                                ? primary.getJobPosition().getName()
                                 : null;
-                        String oldUnitName = existing.getUnit() != null ? existing.getUnit().getName() : null;
-                        String oldDivisionName = existing.getDivision() != null ? existing.getDivision().getName()
+                        String oldUnitName = primary != null && primary.getUnit() != null ? primary.getUnit().getName()
                                 : null;
-                        String oldRegionalName = existing.getRegional() != null ? existing.getRegional().getName()
+                        String oldDivisionName = primary != null && primary.getDivision() != null
+                                ? primary.getDivision().getName()
+                                : null;
+                        String oldRegionalName = primary != null && primary.getRegional() != null
+                                ? primary.getRegional().getName()
                                 : null;
 
                         if (!Objects.equals(existing.getName(), r.name))
@@ -310,32 +341,28 @@ public class EmployeeImportProcessor {
                         if (!Objects.equals(existing.getGender(), r.gender))
                             existing.setGender(r.gender);
 
-                        if (regional != null)
-                            existing.setRegional(regional);
-                        if (division != null)
-                            existing.setDivision(division);
-                        if (unit != null)
-                            existing.setUnit(unit);
-                        if (job != null)
-                            existing.setJobPosition(job);
-
-                        if (r.effectiveDate != null)
-                            existing.setEffectiveDate(r.effectiveDate);
+                        // Do not set legacy fields including effectiveDate
 
                         existing.setUpdatedAt(Instant.now());
 
-                        boolean orgChanged = !sameEntityName(oldRegionalName,
-                                existing.getRegional() != null ? existing.getRegional().getName() : null)
-                                || !sameEntityName(oldDivisionName,
-                                        existing.getDivision() != null ? existing.getDivision().getName() : null)
-                                || !sameEntityName(oldUnitName,
-                                        existing.getUnit() != null ? existing.getUnit().getName() : null)
-                                || !sameEntityName(oldJobTitle,
-                                        existing.getJobPosition() != null ? existing.getJobPosition().getName() : null);
+                        updatePositions(existing, regional, division, unit, job, r.effectiveDate,
+                                regional2, division2, unit2, job2, r.effectiveDate2);
 
-                        EmployeeHistory.EmployeeActionType type = orgChanged
-                                ? EmployeeHistory.EmployeeActionType.MUTASI
-                                : EmployeeHistory.EmployeeActionType.UPDATED;
+                        // Check if org changed implicitly (even though mutasi=false? logic says
+                        // placementChanged false, so org not changed)
+                        // But wait, updatePositions might change effective date?
+                        // If logic says !mutasi, then org didn't change.
+                        // Wait, orgChanged check below in original code was:
+                        /*
+                         * boolean orgChanged = !sameEntityName(oldRegionalName,
+                         * existing.getRegional() != null ? existing.getRegional().getName() : null)
+                         * ...
+                         */
+                        // Since we don't update legacy, and placementChanged returned false, orgChanged
+                        // should be false.
+                        // Exception: maybe simple update of other fields?
+
+                        EmployeeHistory.EmployeeActionType type = EmployeeHistory.EmployeeActionType.UPDATED;
 
                         historyService.snapshotWithOldValues(
                                 existing,
@@ -362,6 +389,19 @@ public class EmployeeImportProcessor {
                     if (!dryRun) {
                         e.setStatus("RESIGN");
                         e.setUpdatedAt(Instant.now());
+                        // Deactivate positions? logic needs to handle this.
+                        // Ideally EmployeeService.resign handles it, but here we do batch or direct
+                        // save.
+                        // We should probably deactivate positions here too or call service.
+                        // But since this is a processor, direct repo manipulation is common for batch.
+                        // Let's update positions to inactive.
+                        List<EmployeePosition> positions = positionRepo.findByEmployeeIdAndDeletedAtIsNull(e.getId());
+                        positions.forEach(p -> {
+                            p.setIsActive(false);
+                            p.setUpdatedAt(Instant.now());
+                        });
+                        positionRepo.saveAll(positions);
+
                         historyService.snapshot(e, EmployeeHistory.EmployeeActionType.RESIGN, LocalDate.now());
                     }
                     plan.resignedEmployees.add(e);
@@ -374,6 +414,12 @@ public class EmployeeImportProcessor {
     }
 
     private List<ImportRow> parseExcel(MultipartFile file) throws Exception {
+        // ... (truncated for brevity, logic remains same)
+        return parseExcelInternal(file);
+    }
+
+    // Helper to avoid duplicate code in replacement
+    private List<ImportRow> parseExcelInternal(MultipartFile file) throws Exception {
         List<ImportRow> out = new ArrayList<>();
         try (Workbook wb = new XSSFWorkbook(file.getInputStream())) {
             Sheet sheet = wb.getSheetAt(0);
@@ -395,12 +441,17 @@ public class EmployeeImportProcessor {
                 String name = safe(fmt.formatCellValue(row.getCell(5)));
                 String gender = safe(fmt.formatCellValue(row.getCell(6)));
                 String email = safe(fmt.formatCellValue(row.getCell(7)));
-                String effStr = safe(fmt.formatCellValue(row.getCell(8)));
+                LocalDate effDate = parseDateSafe(row.getCell(8), safe(fmt.formatCellValue(row.getCell(8))));
 
-                LocalDate effDate = parseDateSafe(row.getCell(8), effStr);
+                String regionalName2 = safe(fmt.formatCellValue(row.getCell(9)));
+                String divisionName2 = safe(fmt.formatCellValue(row.getCell(10)));
+                String unitName2 = safe(fmt.formatCellValue(row.getCell(11)));
+                String jobName2 = safe(fmt.formatCellValue(row.getCell(12)));
+                LocalDate effDate2 = parseDateSafe(row.getCell(13), safe(fmt.formatCellValue(row.getCell(13))));
 
-                out.add(new ImportRow(i + 1, regionalName, divisionName, unitName, jobName,
-                        nip, name, gender, email, effDate));
+                out.add(new ImportRow(i + 1, nip, name, gender, email,
+                        regionalName, divisionName, unitName, jobName, effDate,
+                        regionalName2, divisionName2, unitName2, jobName2, effDate2));
             }
         }
         return out;
@@ -432,10 +483,14 @@ public class EmployeeImportProcessor {
     }
 
     private boolean placementChanged(Employee e, Regional r, Division d, Unit u, JobPosition j) {
-        return !sameEntity(e.getRegional(), r)
-                || !sameEntity(e.getDivision(), d)
-                || !sameEntity(e.getUnit(), u)
-                || !sameEntity(e.getJobPosition(), j);
+        EmployeePosition primary = e.getPrimaryPosition();
+        if (primary == null)
+            return true; // Treat as changed if missing primary
+
+        return !sameEntity(primary.getRegional(), r)
+                || !sameEntity(primary.getDivision(), d)
+                || !sameEntity(primary.getUnit(), u)
+                || !sameEntity(primary.getJobPosition(), j);
     }
 
     private boolean sameEntity(Object a, Object b) {
@@ -450,14 +505,6 @@ public class EmployeeImportProcessor {
         } catch (Exception e) {
             return false;
         }
-    }
-
-    private boolean sameEntityName(String a, String b) {
-        if (a == b)
-            return true;
-        if (a == null || b == null)
-            return false;
-        return a.trim().equalsIgnoreCase(b.trim());
     }
 
     private LocalDate parseDateSafe(Cell cell, String val) {
@@ -534,6 +581,94 @@ public class EmployeeImportProcessor {
         }
     }
 
+    private void createPositions(Employee emp, Regional reg, Division div, Unit unit, JobPosition job,
+            LocalDate effDate,
+            Regional reg2, Division div2, Unit unit2, JobPosition job2, LocalDate effDate2) {
+        Instant now = Instant.now();
+
+        if (job != null) {
+            EmployeePosition primary = EmployeePosition.builder()
+                    .employee(emp)
+                    .positionType(EmployeePosition.PositionType.PRIMARY)
+                    .regional(reg)
+                    .division(div)
+                    .unit(unit)
+                    .jobPosition(job)
+                    .effectiveDate(effDate)
+                    .isActive(true)
+                    .createdAt(now)
+                    .updatedAt(now)
+                    .build();
+            positionRepo.save(Objects.requireNonNull(primary));
+        }
+
+        if (job2 != null) {
+            EmployeePosition secondary = EmployeePosition.builder()
+                    .employee(emp)
+                    .positionType(EmployeePosition.PositionType.SECONDARY)
+                    .regional(reg2)
+                    .division(div2)
+                    .unit(unit2)
+                    .jobPosition(job2)
+                    .effectiveDate(effDate2)
+                    .isActive(true)
+                    .createdAt(now)
+                    .updatedAt(now)
+                    .build();
+            positionRepo.save(Objects.requireNonNull(secondary));
+        }
+    }
+
+    private void updatePositions(Employee emp, Regional reg, Division div, Unit unit, JobPosition job,
+            LocalDate effDate,
+            Regional reg2, Division div2, Unit unit2, JobPosition job2, LocalDate effDate2) {
+        Instant now = Instant.now();
+
+        EmployeePosition primary = positionRepo.findByEmployeeIdAndPositionTypeAndDeletedAtIsNull(
+                emp.getId(), EmployeePosition.PositionType.PRIMARY).orElse(null);
+
+        if (primary == null && job != null) {
+            primary = EmployeePosition.builder()
+                    .employee(emp)
+                    .positionType(EmployeePosition.PositionType.PRIMARY)
+                    .createdAt(now)
+                    .build();
+        }
+
+        if (primary != null) {
+            primary.setRegional(reg);
+            primary.setDivision(div);
+            primary.setUnit(unit);
+            primary.setJobPosition(job);
+            primary.setEffectiveDate(effDate);
+            primary.setUpdatedAt(now);
+            positionRepo.save(primary);
+        }
+
+        EmployeePosition secondary = positionRepo.findByEmployeeIdAndPositionTypeAndDeletedAtIsNull(
+                emp.getId(), EmployeePosition.PositionType.SECONDARY).orElse(null);
+
+        if (job2 != null) {
+            if (secondary == null) {
+                secondary = EmployeePosition.builder()
+                        .employee(emp)
+                        .positionType(EmployeePosition.PositionType.SECONDARY)
+                        .createdAt(now)
+                        .build();
+            }
+            secondary.setRegional(reg2);
+            secondary.setDivision(div2);
+            secondary.setUnit(unit2);
+            secondary.setJobPosition(job2);
+            secondary.setEffectiveDate(effDate2);
+            secondary.setUpdatedAt(now);
+            positionRepo.save(secondary);
+        } else if (secondary != null) {
+            secondary.setDeletedAt(now);
+            positionRepo.save(secondary);
+        }
+    }
+
     private void runAfterCommit(Runnable task) {
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
@@ -552,8 +687,9 @@ public class EmployeeImportProcessor {
     }
 
     private record ImportRow(
-            int rowIndex, String regionalName, String divisionName, String unitName, String jobName,
-            String nip, String name, String gender, String email, LocalDate effectiveDate) {
+            int rowIndex, String nip, String name, String gender, String email,
+            String regionalName, String divisionName, String unitName, String jobName, LocalDate effectiveDate,
+            String regionalName2, String divisionName2, String unitName2, String jobName2, LocalDate effectiveDate2) {
     }
 
     private static class ImportPlan {

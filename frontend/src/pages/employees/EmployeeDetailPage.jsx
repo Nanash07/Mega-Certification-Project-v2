@@ -134,11 +134,66 @@ export default function EmployeeDetailPage() {
                             {employee.status || "-"}
                         </span>
                     </div>
-                    <div>
-                        <p className="text-gray-500">Tanggal SK</p>
-                        <p className="font-medium">{formatDate(employee.effectiveDate)}</p>
+                </div>
+            </div>
+
+            {/* Informasi Jabatan */}
+            <div className="card bg-base-100 shadow p-5">
+                <h2 className="font-bold text-xl mb-4">Posisi & Jabatan</h2>
+                
+                {/* Jabatan Utama */}
+                <div className="p-4 rounded-lg bg-base-50 border-l-4 border-primary mb-4">
+                    <h3 className="font-semibold mb-3 flex items-center gap-2 text-lg">
+                        <span className="badge badge-primary badge-sm border-0 text-white">UTAMA</span>
+                        {employee.jobName || "-"}
+                    </h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+                        <div>
+                            <p className="text-gray-500 text-xs uppercase tracking-wide">Unit</p>
+                            <p className="font-medium">{employee.unitName || "-"}</p>
+                        </div>
+                        <div>
+                            <p className="text-gray-500 text-xs uppercase tracking-wide">Divisi</p>
+                            <p className="font-medium">{employee.divisionName || "-"}</p>
+                        </div>
+                        <div>
+                            <p className="text-gray-500 text-xs uppercase tracking-wide">Regional</p>
+                            <p className="font-medium">{employee.regionalName || "-"}</p>
+                        </div>
+                        <div>
+                            <p className="text-gray-500 text-xs uppercase tracking-wide">Tanggal SK</p>
+                            <p className="font-medium">{formatDate(employee.effectiveDate)}</p>
+                        </div>
                     </div>
                 </div>
+
+                {/* Jabatan Kedua (Optional) */}
+                {employee.jobPositionId2 && (
+                    <div className="p-4 rounded-lg bg-base-50 border-l-4 border-secondary">
+                        <h3 className="font-semibold mb-3 flex items-center gap-2 text-lg">
+                            <span className="badge badge-secondary badge-sm border-0 text-white">KEDUA</span>
+                            {employee.jobName2 || "-"}
+                        </h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+                            <div>
+                                <p className="text-gray-500 text-xs uppercase tracking-wide">Unit</p>
+                                <p className="font-medium">{employee.unitName2 || "-"}</p>
+                            </div>
+                            <div>
+                                <p className="text-gray-500 text-xs uppercase tracking-wide">Divisi</p>
+                                <p className="font-medium">{employee.divisionName2 || "-"}</p>
+                            </div>
+                            <div>
+                                <p className="text-gray-500 text-xs uppercase tracking-wide">Regional</p>
+                                <p className="font-medium">{employee.regionalName2 || "-"}</p>
+                            </div>
+                            <div>
+                                <p className="text-gray-500 text-xs uppercase tracking-wide">Tanggal SK</p>
+                                <p className="font-medium">{formatDate(employee.effectiveDate2)}</p>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Tabs */}

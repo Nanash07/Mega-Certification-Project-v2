@@ -4,6 +4,7 @@ package com.bankmega.certification.service;
 import com.bankmega.certification.dto.EmployeeHistoryResponse;
 import com.bankmega.certification.entity.Employee;
 import com.bankmega.certification.entity.EmployeeHistory;
+import com.bankmega.certification.entity.EmployeePosition;
 import com.bankmega.certification.entity.JobPosition;
 import com.bankmega.certification.repository.EmployeeHistoryRepository;
 import com.bankmega.certification.specification.EmployeeHistorySpecification;
@@ -41,21 +42,35 @@ public class EmployeeHistoryService {
                 if (emp == null)
                         return;
 
+                EmployeePosition primary = emp.getPrimaryPosition();
+                String unitName = primary != null && primary.getUnit() != null
+                                ? primary.getUnit().getName()
+                                : null; // Removed fallback
+                String divisionName = primary != null && primary.getDivision() != null
+                                ? primary.getDivision().getName()
+                                : null; // Removed fallback
+                String regionalName = primary != null && primary.getRegional() != null
+                                ? primary.getRegional().getName()
+                                : null; // Removed fallback
+                LocalDate effDate = primary != null && primary.getEffectiveDate() != null
+                                ? primary.getEffectiveDate()
+                                : null; // Removed fallback
+
                 EmployeeHistory history = EmployeeHistory.builder()
                                 .employee(emp)
                                 .employeeNip(emp.getNip())
                                 .employeeName(emp.getName())
                                 .oldJobPosition(oldJob)
                                 .oldJobTitle(oldJob != null ? oldJob.getName() : null)
-                                .oldUnitName(emp.getUnit() != null ? emp.getUnit().getName() : null)
-                                .oldDivisionName(emp.getDivision() != null ? emp.getDivision().getName() : null)
-                                .oldRegionalName(emp.getRegional() != null ? emp.getRegional().getName() : null)
+                                .oldUnitName(unitName)
+                                .oldDivisionName(divisionName)
+                                .oldRegionalName(regionalName)
                                 .newJobPosition(newJob)
                                 .newJobTitle(newJob != null ? newJob.getName() : null)
-                                .newUnitName(emp.getUnit() != null ? emp.getUnit().getName() : null)
-                                .newDivisionName(emp.getDivision() != null ? emp.getDivision().getName() : null)
-                                .newRegionalName(emp.getRegional() != null ? emp.getRegional().getName() : null)
-                                .effectiveDate(effective != null ? effective : emp.getEffectiveDate())
+                                .newUnitName(unitName)
+                                .newDivisionName(divisionName)
+                                .newRegionalName(regionalName)
+                                .effectiveDate(effective != null ? effective : effDate)
                                 .actionType(actionType)
                                 .actionAt(Instant.now())
                                 .build();
@@ -80,7 +95,22 @@ public class EmployeeHistoryService {
                 if (newEmp == null)
                         return;
 
-                JobPosition newJob = newEmp.getJobPosition();
+                EmployeePosition primary = newEmp.getPrimaryPosition();
+                JobPosition newJob = primary != null && primary.getJobPosition() != null
+                                ? primary.getJobPosition()
+                                : null; // Removed fallback
+                String newUnitName = primary != null && primary.getUnit() != null
+                                ? primary.getUnit().getName()
+                                : null; // Removed fallback
+                String newDivisionName = primary != null && primary.getDivision() != null
+                                ? primary.getDivision().getName()
+                                : null; // Removed fallback
+                String newRegionalName = primary != null && primary.getRegional() != null
+                                ? primary.getRegional().getName()
+                                : null; // Removed fallback
+                LocalDate effDate = primary != null && primary.getEffectiveDate() != null
+                                ? primary.getEffectiveDate()
+                                : null; // Removed fallback
 
                 EmployeeHistory history = EmployeeHistory.builder()
                                 .employee(newEmp)
@@ -92,10 +122,10 @@ public class EmployeeHistoryService {
                                 .oldRegionalName(oldRegionalName)
                                 .newJobPosition(newJob)
                                 .newJobTitle(newJob != null ? newJob.getName() : null)
-                                .newUnitName(newEmp.getUnit() != null ? newEmp.getUnit().getName() : null)
-                                .newDivisionName(newEmp.getDivision() != null ? newEmp.getDivision().getName() : null)
-                                .newRegionalName(newEmp.getRegional() != null ? newEmp.getRegional().getName() : null)
-                                .effectiveDate(effective != null ? effective : newEmp.getEffectiveDate())
+                                .newUnitName(newUnitName)
+                                .newDivisionName(newDivisionName)
+                                .newRegionalName(newRegionalName)
+                                .effectiveDate(effective != null ? effective : effDate)
                                 .actionType(actionType)
                                 .actionAt(Instant.now())
                                 .build();
@@ -121,11 +151,22 @@ public class EmployeeHistoryService {
         }
 
         public void snapshot(Employee emp, EmployeeHistory.EmployeeActionType actionType, LocalDate effectiveDate) {
-                snapshot(emp, emp.getJobPosition(), emp.getJobPosition(), effectiveDate, actionType);
+                EmployeePosition primary = emp != null ? emp.getPrimaryPosition() : null;
+                JobPosition jp = primary != null && primary.getJobPosition() != null
+                                ? primary.getJobPosition()
+                                : null;
+                snapshot(emp, jp, jp, effectiveDate, actionType);
         }
 
         public void snapshot(Employee emp, EmployeeHistory.EmployeeActionType actionType) {
-                snapshot(emp, emp.getJobPosition(), emp.getJobPosition(), emp.getEffectiveDate(), actionType);
+                EmployeePosition primary = emp != null ? emp.getPrimaryPosition() : null;
+                JobPosition jp = primary != null && primary.getJobPosition() != null
+                                ? primary.getJobPosition()
+                                : null;
+                LocalDate effDate = primary != null && primary.getEffectiveDate() != null
+                                ? primary.getEffectiveDate()
+                                : null;
+                snapshot(emp, jp, jp, effDate, actionType);
         }
 
         @Transactional(readOnly = true)

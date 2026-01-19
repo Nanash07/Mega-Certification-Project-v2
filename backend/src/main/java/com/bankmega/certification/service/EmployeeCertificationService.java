@@ -7,6 +7,7 @@ import com.bankmega.certification.entity.CertificationRule;
 import com.bankmega.certification.entity.Employee;
 import com.bankmega.certification.entity.EmployeeCertification;
 import com.bankmega.certification.entity.EmployeeCertificationHistory.ActionType;
+import com.bankmega.certification.entity.EmployeePosition;
 import com.bankmega.certification.entity.Institution;
 
 import com.bankmega.certification.repository.CertificationRuleRepository;
@@ -272,9 +273,7 @@ public class EmployeeCertificationService {
                 .processType(req.getProcessType() != null
                         ? req.getProcessType()
                         : EmployeeCertification.ProcessType.SERTIFIKASI)
-                .jobPositionTitle(employee.getJobPosition() != null
-                        ? employee.getJobPosition().getName()
-                        : null)
+                .jobPositionTitle(getJobTitle(employee))
                 .ruleValidityMonths(rule.getValidityMonths())
                 .ruleReminderMonths(rule.getReminderMonths())
                 .createdAt(Instant.now())
@@ -329,8 +328,7 @@ public class EmployeeCertificationService {
         }
 
         if (ec.getJobPositionTitle() == null || ec.getJobPositionTitle().isBlank()) {
-            var jp = ec.getEmployee().getJobPosition();
-            ec.setJobPositionTitle(jp != null ? jp.getName() : null);
+            ec.setJobPositionTitle(getJobTitle(ec.getEmployee()));
         }
 
         ec.setUpdatedAt(Instant.now());
@@ -639,6 +637,16 @@ public class EmployeeCertificationService {
         } catch (Exception ex) {
             throw new RuntimeException("Failed to export excel", ex);
         }
+    }
+
+    private String getJobTitle(Employee employee) {
+        if (employee == null)
+            return null;
+        EmployeePosition primary = employee.getPrimaryPosition();
+        if (primary != null && primary.getJobPosition() != null) {
+            return primary.getJobPosition().getName();
+        }
+        return null;
     }
 
     private static String nz(String s) {

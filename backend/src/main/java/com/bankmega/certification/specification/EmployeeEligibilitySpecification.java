@@ -18,10 +18,12 @@ public class EmployeeEligibilitySpecification {
         return (root, query, cb) -> {
             if (query != null && query.getResultType() != Long.class && query.getResultType() != long.class) {
                 var empFetch = root.fetch("employee", JoinType.LEFT);
-                empFetch.fetch("jobPosition", JoinType.LEFT);
-                empFetch.fetch("regional", JoinType.LEFT);
-                empFetch.fetch("division", JoinType.LEFT);
-                empFetch.fetch("unit", JoinType.LEFT);
+                // Fetch positions and their details
+                var posFetch = empFetch.fetch("positions", JoinType.LEFT);
+                posFetch.fetch("jobPosition", JoinType.LEFT);
+                posFetch.fetch("regional", JoinType.LEFT);
+                posFetch.fetch("division", JoinType.LEFT);
+                posFetch.fetch("unit", JoinType.LEFT);
 
                 var ruleFetch = root.fetch("certificationRule", JoinType.LEFT);
                 ruleFetch.fetch("certification", JoinType.LEFT);
@@ -39,9 +41,21 @@ public class EmployeeEligibilitySpecification {
     }
 
     public static Specification<EmployeeEligibility> byJobIds(List<Long> jobIds) {
-        return (root, query, cb) -> (jobIds == null || jobIds.isEmpty())
-                ? cb.conjunction()
-                : root.get("employee").get("jobPosition").get("id").in(jobIds);
+        return (root, query, cb) -> {
+            if (jobIds == null || jobIds.isEmpty())
+                return cb.conjunction();
+
+            // Re-join for filtering if not already joined in query structure (usually safe
+            // to join again)
+            // But relying on positions join is better
+            var emp = root.join("employee", JoinType.LEFT);
+            var positions = emp.join("positions", JoinType.LEFT);
+
+            return cb.and(
+                    cb.isNull(positions.get("deletedAt")),
+                    cb.isTrue(positions.get("isActive")),
+                    positions.get("jobPosition").get("id").in(jobIds));
+        };
     }
 
     public static Specification<EmployeeEligibility> byCertCodes(List<String> certCodes) {
@@ -86,50 +100,82 @@ public class EmployeeEligibilitySpecification {
         };
     }
 
-    public static Specification<EmployeeEligibility> bySearch(String keyword) {
+    public static Specification<EmployeeEligibility> bySearch(String search) {
         return (root, query, cb) -> {
-            if (keyword == null || keyword.trim().isEmpty()) {
+            if (search == null || search.trim().isEmpty())
                 return cb.conjunction();
-            }
-            String likePattern = "%" + keyword.toLowerCase() + "%";
 
-            var likeNip = cb.like(cb.lower(root.get("employee").get("nip")), likePattern);
-            var likeEmpName = cb.like(cb.lower(root.get("employee").get("name")), likePattern);
-            var likeJobName = cb.like(cb.lower(root.get("employee").get("jobPosition").get("name")), likePattern);
-            var likeCertCode = cb.like(cb.lower(root.get("certificationRule").get("certification").get("code")),
-                    likePattern);
-            var likeCertName = cb.like(cb.lower(root.get("certificationRule").get("certification").get("name")),
-                    likePattern);
-            var likeSubName = cb.like(cb.lower(root.get("certificationRule").get("subField").get("name")), likePattern);
+            String like = "%" + search.toLowerCase() + "%";
+            var employee = root.join("employee", JoinType.LEFT);
+            var positions = employee.join("positions", JoinType.LEFT);
+            if (query != null)
+                query.distinct(true);
 
-            var likeSource = cb.like(
-                    cb.lower(cb.function("str", String.class, root.get("source"))),
-                    likePattern);
-
-            return cb.or(likeNip, likeEmpName, likeJobName,
-                    likeCertCode, likeCertName, likeSubName,
-                    likeSource);
+            return cb.or(
+                    cb.like(cb.lower(employee.get("nip")), like),
+                    cb.like(cb.lower(employee.get("name")), like),
+                    cb.and(
+                            cb.isNull(positions.get("deletedAt")),
+                            cb.isTrue(positions.get("isActive")),
+                            cb.like(cb.lower(positions.get("jobPosition").get("name")), like)),
+                    cb.like(cb.lower(root.get("certificationRule").get("certification").get("code")), like),
+                    cb.like(cb.lower(root.get("certificationRule").get("certification").get("name")), like),
+                    cb.like(cb.lower(root.get("certificationRule").get("subField").get("name")), like),
+                    cb.like(cb.lower(cb.function("str", String.class, root.get("source"))), like));
         };
     }
 
     // ===== Filter tambahan buat "dashboard style" =====
 
     public static Specification<EmployeeEligibility> byRegionalId(Long regionalId) {
-        return (root, query, cb) -> (regionalId == null)
-                ? cb.conjunction()
-                : cb.equal(root.get("employee").get("regional").get("id"), regionalId);
+        return (root, query, cb) -> {
+            if (regionalId == null)
+                return cb.conjunction();
+
+            var employee = root.join("employee");
+            var positions = employee.join("positions", jakarta.persistence.criteria.JoinType.LEFT);
+            if (query != null)
+                query.distinct(true);
+
+            return cb.and(
+                    cb.isNull(positions.get("deletedAt")),
+                    cb.isTrue(positions.get("isActive")),
+                    cb.equal(positions.get("regional").get("id"), regionalId));
+        };
     }
 
     public static Specification<EmployeeEligibility> byDivisionId(Long divisionId) {
-        return (root, query, cb) -> (divisionId == null)
-                ? cb.conjunction()
-                : cb.equal(root.get("employee").get("division").get("id"), divisionId);
+        return (root, query, cb) -> {
+            if (divisionId == null)
+                return cb.conjunction();
+
+            var employee = root.join("employee");
+            var positions = employee.join("positions", jakarta.persistence.criteria.JoinType.LEFT);
+            if (query != null)
+                query.distinct(true);
+
+            return cb.and(
+                    cb.isNull(positions.get("deletedAt")),
+                    cb.isTrue(positions.get("isActive")),
+                    cb.equal(positions.get("division").get("id"), divisionId));
+        };
     }
 
     public static Specification<EmployeeEligibility> byUnitId(Long unitId) {
-        return (root, query, cb) -> (unitId == null)
-                ? cb.conjunction()
-                : cb.equal(root.get("employee").get("unit").get("id"), unitId);
+        return (root, query, cb) -> {
+            if (unitId == null)
+                return cb.conjunction();
+
+            var employee = root.join("employee");
+            var positions = employee.join("positions", jakarta.persistence.criteria.JoinType.LEFT);
+            if (query != null)
+                query.distinct(true);
+
+            return cb.and(
+                    cb.isNull(positions.get("deletedAt")),
+                    cb.isTrue(positions.get("isActive")),
+                    cb.equal(positions.get("unit").get("id"), unitId));
+        };
     }
 
     public static Specification<EmployeeEligibility> byCertificationId(Long certificationId) {

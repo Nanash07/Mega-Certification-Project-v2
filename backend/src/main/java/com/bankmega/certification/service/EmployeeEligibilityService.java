@@ -42,8 +42,14 @@ public class EmployeeEligibilityService {
         Integer masaBerlaku = null;
         String sisaWaktu = null;
 
-        if (emp != null && emp.getEffectiveDate() != null && rule != null && rule.getWajibSetelahMasuk() != null) {
-            wajibPunya = emp.getEffectiveDate().plusMonths(rule.getWajibSetelahMasuk());
+        EmployeePosition primary = emp != null ? emp.getPrimaryPosition() : null;
+        LocalDate effDate = primary != null ? primary.getEffectiveDate() : null;
+        String jobTitle = primary != null && primary.getJobPosition() != null
+                ? primary.getJobPosition().getName()
+                : null;
+
+        if (effDate != null && rule != null && rule.getWajibSetelahMasuk() != null) {
+            wajibPunya = effDate.plusMonths(rule.getWajibSetelahMasuk());
         }
         if (rule != null) {
             masaBerlaku = rule.getValidityMonths();
@@ -58,8 +64,8 @@ public class EmployeeEligibilityService {
                 .employeeId(emp != null ? emp.getId() : null)
                 .employeeName(emp != null ? emp.getName() : null)
                 .nip(emp != null ? emp.getNip() : null)
-                .jobPositionTitle(emp != null && emp.getJobPosition() != null ? emp.getJobPosition().getName() : null)
-                .effectiveDate(emp != null ? emp.getEffectiveDate() : null)
+                .jobPositionTitle(jobTitle)
+                .effectiveDate(effDate)
 
                 .certificationRuleId(rule != null ? rule.getId() : null)
                 .certificationCode(rule != null ? rule.getCertification().getCode() : null)
@@ -440,8 +446,14 @@ public class EmployeeEligibilityService {
         if (existingElig == null)
             existingElig = List.of();
 
-        Long jobId = employee.getJobPosition() != null ? employee.getJobPosition().getId() : null;
-        List<CertificationRule> mappingRules = jobId != null ? jobRuleMap.getOrDefault(jobId, List.of()) : List.of();
+        Set<Long> allJobIds = employee.getAllActiveJobPositions().stream()
+                .map(JobPosition::getId)
+                .collect(Collectors.toSet());
+
+        List<CertificationRule> mappingRules = allJobIds.stream()
+                .flatMap(jid -> jobRuleMap.getOrDefault(jid, List.of()).stream())
+                .distinct()
+                .toList();
         List<CertificationRule> manualRules = exceptionRuleMap.getOrDefault(employee.getId(), List.of());
 
         Set<Long> jobRuleIds = mappingRules.stream().map(CertificationRule::getId).collect(Collectors.toSet());

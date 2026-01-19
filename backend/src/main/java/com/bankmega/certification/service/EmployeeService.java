@@ -18,11 +18,14 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 
+import java.time.LocalDate;
+
 @Service
 @RequiredArgsConstructor
 public class EmployeeService {
 
         private final EmployeeRepository repo;
+        private final EmployeePositionRepository positionRepo;
         private final RegionalRepository regionalRepo;
         private final DivisionRepository divisionRepo;
         private final UnitRepository unitRepo;
@@ -104,7 +107,7 @@ public class EmployeeService {
 
         @Transactional(readOnly = true)
         public EmployeeResponse getById(Long id) {
-                Employee emp = repo.findById(Objects.requireNonNull(id))
+                Employee emp = repo.findByIdWithPositions(Objects.requireNonNull(id))
                                 .orElseThrow(() -> new NotFoundException("Employee not found with id " + id));
                 return toResponse(emp);
         }
@@ -121,7 +124,14 @@ public class EmployeeService {
                 emp.setDeletedAt(null);
 
                 Employee saved = repo.save(emp);
-                historyService.snapshot(saved, EmployeeHistory.EmployeeActionType.CREATED, saved.getEffectiveDate());
+
+                // Sync to positions table
+                syncPrimaryPosition(saved, req);
+                EmployeePosition primary = positionRepo.findByEmployeeIdAndPositionTypeAndDeletedAtIsNull(
+                                saved.getId(), EmployeePosition.PositionType.PRIMARY).orElse(null);
+                LocalDate effDate = primary != null ? primary.getEffectiveDate() : null;
+
+                historyService.snapshot(saved, EmployeeHistory.EmployeeActionType.CREATED, effDate);
 
                 return toResponse(saved);
         }
@@ -140,28 +150,49 @@ public class EmployeeService {
                         return toResponse(emp);
                 }
 
-                String oldJobTitle = emp.getJobPosition() != null ? emp.getJobPosition().getName() : null;
-                String oldUnitName = emp.getUnit() != null ? emp.getUnit().getName() : null;
-                String oldDivisionName = emp.getDivision() != null ? emp.getDivision().getName() : null;
-                String oldRegionalName = emp.getRegional() != null ? emp.getRegional().getName() : null;
+                // Capture old values from primary position first
+                EmployeePosition oldPrimary = emp.getPrimaryPosition();
+                String oldJobTitle = oldPrimary != null && oldPrimary.getJobPosition() != null
+                                ? oldPrimary.getJobPosition().getName()
+                                : null;
+                String oldUnitName = oldPrimary != null && oldPrimary.getUnit() != null
+                                ? oldPrimary.getUnit().getName()
+                                : null;
+                String oldDivisionName = oldPrimary != null && oldPrimary.getDivision() != null
+                                ? oldPrimary.getDivision().getName()
+                                : null;
+                String oldRegionalName = oldPrimary != null && oldPrimary.getRegional() != null
+                                ? oldPrimary.getRegional().getName()
+                                : null;
 
-                Long oldJobId = emp.getJobPosition() != null ? emp.getJobPosition().getId() : null;
-                Long oldUnitId = emp.getUnit() != null ? emp.getUnit().getId() : null;
-                Long oldDivisionId = emp.getDivision() != null ? emp.getDivision().getId() : null;
-                Long oldRegionalId = emp.getRegional() != null ? emp.getRegional().getId() : null;
+                Long oldJobId = oldPrimary != null && oldPrimary.getJobPosition() != null
+                                ? oldPrimary.getJobPosition().getId()
+                                : null;
+                Long oldUnitId = oldPrimary != null && oldPrimary.getUnit() != null
+                                ? oldPrimary.getUnit().getId()
+                                : null;
+                Long oldDivisionId = oldPrimary != null && oldPrimary.getDivision() != null
+                                ? oldPrimary.getDivision().getId()
+                                : null;
+                Long oldRegionalId = oldPrimary != null && oldPrimary.getRegional() != null
+                                ? oldPrimary.getRegional().getId()
+                                : null;
 
                 emp = mapRequestToEntity(emp, req);
                 emp.setUpdatedAt(Instant.now());
 
                 Employee saved = repo.save(emp);
 
-                boolean orgChanged = !Objects.equals(oldRegionalId,
-                                saved.getRegional() != null ? saved.getRegional().getId() : null)
-                                || !Objects.equals(oldDivisionId,
-                                                saved.getDivision() != null ? saved.getDivision().getId() : null)
-                                || !Objects.equals(oldUnitId, saved.getUnit() != null ? saved.getUnit().getId() : null)
-                                || !Objects.equals(oldJobId,
-                                                saved.getJobPosition() != null ? saved.getJobPosition().getId() : null);
+                // Sync to positions table
+                syncPrimaryPosition(saved, req);
+                EmployeePosition newPrimary = positionRepo.findByEmployeeIdAndPositionTypeAndDeletedAtIsNull(
+                                saved.getId(), EmployeePosition.PositionType.PRIMARY).orElse(null);
+                LocalDate newEffDate = newPrimary != null ? newPrimary.getEffectiveDate() : null;
+
+                boolean orgChanged = !Objects.equals(oldRegionalId, req.getRegionalId())
+                                || !Objects.equals(oldDivisionId, req.getDivisionId())
+                                || !Objects.equals(oldUnitId, req.getUnitId())
+                                || !Objects.equals(oldJobId, req.getJobPositionId());
 
                 EmployeeHistory.EmployeeActionType type = orgChanged
                                 ? EmployeeHistory.EmployeeActionType.MUTASI
@@ -174,7 +205,7 @@ public class EmployeeService {
                                 oldDivisionName,
                                 oldRegionalName,
                                 type,
-                                saved.getEffectiveDate());
+                                newEffDate);
 
                 return toResponse(saved);
         }
@@ -188,8 +219,19 @@ public class EmployeeService {
                         emp.setStatus("RESIGN");
                         emp.setUpdatedAt(Instant.now());
                         Employee saved = repo.save(emp);
-                        historyService.snapshot(saved, EmployeeHistory.EmployeeActionType.RESIGN,
-                                        saved.getEffectiveDate());
+
+                        // Deactivate all positions
+                        List<EmployeePosition> positions = positionRepo.findByEmployeeIdAndDeletedAtIsNull(emp.getId());
+                        positions.forEach(p -> {
+                                p.setIsActive(false);
+                                p.setUpdatedAt(Instant.now());
+                        });
+                        positionRepo.saveAll(positions);
+
+                        EmployeePosition primary = emp.getPrimaryPosition();
+                        LocalDate effDate = primary != null ? primary.getEffectiveDate() : null;
+
+                        historyService.snapshot(saved, EmployeeHistory.EmployeeActionType.RESIGN, effDate);
                         return toResponse(saved);
                 }
 
@@ -206,10 +248,42 @@ public class EmployeeService {
                 emp.setUpdatedAt(Instant.now());
 
                 Employee saved = repo.save(emp);
-                historyService.snapshot(saved, EmployeeHistory.EmployeeActionType.TERMINATED, saved.getEffectiveDate());
+
+                // Soft delete all positions
+                List<EmployeePosition> positions = positionRepo.findByEmployeeIdAndDeletedAtIsNull(emp.getId());
+                positions.forEach(p -> {
+                        p.setDeletedAt(Instant.now());
+                        p.setUpdatedAt(Instant.now());
+                });
+                positionRepo.saveAll(positions);
+
+                EmployeePosition primary = emp.getPrimaryPosition();
+                LocalDate effDate = primary != null ? primary.getEffectiveDate() : null;
+
+                historyService.snapshot(saved, EmployeeHistory.EmployeeActionType.TERMINATED, effDate);
         }
 
         private Employee mapRequestToEntity(Employee emp, EmployeeRequest req) {
+                // Legacy fields are removed.
+                // Regional, Division, Unit, JobPosition are now ONLY handled in
+                // employee_positions table via syncPrimaryPosition.
+                // We only map core employee data here.
+
+                emp.setNip(req.getNip());
+                emp.setName(req.getName());
+                emp.setEmail(req.getEmail());
+                emp.setGender(req.getGender());
+                emp.setStatus(req.getStatus());
+
+                // Effective date is needed for snapshot history but not stored in legacy col
+                // anymore?
+                // Wait, history snapshot uses primary position now.
+                // So we don't need to set it on emp.
+
+                return emp;
+        }
+
+        private void syncPrimaryPosition(Employee emp, EmployeeRequest req) {
                 Regional reg = regionalRepo.findById(Objects.requireNonNull(req.getRegionalId()))
                                 .orElseThrow(() -> new NotFoundException("Regional not found: " + req.getRegionalId()));
                 Division div = divisionRepo.findById(Objects.requireNonNull(req.getDivisionId()))
@@ -220,53 +294,112 @@ public class EmployeeService {
                                 .orElseThrow(() -> new NotFoundException(
                                                 "JobPosition not found: " + req.getJobPositionId()));
 
-                emp.setNip(req.getNip());
-                emp.setName(req.getName());
-                emp.setEmail(req.getEmail());
-                emp.setGender(req.getGender());
-                emp.setRegional(reg);
-                emp.setDivision(div);
-                emp.setUnit(unit);
-                emp.setJobPosition(job);
-                emp.setEffectiveDate(req.getEffectiveDate());
-                emp.setStatus(req.getStatus());
+                EmployeePosition primary = positionRepo.findByEmployeeIdAndPositionTypeAndDeletedAtIsNull(
+                                emp.getId(), EmployeePosition.PositionType.PRIMARY).orElse(null);
 
-                return emp;
+                Instant now = Instant.now();
+                if (primary == null) {
+                        primary = EmployeePosition.builder()
+                                        .employee(emp)
+                                        .positionType(EmployeePosition.PositionType.PRIMARY)
+                                        .createdAt(now)
+                                        .build();
+                }
+
+                primary.setRegional(reg);
+                primary.setDivision(div);
+                primary.setUnit(unit);
+                primary.setJobPosition(job);
+                primary.setEffectiveDate(req.getEffectiveDate());
+                primary.setIsActive(true);
+                primary.setUpdatedAt(now);
+                positionRepo.save(primary);
         }
 
         private boolean hasChanged(Employee emp, EmployeeRequest req) {
+                EmployeePosition primary = emp.getPrimaryPosition();
+
+                Long currentRegionalId = primary != null && primary.getRegional() != null
+                                ? primary.getRegional().getId()
+                                : null;
+                Long currentDivisionId = primary != null && primary.getDivision() != null
+                                ? primary.getDivision().getId()
+                                : null;
+                Long currentUnitId = primary != null && primary.getUnit() != null ? primary.getUnit().getId() : null;
+                Long currentJobId = primary != null && primary.getJobPosition() != null
+                                ? primary.getJobPosition().getId()
+                                : null;
+                LocalDate currentEffDate = primary != null ? primary.getEffectiveDate() : null;
+
                 return !Objects.equals(emp.getName(), req.getName())
                                 || !Objects.equals(emp.getEmail(), req.getEmail())
                                 || !Objects.equals(emp.getGender(), req.getGender())
                                 || !Objects.equals(emp.getStatus(), req.getStatus())
-                                || !Objects.equals(emp.getEffectiveDate(), req.getEffectiveDate())
-                                || !Objects.equals(emp.getRegional() != null ? emp.getRegional().getId() : null,
-                                                req.getRegionalId())
-                                || !Objects.equals(emp.getDivision() != null ? emp.getDivision().getId() : null,
-                                                req.getDivisionId())
-                                || !Objects.equals(emp.getUnit() != null ? emp.getUnit().getId() : null,
-                                                req.getUnitId())
-                                || !Objects.equals(emp.getJobPosition() != null ? emp.getJobPosition().getId() : null,
-                                                req.getJobPositionId());
+                                || !Objects.equals(currentEffDate, req.getEffectiveDate())
+                                || !Objects.equals(currentRegionalId, req.getRegionalId())
+                                || !Objects.equals(currentDivisionId, req.getDivisionId())
+                                || !Objects.equals(currentUnitId, req.getUnitId())
+                                || !Objects.equals(currentJobId, req.getJobPositionId());
         }
 
         private EmployeeResponse toResponse(Employee e) {
+                EmployeePosition primary = e.getPrimaryPosition();
+                EmployeePosition secondary = e.getSecondaryPosition();
+
                 return EmployeeResponse.builder()
                                 .id(e.getId())
                                 .nip(e.getNip())
                                 .name(e.getName())
                                 .email(e.getEmail())
                                 .gender(e.getGender())
-                                .regionalId(e.getRegional() != null ? e.getRegional().getId() : null)
-                                .regionalName(e.getRegional() != null ? e.getRegional().getName() : null)
-                                .divisionId(e.getDivision() != null ? e.getDivision().getId() : null)
-                                .divisionName(e.getDivision() != null ? e.getDivision().getName() : null)
-                                .unitId(e.getUnit() != null ? e.getUnit().getId() : null)
-                                .unitName(e.getUnit() != null ? e.getUnit().getName() : null)
-                                .jobPositionId(e.getJobPosition() != null ? e.getJobPosition().getId() : null)
-                                .jobName(e.getJobPosition() != null ? e.getJobPosition().getName() : null)
-                                .effectiveDate(e.getEffectiveDate())
+                                .regionalId(primary != null && primary.getRegional() != null
+                                                ? primary.getRegional().getId()
+                                                : null)
+                                .regionalName(primary != null && primary.getRegional() != null
+                                                ? primary.getRegional().getName()
+                                                : null)
+                                .divisionId(primary != null && primary.getDivision() != null
+                                                ? primary.getDivision().getId()
+                                                : null)
+                                .divisionName(primary != null && primary.getDivision() != null
+                                                ? primary.getDivision().getName()
+                                                : null)
+                                .unitId(primary != null && primary.getUnit() != null ? primary.getUnit().getId()
+                                                : null)
+                                .unitName(primary != null && primary.getUnit() != null ? primary.getUnit().getName()
+                                                : null)
+                                .jobPositionId(primary != null && primary.getJobPosition() != null
+                                                ? primary.getJobPosition().getId()
+                                                : null)
+                                .jobName(primary != null && primary.getJobPosition() != null
+                                                ? primary.getJobPosition().getName()
+                                                : null)
+                                .effectiveDate(primary != null ? primary.getEffectiveDate() : null)
                                 .status(e.getStatus())
+                                .regionalId2(secondary != null && secondary.getRegional() != null
+                                                ? secondary.getRegional().getId()
+                                                : null)
+                                .regionalName2(secondary != null && secondary.getRegional() != null
+                                                ? secondary.getRegional().getName()
+                                                : null)
+                                .divisionId2(secondary != null && secondary.getDivision() != null
+                                                ? secondary.getDivision().getId()
+                                                : null)
+                                .divisionName2(secondary != null && secondary.getDivision() != null
+                                                ? secondary.getDivision().getName()
+                                                : null)
+                                .unitId2(secondary != null && secondary.getUnit() != null ? secondary.getUnit().getId()
+                                                : null)
+                                .unitName2(secondary != null && secondary.getUnit() != null
+                                                ? secondary.getUnit().getName()
+                                                : null)
+                                .jobPositionId2(secondary != null && secondary.getJobPosition() != null
+                                                ? secondary.getJobPosition().getId()
+                                                : null)
+                                .jobName2(secondary != null && secondary.getJobPosition() != null
+                                                ? secondary.getJobPosition().getName()
+                                                : null)
+                                .effectiveDate2(secondary != null ? secondary.getEffectiveDate() : null)
                                 .createdAt(e.getCreatedAt())
                                 .updatedAt(e.getUpdatedAt())
                                 .deletedAt(e.getDeletedAt())

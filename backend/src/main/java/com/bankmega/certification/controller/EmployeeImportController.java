@@ -18,16 +18,14 @@ import java.util.List;
 public class EmployeeImportController {
 
     private final EmployeeImportService importService;
+    private final com.bankmega.certification.repository.UserRepository userRepo;
 
     @PostMapping("/dry-run")
     public ResponseEntity<EmployeeImportResponse> dryRun(
             @RequestParam("file") MultipartFile file,
             Principal principal) throws Exception {
 
-        User user = new User();
-        user.setId(1L);
-        user.setUsername(principal != null ? principal.getName() : "system");
-
+        User user = resolveUser(principal);
         return ResponseEntity.ok(importService.dryRun(file, user));
     }
 
@@ -36,11 +34,18 @@ public class EmployeeImportController {
             @RequestParam("file") MultipartFile file,
             Principal principal) throws Exception {
 
-        User user = new User();
-        user.setId(1L);
-        user.setUsername(principal != null ? principal.getName() : "system");
-
+        User user = resolveUser(principal);
         return ResponseEntity.ok(importService.confirm(file, user));
+    }
+
+    private User resolveUser(Principal principal) {
+        if (principal == null) {
+            // Should be handled by Security filter, but just in case
+            throw new com.bankmega.certification.exception.NotFoundException("User not authenticated");
+        }
+        return userRepo.findByUsername(principal.getName())
+                .orElseThrow(() -> new com.bankmega.certification.exception.NotFoundException(
+                        "User not found: " + principal.getName()));
     }
 
     @GetMapping("/template")

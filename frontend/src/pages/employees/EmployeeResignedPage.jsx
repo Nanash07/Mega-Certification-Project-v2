@@ -23,7 +23,7 @@ export default function EmployeeResignedPage() {
     const [totalPages, setTotalPages] = useState(0);
     const [totalElements, setTotalElements] = useState(0);
 
-    const TABLE_COLS = 12;
+    const TABLE_COLS = 13;
 
     const [filterEmployee, setFilterEmployee] = useState(null);
     const [regionalIds, setRegionalIds] = useState(null);
@@ -214,23 +214,24 @@ export default function EmployeeResignedPage() {
                                 <th className="w-24">Status</th>
                                 <th>Email</th>
                                 <th>Gender</th>
-                                <th>Regional</th>
-                                <th>Division</th>
-                                <th>Unit</th>
+                                <th className="w-20">Tipe</th>
                                 <th>Jabatan</th>
+                                <th>Unit</th>
+                                <th>Division</th>
+                                <th>Regional</th>
                                 <th>SK Efektif</th>
                             </tr>
                         </thead>
                         <tbody className="text-xs">
                             {loading ? (
                                 <tr>
-                                    <td colSpan={TABLE_COLS} className="text-center py-16">
+                                    <td colSpan={13} className="text-center py-16">
                                         <span className="loading loading-dots loading-lg text-primary" />
                                     </td>
                                 </tr>
                             ) : rows.length === 0 ? (
                                 <tr>
-                                    <td colSpan={TABLE_COLS} className="text-center py-16">
+                                    <td colSpan={13} className="text-center py-16">
                                         <div className="flex flex-col items-center text-gray-400">
                                             <UserX size={48} className="mb-3 opacity-30" />
                                             <p className="text-sm">Tidak ada data pegawai resign</p>
@@ -238,46 +239,84 @@ export default function EmployeeResignedPage() {
                                     </td>
                                 </tr>
                             ) : (
-                                rows.map((e, idx) => (
-                                    <tr key={e.id} className="hover">
-                                        <td>{startIdx + idx}</td>
-                                        <td>{e.nip}</td>
-                                        <td className="font-medium">{e.name}</td>
-                                        <td>
-                                            <div className="tooltip" data-tip="Lihat detail pegawai">
-                                                <Link
-                                                    to={`/employee/${e.id}`}
-                                                    className="btn btn-xs btn-info btn-soft border border-info rounded-lg"
-                                                >
-                                                    <Eye size={12} />
-                                                </Link>
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <span className="badge badge-sm text-white badge-error">
-                                                {formatStatusLabel(e.status)}
-                                            </span>
-                                        </td>
-                                        <td>{e.email}</td>
-                                        <td>{e.gender}</td>
-                                        <td>{e.regionalName || "-"}</td>
-                                        <td>{e.divisionName || "-"}</td>
-                                        <td>{e.unitName || "-"}</td>
-                                        <td>{e.jobName || "-"}</td>
-                                        <td>
-                                            {e.effectiveDate
-                                                ? new Date(e.effectiveDate)
-                                                      .toLocaleDateString("id-ID", {
-                                                          day: "2-digit",
-                                                          month: "short",
-                                                          year: "numeric",
-                                                      })
-                                                      .replace(/\./g, "")
-                                                      .replace(/(\b[a-z])/g, (x) => x.toUpperCase())
-                                                : "-"}
-                                        </td>
-                                    </tr>
-                                ))
+                                rows.map((e, idx) => {
+                                    const primaryRow = (
+                                        <tr key={`${e.id}-primary`} className="hover">
+                                            <td>{startIdx + idx}</td>
+                                            <td>{e.nip}</td>
+                                            <td className="font-medium">{e.name}</td>
+                                            <td>
+                                                <div className="tooltip" data-tip="Lihat detail pegawai">
+                                                    <Link
+                                                        to={`/employee/${e.id}`}
+                                                        className="btn btn-xs btn-info btn-soft border border-info rounded-lg"
+                                                    >
+                                                        <Eye size={12} />
+                                                    </Link>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <span className="badge badge-sm text-white badge-error">
+                                                    {formatStatusLabel(e.status)}
+                                                </span>
+                                            </td>
+                                            <td>{e.email}</td>
+                                            <td>{e.gender}</td>
+                                            <td>
+                                                <span className="badge badge-primary badge-sm border-0 text-white">
+                                                    UTAMA
+                                                </span>
+                                            </td>
+                                            <td>{e.jobName || "-"}</td>
+                                            <td>{e.unitName || "-"}</td>
+                                            <td>{e.divisionName || "-"}</td>
+                                            <td>{e.regionalName || "-"}</td>
+                                            <td>
+                                                {e.effectiveDate
+                                                    ? new Date(e.effectiveDate)
+                                                          .toLocaleDateString("id-ID", {
+                                                              day: "2-digit",
+                                                              month: "short",
+                                                              year: "numeric",
+                                                          })
+                                                          .replace(/\./g, "")
+                                                          .replace(/(\b[a-z])/g, (x) => x.toUpperCase())
+                                                    : "-"}
+                                            </td>
+                                        </tr>
+                                    );
+
+                                    if (e.jobPositionId2) {
+                                        const secondaryRow = (
+                                            <tr key={`${e.id}-secondary`} className="hover bg-base-50">
+                                                <td colSpan={7} className="text-right border-r border-base-200" />
+                                                <td>
+                                                    <span className="badge badge-secondary badge-sm border-0 text-white">
+                                                        KEDUA
+                                                    </span>
+                                                </td>
+                                                <td>{e.jobName2 || "-"}</td>
+                                                <td>{e.unitName2 || "-"}</td>
+                                                <td>{e.divisionName2 || "-"}</td>
+                                                <td>{e.regionalName2 || "-"}</td>
+                                                <td>
+                                                    {e.effectiveDate2
+                                                        ? new Date(e.effectiveDate2)
+                                                              .toLocaleDateString("id-ID", {
+                                                                  day: "2-digit",
+                                                                  month: "short",
+                                                                  year: "numeric",
+                                                              })
+                                                              .replace(/\./g, "")
+                                                              .replace(/(\b[a-z])/g, (x) => x.toUpperCase())
+                                                        : "-"}
+                                                </td>
+                                            </tr>
+                                        );
+                                        return [primaryRow, secondaryRow];
+                                    }
+                                    return primaryRow;
+                                })
                             )}
                         </tbody>
                     </table>
