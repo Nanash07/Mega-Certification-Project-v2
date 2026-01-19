@@ -1,7 +1,3 @@
-// =============================================================================
-// Reusable Action Button Component
-// =============================================================================
-
 import { Eye, Pencil, Trash2, Upload, Download, RotateCw, Plus, History } from "lucide-react";
 
 const VARIANTS = {
@@ -15,16 +11,6 @@ const VARIANTS = {
     history: { Icon: History, cls: "btn-accent", tip: "Histori" },
 };
 
-/**
- * ActionButton - Small icon button for table actions
- *
- * @param {Object} props
- * @param {"view"|"edit"|"delete"|"upload"|"download"|"refresh"|"add"|"history"} props.variant - Button variant
- * @param {Function} props.onClick - Click handler
- * @param {string} [props.tooltip] - Custom tooltip text
- * @param {boolean} [props.disabled=false] - Disabled state
- * @param {string} [props.size="xs"] - Button size
- */
 export default function ActionButton({ variant, onClick, tooltip, disabled = false, size = "xs" }) {
     const config = VARIANTS[variant];
     if (!config) return null;
@@ -46,9 +32,6 @@ export default function ActionButton({ variant, onClick, tooltip, disabled = fal
     );
 }
 
-/**
- * ActionButtonGroup - Container for multiple action buttons
- */
 export function ActionButtonGroup({ children }) {
     return <div className="flex gap-2">{children}</div>;
 }

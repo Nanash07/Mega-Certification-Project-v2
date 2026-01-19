@@ -1,18 +1,3 @@
-// =============================================================================
-// Reusable Data Table Component
-// =============================================================================
-
-/**
- * DataTable - Table with loading and empty states
- *
- * @param {Object} props
- * @param {string[]} props.columns - Column headers
- * @param {Array} props.data - Data rows
- * @param {boolean} props.loading - Loading state
- * @param {string} [props.emptyMessage="Tidak ada data"] - Empty state message
- * @param {number} [props.startIdx=1] - Starting index for row numbers
- * @param {Function} props.renderRow - Function to render each row (row, index) => JSX
- */
 export default function DataTable({
     columns,
     data,

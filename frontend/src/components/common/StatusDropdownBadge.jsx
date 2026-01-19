@@ -1,23 +1,5 @@
-// src/components/common/StatusDropdownBadge.jsx
 import { useState, useRef, useEffect } from "react";
 import { ChevronDown } from "lucide-react";
-
-/**
- * Status badge dengan dropdown menu untuk mengubah status
- *
- * @example
- * const STATUS_OPTIONS = [
- *   { value: true, label: "Active", badgeClass: "badge-success", btnClass: "btn-success" },
- *   { value: false, label: "Nonactive", badgeClass: "badge-secondary", btnClass: "btn-secondary" },
- * ];
- *
- * <StatusDropdownBadge
- *   currentValue={row.isActive}
- *   options={STATUS_OPTIONS}
- *   onChange={(newValue) => handleChangeStatus(row, newValue)}
- *   disabled={!canEdit}
- * />
- */
 export default function StatusDropdownBadge({
     currentValue,
     options = [],

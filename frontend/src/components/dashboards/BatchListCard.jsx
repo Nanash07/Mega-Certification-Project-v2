@@ -45,9 +45,6 @@ function QuotaBar({ filled, quota, color = "blue" }) {
     );
 }
 
-/**
- * Komponen batch list reusable (data di-load sendiri)
- */
 export default function BatchListCard({ title, status, filters = {}, initialRows = 5 }) {
     const navigate = useNavigate();
 

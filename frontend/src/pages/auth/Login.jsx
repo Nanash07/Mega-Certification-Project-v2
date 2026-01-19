@@ -70,7 +70,7 @@ const Login = () => {
                     </div>
                     <h1 className="text-4xl font-bold text-gray-900 mb-4 tracking-tight">Mega Certification</h1>
                     <p className="text-gray-500 text-lg leading-relaxed max-w-md mx-auto">
-                        Sistem Manajemen Sertifikasi dan Data Pegawai Terpadu Bank Mega.
+                        Sistem Manajemen Sertifikasi Bank Mega.
                     </p>
                 </div>
             </div>

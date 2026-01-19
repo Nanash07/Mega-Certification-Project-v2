@@ -1,12 +1,3 @@
-// src/components/common/PageHeader.jsx
-/**
- * Reusable page header component with title, subtitle, and action buttons
- *
- * @example
- * <PageHeader title="Kelola User" subtitle="456 pengguna terdaftar">
- *   <button className="btn btn-sm btn-primary">Tambah User</button>
- * </PageHeader>
- */
 export default function PageHeader({ title, subtitle, children }) {
     return (
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">

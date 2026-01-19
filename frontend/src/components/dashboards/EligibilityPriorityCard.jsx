@@ -39,9 +39,6 @@ function getPriorityPath() {
     return "/employee/eligibility";
 }
 
-/**
- * Reusable card untuk list eligibility by status (NOT_YET_CERTIFIED / DUE / EXPIRED)
- */
 export default function EligibilityPriorityCard({
     title,
     status,

@@ -1,12 +1,3 @@
-// src/components/common/TableLoadingRow.jsx
-/**
- * Loading state row untuk table
- *
- * @example
- * <tbody>
- *   {loading ? <TableLoadingRow colSpan={10} /> : <DataRows />}
- * </tbody>
- */
 export default function TableLoadingRow({ colSpan = 10 }) {
     return (
         <tr>

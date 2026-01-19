@@ -1,22 +1,4 @@
-// src/components/common/TableCard.jsx
 import Pagination from "./Pagination";
-
-/**
- * Reusable table card container dengan pagination
- *
- * @example
- * <TableCard
- *   pagination={{
- *     page, totalPages, totalElements, rowsPerPage,
- *     onPageChange: setPage,
- *     onRowsPerPageChange: (v) => { setRowsPerPage(v); setPage(1); }
- *   }}
- *   showPagination={rows.length > 0}
- * >
- *   <thead>...</thead>
- *   <tbody>...</tbody>
- * </TableCard>
- */
 export default function TableCard({ children, pagination, showPagination = true }) {
     return (
         <div className="card bg-base-100 shadow-sm border border-gray-100 overflow-hidden">

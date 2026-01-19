@@ -35,14 +35,6 @@ const STATUS_LABELS = {
     ABSENT: "Tidak Hadir",
 };
 
-/**
- * StatusBadge - Displays a colored badge based on status
- *
- * @param {Object} props
- * @param {string} props.status - Status value
- * @param {string} [props.tooltip] - Custom tooltip text
- * @param {string} [props.size="sm"] - Badge size (sm, md, lg)
- */
 export default function StatusBadge({ status, tooltip, size = "sm" }) {
     if (!status) return <span>-</span>;
 
@@ -59,9 +51,6 @@ export default function StatusBadge({ status, tooltip, size = "sm" }) {
     );
 }
 
-/**
- * SourceBadge - Displays eligibility source badge
- */
 export function SourceBadge({ source }) {
     if (!source) return <span>-</span>;
 

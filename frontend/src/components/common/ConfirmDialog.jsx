@@ -1,20 +1,3 @@
-// =============================================================================
-// Reusable Confirm Dialog Component
-// =============================================================================
-
-/**
- * ConfirmDialog - Modal dialog for confirming destructive actions
- *
- * @param {Object} props
- * @param {boolean} props.open - Whether dialog is open
- * @param {string} props.title - Dialog title
- * @param {string} props.message - Dialog message
- * @param {Function} props.onConfirm - Callback when confirmed
- * @param {Function} props.onCancel - Callback when cancelled
- * @param {string} [props.confirmLabel="Hapus"] - Confirm button label
- * @param {string} [props.cancelLabel="Batal"] - Cancel button label
- * @param {string} [props.confirmClass="btn-error"] - Confirm button class
- */
 export default function ConfirmDialog({
     open,
     title = "Konfirmasi",

@@ -1,16 +1,4 @@
-// src/components/common/FilterCard.jsx
 import { Eraser } from "lucide-react";
-
-/**
- * Reusable filter card wrapper with clear filter button
- *
- * @example
- * <FilterCard onClear={handleClear} cols={4}>
- *   <FilterField label="Status">
- *     <Select ... />
- *   </FilterField>
- * </FilterCard>
- */
 export default function FilterCard({ children, onClear, cols = 6 }) {
     const gridColsClass = {
         2: "lg:grid-cols-2",
@@ -41,9 +29,6 @@ export default function FilterCard({ children, onClear, cols = 6 }) {
     );
 }
 
-/**
- * Filter field wrapper dengan label
- */
 export function FilterField({ label, icon: Icon, children }) {
     return (
         <div className="flex flex-col gap-1">
