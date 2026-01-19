@@ -394,6 +394,55 @@ public class EmployeeEligibilityService {
         syncWithCertifications(List.of(employee));
     }
 
+    @Transactional
+    public void refreshEligibilityForJobPosition(Long jobPositionId) {
+        if (jobPositionId == null)
+            return;
+
+        // Find all active employees that have this job position (primary or secondary)
+        List<Employee> employees = employeeRepo.findByDeletedAtIsNull().stream()
+                .filter(e -> !"RESIGN".equalsIgnoreCase(e.getStatus()))
+                .filter(e -> {
+                    EmployeePosition primary = e.getPrimaryPosition();
+                    EmployeePosition secondary = e.getSecondaryPosition();
+                    boolean matchPrimary = primary != null
+                            && primary.getJobPosition() != null
+                            && Objects.equals(primary.getJobPosition().getId(), jobPositionId);
+                    boolean matchSecondary = secondary != null
+                            && secondary.getJobPosition() != null
+                            && Objects.equals(secondary.getJobPosition().getId(), jobPositionId);
+                    return matchPrimary || matchSecondary;
+                })
+                .toList();
+
+        if (employees.isEmpty())
+            return;
+
+        // Refresh eligibility for each employee
+        Map<Long, List<CertificationRule>> jobRuleMap = jobCertMappingRepo.findWithRelationsByDeletedAtIsNull().stream()
+                .collect(Collectors.groupingBy(
+                        j -> j.getJobPosition().getId(),
+                        Collectors.mapping(JobCertificationMapping::getCertificationRule, Collectors.toList())));
+
+        Map<Long, List<CertificationRule>> exceptionRuleMap = exceptionRepo
+                .findWithRelationsByDeletedAtIsNullAndIsActiveTrue().stream()
+                .collect(Collectors.groupingBy(
+                        ex -> ex.getEmployee().getId(),
+                        Collectors.mapping(EmployeeEligibilityException::getCertificationRule, Collectors.toList())));
+
+        List<EmployeeEligibility> toSave = new ArrayList<>();
+        for (Employee employee : employees) {
+            List<EmployeeEligibility> existingElig = eligibilityRepo.findByEmployeeId(employee.getId());
+            toSave.addAll(syncEligibilitiesForEmployee(employee, existingElig, jobRuleMap, exceptionRuleMap));
+        }
+
+        if (!toSave.isEmpty()) {
+            eligibilityRepo.saveAll(toSave);
+        }
+
+        syncWithCertifications(employees);
+    }
+
     private boolean isResigned(Employee e) {
         if (e == null)
             return true;

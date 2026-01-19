@@ -10,6 +10,7 @@ import com.bankmega.certification.repository.JobCertificationMappingRepository;
 import com.bankmega.certification.repository.JobPositionRepository;
 import com.bankmega.certification.specification.JobCertificationMappingSpecification;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.*;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
@@ -19,6 +20,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class JobCertificationMappingService {
@@ -26,6 +28,7 @@ public class JobCertificationMappingService {
         private final JobCertificationMappingRepository mappingRepo;
         private final JobPositionRepository jobPositionRepo;
         private final CertificationRuleRepository ruleRepo;
+        private final EmployeeEligibilityService eligibilityService;
 
         // 🔹 Convert entity → DTO Response
         private JobCertificationMappingResponse toResponse(JobCertificationMapping m) {
@@ -106,7 +109,17 @@ public class JobCertificationMappingService {
                                 .updatedAt(Instant.now())
                                 .build();
 
-                return toResponse(mappingRepo.save(Objects.requireNonNull(mapping)));
+                JobCertificationMapping saved = mappingRepo.save(Objects.requireNonNull(mapping));
+
+                // Auto-refresh eligibility for employees with this job position
+                try {
+                        eligibilityService.refreshEligibilityForJobPosition(job.getId());
+                        log.info("Refreshed eligibility for jobPositionId={} after mapping created", job.getId());
+                } catch (Exception e) {
+                        log.warn("Failed to refresh eligibility for jobPositionId={}: {}", job.getId(), e.getMessage());
+                }
+
+                return toResponse(saved);
         }
 
         // 🔹 Update mapping
@@ -133,7 +146,19 @@ public class JobCertificationMappingService {
                 }
 
                 mapping.setUpdatedAt(Instant.now());
-                return toResponse(mappingRepo.save(mapping));
+                JobCertificationMapping saved = mappingRepo.save(mapping);
+
+                // Auto-refresh eligibility for employees with this job position
+                try {
+                        eligibilityService.refreshEligibilityForJobPosition(mapping.getJobPosition().getId());
+                        log.info("Refreshed eligibility for jobPositionId={} after mapping updated",
+                                        mapping.getJobPosition().getId());
+                } catch (Exception e) {
+                        log.warn("Failed to refresh eligibility for jobPositionId={}: {}",
+                                        mapping.getJobPosition().getId(), e.getMessage());
+                }
+
+                return toResponse(saved);
         }
 
         // 🔹 Toggle aktif/nonaktif
@@ -145,7 +170,19 @@ public class JobCertificationMappingService {
                 mapping.setIsActive(!mapping.getIsActive());
                 mapping.setUpdatedAt(Instant.now());
 
-                return toResponse(mappingRepo.save(mapping));
+                JobCertificationMapping saved = mappingRepo.save(mapping);
+
+                // Auto-refresh eligibility for employees with this job position
+                try {
+                        eligibilityService.refreshEligibilityForJobPosition(mapping.getJobPosition().getId());
+                        log.info("Refreshed eligibility for jobPositionId={} after mapping toggled",
+                                        mapping.getJobPosition().getId());
+                } catch (Exception e) {
+                        log.warn("Failed to refresh eligibility for jobPositionId={}: {}",
+                                        mapping.getJobPosition().getId(), e.getMessage());
+                }
+
+                return toResponse(saved);
         }
 
         // 🔹 Soft delete mapping
@@ -158,7 +195,16 @@ public class JobCertificationMappingService {
                 mapping.setDeletedAt(Instant.now());
                 mapping.setUpdatedAt(Instant.now());
 
+                Long jobPosId = mapping.getJobPosition().getId();
                 mappingRepo.save(mapping);
+
+                // Auto-refresh eligibility for employees with this job position
+                try {
+                        eligibilityService.refreshEligibilityForJobPosition(jobPosId);
+                        log.info("Refreshed eligibility for jobPositionId={} after mapping deleted", jobPosId);
+                } catch (Exception e) {
+                        log.warn("Failed to refresh eligibility for jobPositionId={}: {}", jobPosId, e.getMessage());
+                }
         }
 
         // 🔹 Ambil semua mapping aktif untuk 1 jabatan

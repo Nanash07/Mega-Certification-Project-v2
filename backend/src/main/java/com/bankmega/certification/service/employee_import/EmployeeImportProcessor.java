@@ -280,7 +280,9 @@ public class EmployeeImportProcessor {
                     continue;
                 }
 
-                boolean mutasi = placementChanged(existing, regional, division, unit, job);
+                boolean primaryChanged = primaryPlacementChanged(existing, regional, division, unit, job);
+                boolean secondaryChanged = secondaryPlacementChanged(existing, regional2, division2, unit2, job2);
+                boolean mutasi = primaryChanged || secondaryChanged;
                 boolean changedProfile = profileChanged(existing, r.name, r.email, r.gender);
 
                 if (mutasi) {
@@ -482,7 +484,7 @@ public class EmployeeImportProcessor {
                 || !Objects.equals(emp.getGender(), gender);
     }
 
-    private boolean placementChanged(Employee e, Regional r, Division d, Unit u, JobPosition j) {
+    private boolean primaryPlacementChanged(Employee e, Regional r, Division d, Unit u, JobPosition j) {
         EmployeePosition primary = e.getPrimaryPosition();
         if (primary == null)
             return true; // Treat as changed if missing primary
@@ -491,6 +493,28 @@ public class EmployeeImportProcessor {
                 || !sameEntity(primary.getDivision(), d)
                 || !sameEntity(primary.getUnit(), u)
                 || !sameEntity(primary.getJobPosition(), j);
+    }
+
+    private boolean secondaryPlacementChanged(Employee e, Regional r2, Division d2, Unit u2, JobPosition j2) {
+        EmployeePosition secondary = e.getSecondaryPosition();
+
+        // If no secondary before and no secondary now -> no change
+        if (secondary == null && j2 == null)
+            return false;
+
+        // If secondary exists but now removed -> changed
+        if (secondary != null && j2 == null)
+            return true;
+
+        // If no secondary before but now adding -> changed
+        if (secondary == null && j2 != null)
+            return true;
+
+        // Both exist, check fields
+        return !sameEntity(secondary.getRegional(), r2)
+                || !sameEntity(secondary.getDivision(), d2)
+                || !sameEntity(secondary.getUnit(), u2)
+                || !sameEntity(secondary.getJobPosition(), j2);
     }
 
     private boolean sameEntity(Object a, Object b) {

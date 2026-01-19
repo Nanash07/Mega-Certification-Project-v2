@@ -104,15 +104,18 @@ public class BatchSpecification {
 
             Join<Object, Object> eb = root.join("participants", JoinType.LEFT);
             Join<Object, Object> e = eb.join("employee", JoinType.LEFT);
+            Join<Object, Object> positions = e.join("positions", JoinType.LEFT);
 
-            var predicates = cb.conjunction();
+            var predicates = cb.and(
+                    cb.equal(positions.get("isActive"), true),
+                    cb.isNull(positions.get("deletedAt")));
 
             if (regionalId != null)
-                predicates = cb.and(predicates, cb.equal(e.get("regional").get("id"), regionalId));
+                predicates = cb.and(predicates, cb.equal(positions.get("regional").get("id"), regionalId));
             if (divisionId != null)
-                predicates = cb.and(predicates, cb.equal(e.get("division").get("id"), divisionId));
+                predicates = cb.and(predicates, cb.equal(positions.get("division").get("id"), divisionId));
             if (unitId != null)
-                predicates = cb.and(predicates, cb.equal(e.get("unit").get("id"), unitId));
+                predicates = cb.and(predicates, cb.equal(positions.get("unit").get("id"), unitId));
 
             return cb.or(cb.isNull(e.get("id")), predicates);
         };

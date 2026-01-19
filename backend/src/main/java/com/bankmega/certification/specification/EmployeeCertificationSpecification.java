@@ -18,10 +18,12 @@ public class EmployeeCertificationSpecification {
         return (root, query, cb) -> {
             if (query != null && query.getResultType() != Long.class && query.getResultType() != long.class) {
                 var empFetch = root.fetch("employee", JoinType.LEFT);
-                empFetch.fetch("jobPosition", JoinType.LEFT);
-                empFetch.fetch("regional", JoinType.LEFT);
-                empFetch.fetch("division", JoinType.LEFT);
-                empFetch.fetch("unit", JoinType.LEFT);
+                // Fetch positions subgraph instead of legacy fields
+                var posFetch = empFetch.fetch("positions", JoinType.LEFT);
+                posFetch.fetch("jobPosition", JoinType.LEFT);
+                posFetch.fetch("regional", JoinType.LEFT);
+                posFetch.fetch("division", JoinType.LEFT);
+                posFetch.fetch("unit", JoinType.LEFT);
 
                 var ruleFetch = root.fetch("certificationRule", JoinType.LEFT);
                 ruleFetch.fetch("certification", JoinType.LEFT);

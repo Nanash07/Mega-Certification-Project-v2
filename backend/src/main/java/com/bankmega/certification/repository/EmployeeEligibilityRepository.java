@@ -25,7 +25,8 @@ public interface EmployeeEligibilityRepository
 
         List<EmployeeEligibility> findByCertificationRule_IdAndIsActiveTrueAndDeletedAtIsNull(Long certRuleId);
 
-        @EntityGraph(attributePaths = { "employee", "employee.jobPosition", "certificationRule",
+        @EntityGraph(attributePaths = { "employee", "employee.positions", "employee.positions.jobPosition",
+                        "certificationRule",
                         "certificationRule.certification" })
         List<EmployeeEligibility> findWithRelationsByCertificationRule_IdAndIsActiveTrueAndDeletedAtIsNull(
                         Long certRuleId);
@@ -65,10 +66,11 @@ public interface EmployeeEligibilityRepository
         @Override
         @EntityGraph(attributePaths = {
                         "employee",
-                        "employee.jobPosition",
-                        "employee.regional",
-                        "employee.division",
-                        "employee.unit",
+                        "employee.positions",
+                        "employee.positions.jobPosition",
+                        "employee.positions.regional",
+                        "employee.positions.division",
+                        "employee.positions.unit",
                         "certificationRule",
                         "certificationRule.certification",
                         "certificationRule.certificationLevel",
@@ -81,10 +83,11 @@ public interface EmployeeEligibilityRepository
         @Override
         @EntityGraph(attributePaths = {
                         "employee",
-                        "employee.jobPosition",
-                        "employee.regional",
-                        "employee.division",
-                        "employee.unit",
+                        "employee.positions",
+                        "employee.positions.jobPosition",
+                        "employee.positions.regional",
+                        "employee.positions.division",
+                        "employee.positions.unit",
                         "certificationRule",
                         "certificationRule.certification",
                         "certificationRule.certificationLevel",
