@@ -262,11 +262,11 @@ export default function EmployeeDetailPage() {
                             <p className="text-sm">Belum ada sertifikasi</p>
                         </div>
                     ) : (
-                        <div className="divide-y divide-gray-100">
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 p-4">
                             {certifications.map((c) => (
                                 <div
                                     key={c.id}
-                                    className="p-4 hover:bg-base-200/30 transition-colors"
+                                    className="p-4 hover:bg-base-200/30 transition-colors border-2 border-gray-200 rounded-lg"
                                 >
                                     <div className="flex gap-4">
                                         {/* Thumbnail */}
