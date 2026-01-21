@@ -1,8 +1,10 @@
 import { useState, useMemo } from "react";
 import Select from "react-select";
 import toast from "react-hot-toast";
-import { X, Save, UserPlus, Mail, Lock, Shield, CheckCircle, User } from "lucide-react";
+import { X, Save, UserPlus, Mail, Lock, Shield, CheckCircle, User, Eye, EyeOff } from "lucide-react";
 import { createUser } from "../../services/userService";
+import { validatePassword } from "../../utils/passwordUtils";
+import PasswordRequirements from "../common/PasswordRequirements";
 
 export default function CreateUserModal({ open, onClose, roles, onSaved }) {
     const [form, setForm] = useState({
@@ -13,6 +15,7 @@ export default function CreateUserModal({ open, onClose, roles, onSaved }) {
         isActive: true,
     });
     const [loading, setLoading] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
 
     const selectStyles = useMemo(
         () => ({
@@ -52,11 +55,19 @@ export default function CreateUserModal({ open, onClose, roles, onSaved }) {
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
+        // Validasi password
+        const { isValid, errors } = validatePassword(form.password);
+        if (!isValid) {
+            toast.error(`Password tidak memenuhi syarat: ${errors.join(", ")}`);
+            setLoading(false);
+            return;
+        }
+
         try {
             await createUser(form);
             toast.success("User berhasil dibuat");
             onSaved();
-            onClose(); 
+            onClose();  
         } catch (err) {
             toast.error(err?.response?.data?.message ?? "Gagal membuat user");
         } finally {
@@ -130,15 +141,25 @@ export default function CreateUserModal({ open, onClose, roles, onSaved }) {
                             <label className="font-medium text-gray-600 flex items-center gap-1">
                                 <Lock size={14} /> Password
                             </label>
-                            <input
-                                type="password"
-                                name="password"
-                                className="input input-bordered input-sm w-full rounded-lg"
-                                value={form.password}
-                                onChange={handleChange}
-                                placeholder="Password"
-                                required
-                            />
+                            <div className="relative">
+                                <input
+                                    type={showPassword ? "text" : "password"}
+                                    name="password"
+                                    className="input input-bordered input-sm w-full rounded-lg pr-8"
+                                    value={form.password}
+                                    onChange={handleChange}
+                                    placeholder="Password"
+                                    required
+                                />
+                                <button
+                                    type="button"
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors z-10"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                >
+                                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                                </button>
+                            </div>
+                                <PasswordRequirements password={form.password} show={form.password.length > 0} />
                         </div>
 
                         {/* Role */}

@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { fetchPicScopes } from "../../services/picScopeService";
 import ManageScopeModal from "../../components/pic/ManageScopeModal";
-import { Target, Settings } from "lucide-react";
+import { Target, Settings, ArrowLeft } from "lucide-react";
 
 export default function PicCertificationScopePage() {
+    const navigate = useNavigate();
     const [scopes, setScopes] = useState([]);
     const [loading, setLoading] = useState(false);
     const [manageUser, setManageUser] = useState(null);
@@ -30,9 +32,17 @@ export default function PicCertificationScopePage() {
         <div className="space-y-4 w-full">
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                <div>
-                    <h1 className="text-lg sm:text-xl font-bold">Kelola PIC Scope</h1>
-                    <p className="text-xs text-gray-500">{scopes.length} PIC terdaftar</p>
+                <div className="flex items-center gap-3">
+                    <button
+                        className="btn btn-sm btn-ghost btn-circle"
+                        onClick={() => navigate(-1)}
+                    >
+                        <ArrowLeft size={16} />
+                    </button>
+                    <div>
+                        <h2 className="text-lg sm:text-xl font-bold">Kelola PIC Scope</h2>
+                        <p className="text-xs text-gray-500">{scopes.length} PIC terdaftar</p>
+                    </div>
                 </div>
             </div>
 
@@ -78,10 +88,10 @@ export default function PicCertificationScopePage() {
                                         </td>
                                         <td>
                                             <button
-                                                className="btn btn-xs btn-info btn-soft border border-info rounded-lg flex gap-1"
+                                                className="btn btn-sm btn-info btn-soft border border-info rounded-lg flex gap-1 whitespace-nowrap"
                                                 onClick={() => setManageUser(s)}
                                             >
-                                                <Settings size={12} />
+                                                <Settings size={14} />
                                                 Kelola Scope
                                             </button>
                                         </td>

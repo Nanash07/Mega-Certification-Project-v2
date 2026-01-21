@@ -24,6 +24,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.bankmega.certification.util.PasswordValidator;
+
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -109,7 +111,8 @@ public class UserService {
         }
 
         Pageable sorted = pageable.getSort().isUnsorted()
-                ? PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), Sort.by(Sort.Order.asc("username")))
+                ? PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(),
+                        Sort.by(Sort.Direction.DESC, "updatedAt"))
                 : pageable;
 
         // Saran: tambahkan @EntityGraph(attributePaths = {"role", "employee"}) di
@@ -167,6 +170,11 @@ public class UserService {
                 ? req.getPassword()
                 : username;
 
+        // Validasi password hanya jika user memberikan password eksplisit
+        if (req.getPassword() != null && !req.getPassword().isBlank()) {
+            PasswordValidator.validate(rawPassword);
+        }
+
         User user = User.builder()
                 .username(username)
                 .email(trimToNull(req.getEmail())) // boleh null & duplikat
@@ -223,6 +231,8 @@ public class UserService {
 
         // password
         if (req.getPassword() != null && !req.getPassword().isBlank()) {
+            // Validasi password dengan aturan keamanan
+            PasswordValidator.validate(req.getPassword());
             user.setPassword(BCrypt.hashpw(req.getPassword(), BCrypt.gensalt()));
             user.setIsFirstLogin(true);
             changed = true;

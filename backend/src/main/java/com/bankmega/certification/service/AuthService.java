@@ -16,6 +16,8 @@ import org.springframework.security.crypto.bcrypt.BCrypt;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.bankmega.certification.util.PasswordValidator;
+
 import java.time.Instant;
 
 @Slf4j
@@ -88,9 +90,8 @@ public class AuthService {
         if (req.getNewPassword() == null || req.getNewPassword().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Password baru wajib diisi");
         }
-        if (req.getNewPassword().length() < 6) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Password baru minimal 6 karakter");
-        }
+        // Validasi password dengan aturan keamanan
+        PasswordValidator.validate(req.getNewPassword());
 
         passwordResetService.resetPassword(req.getToken(), req.getNewPassword());
     }
@@ -104,9 +105,8 @@ public class AuthService {
         if (req.getNewPassword() == null || req.getNewPassword().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Password baru wajib diisi");
         }
-        if (req.getNewPassword().length() < 6) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Password baru minimal 6 karakter");
-        }
+        // Validasi password dengan aturan keamanan
+        PasswordValidator.validate(req.getNewPassword());
 
         User user = userRepository.findByUsernameAndDeletedAtIsNull(req.getUsername())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "User tidak ditemukan"));

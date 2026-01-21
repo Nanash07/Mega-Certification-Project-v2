@@ -16,6 +16,8 @@ import org.springframework.security.crypto.bcrypt.BCrypt;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.bankmega.certification.util.PasswordValidator;
+
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -125,9 +127,8 @@ public class PasswordResetService {
         if (newPassword == null || newPassword.isBlank()) {
             throw new ConflictException("Password baru wajib diisi");
         }
-        if (newPassword.length() < 6) {
-            throw new ConflictException("Password baru minimal 6 karakter");
-        }
+        // Validasi password dengan aturan keamanan
+        PasswordValidator.validate(newPassword);
 
         PasswordResetToken tokenEntity = tokenRepo.findByToken(token.trim())
                 .orElseThrow(() -> new ConflictException("Token reset password tidak valid"));

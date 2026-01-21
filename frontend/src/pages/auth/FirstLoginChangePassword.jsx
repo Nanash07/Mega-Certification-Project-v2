@@ -3,6 +3,8 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Lock, Eye, EyeOff, ShieldCheck, Loader2 } from "lucide-react";
 import { changePasswordFirstLogin } from "../../services/authService";
+import { validatePassword } from "../../utils/passwordUtils";
+import PasswordRequirements from "../../components/common/PasswordRequirements";
 
 const currentYear = new Date().getFullYear();
 
@@ -56,6 +58,13 @@ const FirstLoginChangePassword = () => {
 
         if (newPassword.length < 6) {
             setError("Password baru minimal 6 karakter.");
+            return;
+        }
+
+        // Validasi password dengan aturan keamanan
+        const { isValid, errors } = validatePassword(newPassword);
+        if (!isValid) {
+            setError(`Password tidak memenuhi syarat: ${errors.join(", ")}`);
             return;
         }
 
@@ -126,11 +135,12 @@ const FirstLoginChangePassword = () => {
                                 <button
                                     type="button"
                                     onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 transition-colors"
+                                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 transition-colors z-10"
                                 >
                                     {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                                 </button>
                             </div>
+                            <PasswordRequirements password={newPassword} show={newPassword.length > 0} />
                         </div>
 
                          {/* CONFIRM PASSWORD FIELD */}

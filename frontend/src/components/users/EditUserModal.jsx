@@ -2,8 +2,10 @@
 import { useEffect, useState, useMemo } from "react";
 import Select from "react-select";
 import toast from "react-hot-toast";
-import { X, Save, Pencil, User, Mail, Lock, Shield, CheckCircle } from "lucide-react";
+import { X, Save, Pencil, User, Mail, Lock, Shield, CheckCircle, Eye, EyeOff } from "lucide-react";
 import { updateUser } from "../../services/userService";
+import { validatePassword } from "../../utils/passwordUtils";
+import PasswordRequirements from "../common/PasswordRequirements";
 
 export default function EditUserModal({ open, onClose, roles, initial, onSaved }) {
     const [form, setForm] = useState({
@@ -14,6 +16,7 @@ export default function EditUserModal({ open, onClose, roles, initial, onSaved }
         isActive: true,
     });
     const [loading, setLoading] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
 
     const selectStyles = useMemo(
         () => ({
@@ -65,6 +68,16 @@ export default function EditUserModal({ open, onClose, roles, initial, onSaved }
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
+        // Validasi password jika diisi
+        if (form.password) {
+            const { isValid, errors } = validatePassword(form.password);
+            if (!isValid) {
+                toast.error(`Password tidak memenuhi syarat: ${errors.join(", ")}`);
+                setLoading(false);
+                return;
+            }
+        }
+
         try {
             await updateUser(initial.id, form);
             toast.success("User berhasil diperbarui");
@@ -143,14 +156,24 @@ export default function EditUserModal({ open, onClose, roles, initial, onSaved }
                             <label className="font-medium text-gray-600 flex items-center gap-1">
                                 <Lock size={14} /> Password
                             </label>
-                            <input
-                                type="password"
-                                name="password"
-                                className="input input-bordered input-sm w-full rounded-lg"
-                                value={form.password}
-                                onChange={handleChange}
-                                placeholder="Kosongkan jika tidak diubah"
-                            />
+                            <div className="relative">
+                                <input
+                                    type={showPassword ? "text" : "password"}
+                                    name="password"
+                                    className="input input-bordered input-sm w-full rounded-lg pr-8"
+                                    value={form.password}
+                                    onChange={handleChange}
+                                    placeholder="Kosongkan jika tidak diubah"
+                                />
+                                <button
+                                    type="button"
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors z-10"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                >
+                                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                                </button>
+                            </div>
+                                <PasswordRequirements password={form.password} show={!!form.password} />
                         </div>
 
                         {/* Role */}

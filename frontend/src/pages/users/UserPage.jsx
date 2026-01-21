@@ -113,6 +113,15 @@ export default function UserPage() {
         };
     }
 
+    function getRoleBadgeClass(roleName) {
+        if (!roleName) return "badge-ghost";
+        const n = roleName.toUpperCase();
+        if (n.includes("SUPERADMIN")) return "badge-primary";
+        if (n.includes("PIC")) return "badge-info";
+        if (n.includes("PEGAWAI")) return "badge-secondary";
+        return "badge-accent";
+    }
+
     function renderStatusBadge(row) {
         const { label, badgeCls } = getStatusStyle(row.isActive);
         const targetPrivileged = isPrivilegedRole(row.roleName);
@@ -352,7 +361,9 @@ export default function UserPage() {
                                             <td>{u.employeeNip || "-"}</td>
                                             <td>{renderStatusBadge(u)}</td>
                                             <td>
-                                                <span className="badge badge-sm badge-ghost">{u.roleName || "-"}</span>
+                                                <span className={`badge badge-sm ${getRoleBadgeClass(u.roleName)} text-white`}>
+                                                    {u.roleName || "-"}
+                                                </span>
                                             </td>
                                             <td className="text-gray-500">
                                                 {u.updatedAt
