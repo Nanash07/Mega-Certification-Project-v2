@@ -14,25 +14,29 @@ import java.util.Optional;
 @Repository
 public interface EmployeePositionRepository extends JpaRepository<EmployeePosition, Long> {
 
-    List<EmployeePosition> findByEmployeeIdAndDeletedAtIsNull(Long employeeId);
+        List<EmployeePosition> findByEmployeeIdAndDeletedAtIsNull(Long employeeId);
 
-    Optional<EmployeePosition> findByEmployeeIdAndPositionTypeAndDeletedAtIsNull(Long employeeId, PositionType type);
+        // Optimized: Batch load positions for multiple employees
+        List<EmployeePosition> findByEmployeeIdInAndDeletedAtIsNull(Collection<Long> employeeIds);
 
-    @Query("SELECT ep FROM EmployeePosition ep " +
-            "LEFT JOIN FETCH ep.regional " +
-            "LEFT JOIN FETCH ep.division " +
-            "LEFT JOIN FETCH ep.unit " +
-            "LEFT JOIN FETCH ep.jobPosition " +
-            "WHERE ep.employee.id IN :employeeIds AND ep.deletedAt IS NULL")
-    List<EmployeePosition> findWithRelationsByEmployeeIds(@Param("employeeIds") Collection<Long> ids);
+        Optional<EmployeePosition> findByEmployeeIdAndPositionTypeAndDeletedAtIsNull(Long employeeId,
+                        PositionType type);
 
-    @Query("SELECT ep FROM EmployeePosition ep " +
-            "LEFT JOIN FETCH ep.regional " +
-            "LEFT JOIN FETCH ep.division " +
-            "LEFT JOIN FETCH ep.unit " +
-            "LEFT JOIN FETCH ep.jobPosition " +
-            "WHERE ep.employee.id = :employeeId AND ep.deletedAt IS NULL")
-    List<EmployeePosition> findWithRelationsByEmployeeId(@Param("employeeId") Long employeeId);
+        @Query("SELECT ep FROM EmployeePosition ep " +
+                        "LEFT JOIN FETCH ep.regional " +
+                        "LEFT JOIN FETCH ep.division " +
+                        "LEFT JOIN FETCH ep.unit " +
+                        "LEFT JOIN FETCH ep.jobPosition " +
+                        "WHERE ep.employee.id IN :employeeIds AND ep.deletedAt IS NULL")
+        List<EmployeePosition> findWithRelationsByEmployeeIds(@Param("employeeIds") Collection<Long> ids);
 
-    void deleteByEmployeeId(Long employeeId);
+        @Query("SELECT ep FROM EmployeePosition ep " +
+                        "LEFT JOIN FETCH ep.regional " +
+                        "LEFT JOIN FETCH ep.division " +
+                        "LEFT JOIN FETCH ep.unit " +
+                        "LEFT JOIN FETCH ep.jobPosition " +
+                        "WHERE ep.employee.id = :employeeId AND ep.deletedAt IS NULL")
+        List<EmployeePosition> findWithRelationsByEmployeeId(@Param("employeeId") Long employeeId);
+
+        void deleteByEmployeeId(Long employeeId);
 }

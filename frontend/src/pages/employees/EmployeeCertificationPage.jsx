@@ -96,7 +96,6 @@ export default function EmployeeCertificationPage() {
             page: page - 1,
             size: rowsPerPage,
             employeeIds: filterEmployee ? [filterEmployee.value] : [],
-            employeeIds: filterEmployee ? [filterEmployee.value] : [],
             certCodes: filterCertCode ? [filterCertCode.value] : [],
             levels: filterLevel ? [filterLevel.value] : [],
             subCodes: filterSubField ? [filterSubField.value] : [],

@@ -19,7 +19,7 @@ import { fetchMyPicScope } from "../../services/picScopeService";
 import CreateCertificationRuleModal from "../../components/certification-rules/CreateCertificationRuleModal";
 import EditCertificationRuleModal from "../../components/certification-rules/EditCertificationRuleModal";
 
-const TABLE_COLS = 11;
+const TABLE_COLS = 10;
 
 export default function CertificationRulePage() {
     const navigate = useNavigate();
@@ -313,7 +313,6 @@ export default function CertificationRulePage() {
                                 <th>Sub Bidang</th>
                                 <th>Masa Berlaku</th>
                                 <th>Reminder</th>
-                                <th>Refreshment</th>
                                 <th>Wajib Setelah Masuk</th>
                                 <th className="w-28">Status</th>
                                 <th>Updated At</th>
@@ -364,7 +363,6 @@ export default function CertificationRulePage() {
                                         <td>{r.subFieldCode || "-"}</td>
                                         <td>{r.validityMonths} bulan</td>
                                         <td>{r.reminderMonths} bulan</td>
-                                        <td>{r.refreshmentTypeName || "-"}</td>
                                         <td>{r.wajibSetelahMasuk != null ? `${r.wajibSetelahMasuk} bulan` : "-"}</td>
                                         <td>{renderStatusBadge(r)}</td>
                                         <td className="text-gray-500">{formatDateTime(r.updatedAt)}</td>

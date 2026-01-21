@@ -44,7 +44,7 @@ export default function EditCertificationLevelModal({ open, initial, onClose, on
 
     return (
         <dialog className="modal modal-open" open={open}>
-            <div className="modal-box max-w-lg bg-base-100 shadow-2xl border border-gray-100 rounded-2xl">
+            <div className="modal-box max-w-lg">
                 {/* Header */}
                 <div className="flex items-center justify-between pb-4 border-b border-gray-100">
                     <div className="flex items-center gap-3">
@@ -91,7 +91,7 @@ export default function EditCertificationLevelModal({ open, initial, onClose, on
                                 value={form.name}
                                 onChange={(e) => setField("name", e.target.value)}
                                 required
-                                placeholder="Contoh: Jenjang 4"
+                                placeholder="Jenjang 4"
                             />
                         </div>
                     </form>
@@ -101,7 +101,7 @@ export default function EditCertificationLevelModal({ open, initial, onClose, on
                 <div className="flex justify-end gap-2 pt-4 border-t border-gray-100">
                     <button
                         type="button"
-                        className="btn btn-sm btn-ghost rounded-lg"
+                        className="btn btn-sm btn-ghost rounded-lg border border-gray-200"
                         onClick={onClose}
                         disabled={submitting}
                     >
@@ -119,7 +119,7 @@ export default function EditCertificationLevelModal({ open, initial, onClose, on
                 </div>
             </div>
 
-            <form method="dialog" className="modal-backdrop bg-black/50">
+            <form method="dialog" className="modal-backdrop">
                 <button onClick={onClose}>close</button>
             </form>
         </dialog>

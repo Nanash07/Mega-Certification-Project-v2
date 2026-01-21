@@ -434,10 +434,6 @@ public class BatchService {
                 .subFieldCode(rule != null && rule.getSubField() != null ? rule.getSubField().getCode() : null)
                 .validityMonths(rule != null ? rule.getValidityMonths() : null)
                 .reminderMonths(rule != null ? rule.getReminderMonths() : null)
-                .refreshmentTypeId(
-                        rule != null && rule.getRefreshmentType() != null ? rule.getRefreshmentType().getId() : null)
-                .refreshmentTypeName(
-                        rule != null && rule.getRefreshmentType() != null ? rule.getRefreshmentType().getName() : null)
                 .wajibSetelahMasuk(rule != null ? rule.getWajibSetelahMasuk() : null)
                 .isActiveRule(rule != null ? rule.getIsActive() : null)
                 .institutionId(b.getInstitution() != null ? b.getInstitution().getId() : null)

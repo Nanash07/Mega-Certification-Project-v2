@@ -152,7 +152,7 @@ public class EmployeeEligibilityExceptionService {
 
         private Sort defaultSort() {
                 return Sort.by(
-                                Sort.Order.asc("employee.jobPosition.name"),
+                                Sort.Order.asc("employee.nip"),
                                 Sort.Order.asc("certificationRule.certification.code"),
                                 Sort.Order.asc("certificationRule.certificationLevel.level"),
                                 Sort.Order.asc("certificationRule.subField.code"));

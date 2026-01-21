@@ -61,7 +61,6 @@ public class EmployeeCertificationHistory {
     // 🔹 Status & proses
     @Enumerated(EnumType.STRING)
     private EmployeeCertification.Status status;
-    private String processType;
 
     // 🔹 Action info
     @Enumerated(EnumType.STRING)

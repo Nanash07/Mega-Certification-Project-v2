@@ -45,7 +45,6 @@ public class CertificationRuleHistory {
     private Integer validityMonths;
     private Integer reminderMonths;
     private Integer wajibSetelahMasuk;
-    private String refreshmentTypeName;
 
     private Boolean isActive;
 

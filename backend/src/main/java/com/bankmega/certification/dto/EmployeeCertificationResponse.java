@@ -47,7 +47,6 @@ public class EmployeeCertificationResponse {
     private String fileType;
 
     private EmployeeCertification.Status status;
-    private EmployeeCertification.ProcessType processType;
 
     // 🔹 Audit
     private Instant createdAt;

@@ -42,7 +42,7 @@ public class CertificationRuleHistorySpecification {
                     cb.like(cb.lower(root.get("certificationLevelName")), like),
                     cb.like(cb.lower(root.get("subFieldName")), like),
                     cb.like(cb.lower(root.get("subFieldCode")), like),
-                    cb.like(cb.lower(root.get("refreshmentTypeName")), like),
+
                     cb.like(cb.lower(cb.function("CAST", String.class, root.get("certificationLevelLevel"))), like));
         };
     }

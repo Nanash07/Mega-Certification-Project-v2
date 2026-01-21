@@ -64,7 +64,8 @@ public interface EmployeeCertificationRepository extends
         @Override
         @EntityGraph(attributePaths = {
                         "employee",
-                        "employee.jobPosition",
+                        "employee.positions",
+                        "employee.positions.jobPosition",
                         "certificationRule",
                         "certificationRule.certification",
                         "certificationRule.certificationLevel",
@@ -78,7 +79,8 @@ public interface EmployeeCertificationRepository extends
         @Override
         @EntityGraph(attributePaths = {
                         "employee",
-                        "employee.jobPosition",
+                        "employee.positions",
+                        "employee.positions.jobPosition",
                         "certificationRule",
                         "certificationRule.certification",
                         "certificationRule.certificationLevel",

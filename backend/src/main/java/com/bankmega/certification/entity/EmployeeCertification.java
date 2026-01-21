@@ -77,10 +77,6 @@ public class EmployeeCertification {
     @Column(length = 30, nullable = false)
     private Status status;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "process_type", length = 30)
-    private ProcessType processType;
-
     // 🔹 Audit fields
     @CreatedDate
     @Column(name = "created_at", updatable = false, nullable = false)
@@ -100,12 +96,5 @@ public class EmployeeCertification {
         DUE,
         EXPIRED,
         INVALID
-    }
-
-    public enum ProcessType {
-        SERTIFIKASI,
-        REFRESHMENT,
-        TRAINING,
-        EXTENSION
     }
 }

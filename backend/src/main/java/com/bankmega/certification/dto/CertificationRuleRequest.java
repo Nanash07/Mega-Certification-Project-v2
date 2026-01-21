@@ -22,7 +22,6 @@ public class CertificationRuleRequest {
     @NotNull
     private Integer reminderMonths;
 
-    private Long refreshmentTypeId;
     private Integer wajibSetelahMasuk;
 
     private Boolean isActive;

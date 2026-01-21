@@ -10,6 +10,7 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.header.writers.XXssProtectionHeaderWriter;
 
 @Configuration
 @EnableMethodSecurity
@@ -25,6 +26,11 @@ public class SecurityConfig {
                 // cors handled by CorsFilterConfig (global)
                 .cors(cors -> {
                 })
+                // Configure headers - allow iframe for file preview
+                .headers(headers -> headers
+                        .frameOptions(frameOptions -> frameOptions.sameOrigin())
+                        .xssProtection(
+                                xss -> xss.headerValue(XXssProtectionHeaderWriter.HeaderValue.ENABLED_MODE_BLOCK)))
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         // preflight MUST pass
@@ -32,6 +38,10 @@ public class SecurityConfig {
 
                         // auth endpoints public
                         .requestMatchers("/api/auth/**").permitAll()
+
+                        // employee certifications file endpoint public (for preview)
+                        .requestMatchers(HttpMethod.GET, "/api/employee-certifications/{id}/file").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/employee-certifications/*/file").permitAll()
 
                         // roles
                         .requestMatchers(HttpMethod.GET, "/api/roles/**").hasAnyRole("SUPERADMIN", "PIC")
@@ -44,9 +54,6 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/certifications").hasRole("SUPERADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/certifications/**").hasRole("SUPERADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/certifications/**").hasRole("SUPERADMIN")
-
-                        // employee certifications file endpoint public
-                        .requestMatchers(HttpMethod.GET, "/api/employee-certifications/*/file").permitAll()
 
                         .requestMatchers(HttpMethod.POST, "/api/employee-certifications/**")
                         .hasAnyRole("SUPERADMIN", "PIC")

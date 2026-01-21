@@ -130,7 +130,7 @@ export default function ImportEmployeeModal({ open, onClose, onImported }) {
                 {/* Actions */}
                 <div className="modal-action">
                     <button
-                        className="btn btn-error btn-soft"
+                        className="btn btn-sm btn-ghost rounded-lg border border-gray-200"
                         onClick={handleClose}
                         disabled={loading} // 🚫 disable tombol batal
                     >

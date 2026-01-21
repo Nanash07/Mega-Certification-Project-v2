@@ -42,10 +42,6 @@ public class CertificationRule {
     @Column(name = "reminder_months")
     private Integer reminderMonths;
 
-    @ManyToOne
-    @JoinColumn(name = "refreshment_type_id")
-    private RefreshmentType refreshmentType;
-
     @Column(name = "wajib_setelah_masuk")
     private Integer wajibSetelahMasuk; // dalam bulan
 

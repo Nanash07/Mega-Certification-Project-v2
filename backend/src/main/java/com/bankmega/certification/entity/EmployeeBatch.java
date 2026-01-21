@@ -11,7 +11,12 @@ import java.time.Instant;
 import java.time.LocalDate;
 
 @Entity
-@Table(name = "employee_batches", uniqueConstraints = @UniqueConstraint(columnNames = { "batch_id", "employee_id" }))
+@Table(name = "employee_batches", uniqueConstraints = @UniqueConstraint(columnNames = { "batch_id",
+        "employee_id" }), indexes = {
+                @Index(name = "idx_emp_batch_batch_deleted", columnList = "batch_id, deleted_at"),
+                @Index(name = "idx_emp_batch_employee_deleted", columnList = "employee_id, deleted_at"),
+                @Index(name = "idx_emp_batch_status", columnList = "status")
+        })
 @Getter
 @Setter
 @NoArgsConstructor

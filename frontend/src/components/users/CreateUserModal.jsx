@@ -74,7 +74,7 @@ export default function CreateUserModal({ open, onClose, roles, onSaved }) {
 
     return (
         <dialog className="modal modal-open" open={open}>
-            <div className="modal-box max-w-2xl bg-base-100 shadow-2xl border border-gray-100 rounded-2xl">
+            <div className="modal-box max-w-2xl bg-base-100 shadow-2xl rounded-2xl">
                 {/* Header */}
                 <div className="flex items-center justify-between pb-4 border-b border-gray-100">
                     <div className="flex items-center gap-3">
@@ -177,7 +177,7 @@ export default function CreateUserModal({ open, onClose, roles, onSaved }) {
                 <div className="flex justify-end gap-2 pt-4 border-t border-gray-100">
                     <button
                         type="button"
-                        className="btn btn-sm btn-ghost rounded-lg"
+                        className="btn btn-sm btn-ghost rounded-lg border border-gray-200"
                         onClick={onClose}
                         disabled={loading}
                     >

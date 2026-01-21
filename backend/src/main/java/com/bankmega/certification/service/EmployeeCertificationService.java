@@ -90,7 +90,6 @@ public class EmployeeCertificationService {
                 .fileName(ec.getFileName())
                 .fileType(ec.getFileType())
                 .status(ec.getStatus())
-                .processType(ec.getProcessType())
                 .createdAt(ec.getCreatedAt())
                 .updatedAt(ec.getUpdatedAt())
                 .deletedAt(ec.getDeletedAt())
@@ -186,7 +185,6 @@ public class EmployeeCertificationService {
     private boolean hasChanged(EmployeeCertification ec, EmployeeCertificationRequest req) {
         return !Objects.equals(ec.getCertNumber(), req.getCertNumber()) ||
                 !Objects.equals(ec.getCertDate(), req.getCertDate()) ||
-                !Objects.equals(ec.getProcessType(), req.getProcessType()) ||
                 (req.getInstitutionId() != null &&
                         (ec.getInstitution() == null ||
                                 !Objects.equals(ec.getInstitution().getId(), req.getInstitutionId())))
@@ -223,9 +221,7 @@ public class EmployeeCertificationService {
     }
 
     private void maybeResetCounters(EmployeeCertification ec) {
-        if (ec != null
-                && ec.getProcessType() == EmployeeCertification.ProcessType.SERTIFIKASI
-                && ec.getCertDate() != null) {
+        if (ec != null && ec.getCertDate() != null) {
             resetCountersFor(ec.getEmployee().getId(), ec.getCertificationRule().getId());
         }
     }
@@ -270,9 +266,6 @@ public class EmployeeCertificationService {
                 .institution(institution)
                 .certNumber(req.getCertNumber())
                 .certDate(req.getCertDate())
-                .processType(req.getProcessType() != null
-                        ? req.getProcessType()
-                        : EmployeeCertification.ProcessType.SERTIFIKASI)
                 .jobPositionTitle(getJobTitle(employee))
                 .ruleValidityMonths(rule.getValidityMonths())
                 .ruleReminderMonths(rule.getReminderMonths())
@@ -323,9 +316,6 @@ public class EmployeeCertificationService {
 
         ec.setCertNumber(req.getCertNumber());
         ec.setCertDate(req.getCertDate());
-        if (req.getProcessType() != null) {
-            ec.setProcessType(req.getProcessType());
-        }
 
         if (ec.getJobPositionTitle() == null || ec.getJobPositionTitle().isBlank()) {
             ec.setJobPositionTitle(getJobTitle(ec.getEmployee()));

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import Select from "react-select";
-import { X, Pencil, Award, Building2, FileText, Calendar, Tag, Save, User } from "lucide-react";
+import { X, Pencil, Award, Building2, FileText, Calendar, Save, User } from "lucide-react";
 import { updateCertification } from "../../services/employeeCertificationService";
 import { fetchCertificationRules } from "../../services/certificationRuleService";
 import { fetchInstitutions } from "../../services/institutionService";
@@ -50,7 +50,6 @@ export default function EditCertificationModal({ open, data, onClose, onSaved })
                 institutionId: data.institutionId,
                 certNumber: data.certNumber,
                 certDate: data.certDate ? data.certDate.split("T")[0] : "",
-                processType: data.processType || "SERTIFIKASI",
             });
 
             Promise.all([fetchCertificationRules(), fetchInstitutions()])
@@ -93,7 +92,7 @@ export default function EditCertificationModal({ open, data, onClose, onSaved })
 
     return (
         <dialog className="modal modal-open" open={open}>
-            <div className="modal-box max-w-3xl bg-base-100 shadow-2xl border border-gray-100 rounded-2xl">
+            <div className="modal-box max-w-3xl">
                 {/* Header */}
                 <div className="flex items-center justify-between pb-4 border-b border-gray-100">
                     <div className="flex items-center gap-3">
@@ -187,27 +186,11 @@ export default function EditCertificationModal({ open, data, onClose, onSaved })
                             className="input input-bordered input-sm w-full rounded-lg"
                         />
                     </div>
-
-                    {/* Jenis Proses */}
-                    <div className="flex flex-col gap-1">
-                        <label className="font-medium text-gray-600 flex items-center gap-1">
-                            <Tag size={14} /> Jenis Proses
-                        </label>
-                        <select
-                            value={form.processType || "SERTIFIKASI"}
-                            onChange={(e) => setForm({ ...form, processType: e.target.value })}
-                            className="select select-bordered select-sm w-full rounded-lg"
-                        >
-                            <option value="SERTIFIKASI">Sertifikasi</option>
-                            <option value="REFRESHMENT">Refreshment</option>
-                            <option value="TRAINING">Training</option>
-                        </select>
-                    </div>
                 </div>
 
                 {/* Footer */}
                 <div className="flex justify-end gap-2 pt-4 border-t border-gray-100">
-                    <button className="btn btn-sm btn-ghost rounded-lg" onClick={onClose} disabled={saving}>
+                    <button className="btn btn-sm btn-ghost rounded-lg border border-gray-200" onClick={onClose} disabled={saving}>
                         Batal
                     </button>
                     <button className="btn btn-sm btn-primary rounded-lg gap-1" onClick={handleSave} disabled={saving}>
@@ -221,7 +204,7 @@ export default function EditCertificationModal({ open, data, onClose, onSaved })
                 </div>
             </div>
 
-            <form method="dialog" className="modal-backdrop bg-black/50">
+            <form method="dialog" className="modal-backdrop">
                 <button onClick={onClose}>close</button>
             </form>
         </dialog>

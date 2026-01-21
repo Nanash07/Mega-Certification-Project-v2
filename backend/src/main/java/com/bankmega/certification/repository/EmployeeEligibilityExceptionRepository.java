@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 public interface EmployeeEligibilityExceptionRepository
                 extends JpaRepository<EmployeeEligibilityException, Long>,
@@ -23,6 +24,11 @@ public interface EmployeeEligibilityExceptionRepository
 
         @EntityGraph(attributePaths = { "employee", "certificationRule" })
         List<EmployeeEligibilityException> findWithRelationsByDeletedAtIsNullAndIsActiveTrue();
+
+        // Optimized: Query exceptions for specific employees with relations
+        @EntityGraph(attributePaths = { "employee", "certificationRule" })
+        List<EmployeeEligibilityException> findWithRelationsByEmployeeIdInAndIsActiveTrueAndDeletedAtIsNull(
+                        Set<Long> employeeIds);
 
         Optional<EmployeeEligibilityException> findFirstByEmployeeIdAndCertificationRuleId(
                         Long employeeId, Long certificationRuleId);

@@ -68,9 +68,8 @@ public class EmployeeCertificationHistoryService {
                                 .fileName(ec.getFileName())
                                 .fileType(ec.getFileType())
 
-                                // 🔹 Status & process
+                                // 🔹 Status
                                 .status(ec.getStatus())
-                                .processType(ec.getProcessType().name())
 
                                 // 🔹 Action
                                 .actionType(actionType)
@@ -148,7 +147,7 @@ public class EmployeeCertificationHistoryService {
                                 .fileName(h.getFileName())
                                 .fileType(h.getFileType())
                                 .status(h.getStatus())
-                                .processType(h.getProcessType())
+
                                 .actionType(h.getActionType())
                                 .actionAt(h.getActionAt())
                                 .build();

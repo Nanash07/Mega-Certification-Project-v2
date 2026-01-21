@@ -233,7 +233,7 @@ export default function CreateExceptionModal({ open, onClose, onSaved, picCertCo
 
                 {/* Actions */}
                 <div className="modal-action mt-4 flex justify-end gap-2">
-                    <button className="btn btn-sm" onClick={onClose}>
+                    <button className="btn btn-sm btn-ghost rounded-lg border border-gray-200" onClick={onClose}>
                         Batal
                     </button>
                     <button className="btn btn-primary btn-sm" onClick={onSubmit}>

@@ -312,7 +312,8 @@ public class EmployeeEligibilityService {
 
     @Transactional
     public int refreshEligibility() {
-        List<Employee> employees = employeeRepo.findAll();
+        // Optimized: Use EntityGraph to load employees with positions in single query
+        List<Employee> employees = employeeRepo.findWithRelationsByDeletedAtIsNull();
         if (employees.isEmpty())
             return 0;
 
@@ -361,7 +362,8 @@ public class EmployeeEligibilityService {
 
     @Transactional
     public void refreshEligibilityForEmployee(Long employeeId) {
-        Employee employee = employeeRepo.findById(java.util.Objects.requireNonNull(employeeId))
+        // Optimized: Use EntityGraph to load employee with positions in single query
+        Employee employee = employeeRepo.findByIdWithPositions(java.util.Objects.requireNonNull(employeeId))
                 .orElseThrow(() -> new RuntimeException("Employee not found"));
 
         if (isResigned(employee)) {
@@ -399,9 +401,9 @@ public class EmployeeEligibilityService {
         if (jobPositionId == null)
             return;
 
-        // Find all active employees that have this job position (primary or secondary)
-        List<Employee> employees = employeeRepo.findByDeletedAtIsNull().stream()
-                .filter(e -> !"RESIGN".equalsIgnoreCase(e.getStatus()))
+        // Optimized: Use EntityGraph to load employees with positions in single query
+        List<Employee> employees = employeeRepo.findWithRelationsByStatusIgnoreCaseNotAndDeletedAtIsNull("RESIGN")
+                .stream()
                 .filter(e -> {
                     EmployeePosition primary = e.getPrimaryPosition();
                     EmployeePosition secondary = e.getSecondaryPosition();

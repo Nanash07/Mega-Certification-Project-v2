@@ -182,7 +182,7 @@ export default function EditJobCertificationMappingModal({ open, onClose, onSave
                 <div className="flex justify-end gap-2 pt-4 border-t border-gray-100">
                     <button
                         type="button"
-                        className="btn btn-sm btn-ghost rounded-lg"
+                        className="btn btn-sm btn-ghost rounded-lg border border-gray-200"
                         onClick={onClose}
                         disabled={submitting}
                     >

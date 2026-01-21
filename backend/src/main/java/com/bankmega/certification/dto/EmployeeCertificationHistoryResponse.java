@@ -48,7 +48,6 @@ public class EmployeeCertificationHistoryResponse {
 
     // 🔹 Status & process
     private EmployeeCertification.Status status;
-    private String processType;
 
     // 🔹 Action log
     private EmployeeCertificationHistory.ActionType actionType;

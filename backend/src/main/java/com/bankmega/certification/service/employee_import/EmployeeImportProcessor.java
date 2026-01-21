@@ -146,7 +146,8 @@ public class EmployeeImportProcessor {
             return plan;
 
         if (strictGuard) {
-            int activeNow = empRepo.findByDeletedAtIsNull().size();
+            // Optimized: Use count query instead of loading all entities
+            long activeNow = empRepo.countByDeletedAtIsNull();
             if (!dryRun && rows.size() < Math.max(50, (int) (activeNow * 0.6))) {
                 throw new IllegalStateException("Import terdeteksi bukan full snapshot ("
                         + rows.size() + " < 60% dari aktif: " + activeNow + "). "
@@ -384,31 +385,53 @@ public class EmployeeImportProcessor {
             }
         }
 
+        // Optimized: Use lightweight query to get all non-deleted employees for resign
+        // check
         List<Employee> allNonDeleted = empRepo.findByDeletedAtIsNull();
-        for (Employee e : allNonDeleted) {
-            if (!importedNips.contains(e.getNip())) {
-                if (!"RESIGN".equalsIgnoreCase(e.getStatus())) {
-                    if (!dryRun) {
-                        e.setStatus("RESIGN");
-                        e.setUpdatedAt(Instant.now());
-                        // Deactivate positions? logic needs to handle this.
-                        // Ideally EmployeeService.resign handles it, but here we do batch or direct
-                        // save.
-                        // We should probably deactivate positions here too or call service.
-                        // But since this is a processor, direct repo manipulation is common for batch.
-                        // Let's update positions to inactive.
-                        List<EmployeePosition> positions = positionRepo.findByEmployeeIdAndDeletedAtIsNull(e.getId());
-                        positions.forEach(p -> {
-                            p.setIsActive(false);
-                            p.setUpdatedAt(Instant.now());
-                        });
-                        positionRepo.saveAll(positions);
 
-                        historyService.snapshot(e, EmployeeHistory.EmployeeActionType.RESIGN, LocalDate.now());
-                    }
-                    plan.resignedEmployees.add(e);
-                    plan.resigned++;
+        // First pass: identify resignees
+        List<Employee> resignCandidates = new ArrayList<>();
+        for (Employee e : allNonDeleted) {
+            if (!importedNips.contains(e.getNip()) && !"RESIGN".equalsIgnoreCase(e.getStatus())) {
+                resignCandidates.add(e);
+            }
+        }
+
+        if (!resignCandidates.isEmpty() && !dryRun) {
+            // Optimized: Batch load all positions for resign candidates
+            Set<Long> resignIds = resignCandidates.stream().map(Employee::getId).collect(Collectors.toSet());
+            Map<Long, List<EmployeePosition>> positionsByEmpId = positionRepo
+                    .findByEmployeeIdInAndDeletedAtIsNull(resignIds)
+                    .stream().collect(Collectors.groupingBy(p -> p.getEmployee().getId()));
+
+            List<EmployeePosition> allPositionsToSave = new ArrayList<>();
+            Instant now = Instant.now();
+
+            for (Employee e : resignCandidates) {
+                e.setStatus("RESIGN");
+                e.setUpdatedAt(now);
+
+                List<EmployeePosition> positions = positionsByEmpId.getOrDefault(e.getId(), List.of());
+                for (EmployeePosition p : positions) {
+                    p.setIsActive(false);
+                    p.setUpdatedAt(now);
+                    allPositionsToSave.add(p);
                 }
+
+                historyService.snapshot(e, EmployeeHistory.EmployeeActionType.RESIGN, LocalDate.now());
+                plan.resignedEmployees.add(e);
+                plan.resigned++;
+            }
+
+            // Batch save all positions
+            if (!allPositionsToSave.isEmpty()) {
+                positionRepo.saveAll(allPositionsToSave);
+            }
+        } else {
+            // Dry run - just count
+            for (Employee e : resignCandidates) {
+                plan.resignedEmployees.add(e);
+                plan.resigned++;
             }
         }
 

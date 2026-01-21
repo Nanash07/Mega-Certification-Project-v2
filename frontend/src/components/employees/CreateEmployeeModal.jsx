@@ -148,7 +148,7 @@ export default function CreateEmployeeModal({ open, onClose, onSaved }) {
           <div className="modal-action">
             <button
               type="button"
-              className="btn"
+              className="btn btn-sm btn-ghost rounded-lg border border-gray-200"
               onClick={onClose}
               disabled={submitting}
             >

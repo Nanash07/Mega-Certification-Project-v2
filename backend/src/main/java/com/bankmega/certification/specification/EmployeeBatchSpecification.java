@@ -1,7 +1,6 @@
 package com.bankmega.certification.specification;
 
 import com.bankmega.certification.entity.EmployeeBatch;
-import jakarta.persistence.criteria.Fetch;
 import jakarta.persistence.criteria.Join;
 import jakarta.persistence.criteria.JoinType;
 import org.springframework.data.jpa.domain.Specification;
@@ -85,21 +84,6 @@ public class EmployeeBatchSpecification {
         };
     }
 
-    // Fetch join supaya gak N+1; skip untuk count query
-    public static Specification<EmployeeBatch> withOrgFetch() {
-        return (root, query, cb) -> {
-            if (query != null && query.getResultType() != Long.class && query.getResultType() != long.class) {
-                Fetch<Object, Object> emp = root.fetch("employee", JoinType.LEFT);
-                // Fetch positions subgraph instead of legacy fields
-                var posFetch = emp.fetch("positions", JoinType.LEFT);
-                posFetch.fetch("jobPosition", JoinType.LEFT);
-                posFetch.fetch("division", JoinType.LEFT);
-                posFetch.fetch("regional", JoinType.LEFT);
-                posFetch.fetch("unit", JoinType.LEFT);
-                root.fetch("batch", JoinType.LEFT);
-                query.distinct(true);
-            }
-            return cb.conjunction();
-        };
-    }
+    // Note: withOrgFetch() removed - eager fetching now handled by @EntityGraph in
+    // EmployeeBatchRepository
 }

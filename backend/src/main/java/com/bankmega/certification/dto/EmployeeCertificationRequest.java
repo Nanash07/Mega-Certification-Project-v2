@@ -1,6 +1,5 @@
 package com.bankmega.certification.dto;
 
-import com.bankmega.certification.entity.EmployeeCertification;
 import lombok.*;
 
 import java.time.LocalDate;
@@ -21,8 +20,6 @@ public class EmployeeCertificationRequest {
     private LocalDate validFrom;
     private LocalDate validUntil;
     private String fileUrl;
-
-    private EmployeeCertification.ProcessType processType;
 
     private String notes;
 }

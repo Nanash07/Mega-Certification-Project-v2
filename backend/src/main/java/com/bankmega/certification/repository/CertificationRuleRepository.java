@@ -14,10 +14,10 @@ import java.util.Optional;
 public interface CertificationRuleRepository
                 extends JpaRepository<CertificationRule, Long>, JpaSpecificationExecutor<CertificationRule> {
 
-        @EntityGraph(attributePaths = { "certification", "certificationLevel", "subField", "refreshmentType" })
+        @EntityGraph(attributePaths = { "certification", "certificationLevel", "subField" })
         List<CertificationRule> findWithRelationsByDeletedAtIsNull();
 
-        @EntityGraph(attributePaths = { "certification", "certificationLevel", "subField", "refreshmentType" })
+        @EntityGraph(attributePaths = { "certification", "certificationLevel", "subField" })
         List<CertificationRule> findWithRelationsByIsActiveTrueAndDeletedAtIsNull();
 
         // 🔹 Ambil semua rule yang belum soft-delete

@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, User, Briefcase, Award, History, CheckCircle, FileImage } from "lucide-react";
 
 import { getEmployeeDetail } from "../../services/employeeService";
 import { fetchCertifications } from "../../services/employeeCertificationService";
@@ -12,6 +12,12 @@ import { fetchEligibilityByEmployee } from "../../services/employeeEligibilitySe
 import ViewEmployeeCertificationModal from "../../components/employee-certifications/ViewEmployeeCertificationModal";
 import UploadCertificationModal from "../../components/employee-certifications/UploadEmployeeCertificationModal";
 import EditCertificationModal from "../../components/employee-certifications/EditEmployeeCertificationModal";
+
+const TABS = [
+    { id: "certifications", label: "Sertifikasi", icon: Award },
+    { id: "history", label: "Riwayat Jabatan", icon: History },
+    { id: "eligibility", label: "Eligibility", icon: CheckCircle },
+];
 
 export default function EmployeeDetailPage() {
     const { id } = useParams();
@@ -23,7 +29,7 @@ export default function EmployeeDetailPage() {
     const [eligibilities, setEligibilities] = useState([]);
 
     const [loading, setLoading] = useState(true);
-    const [tab, setTab] = useState("certifications"); // certifications | history | eligibility
+    const [tab, setTab] = useState("certifications");
 
     const [viewData, setViewData] = useState(null);
     const [uploadData, setUploadData] = useState(null);
@@ -71,193 +77,228 @@ export default function EmployeeDetailPage() {
 
     if (loading) {
         return (
-            <div className="flex justify-center items-center h-64">
-                <span className="loading loading-dots loading-lg" />
+            <div className="flex justify-center py-16">
+                <span className="loading loading-dots loading-lg text-primary" />
             </div>
         );
     }
 
     if (!employee) {
         return (
-            <div className="text-center text-gray-500 p-10">
-                Data pegawai tidak ditemukan
-                <div className="mt-3">
-                    <button className="btn btn-accent btn-sm" onClick={() => navigate(-1)}>
-                        Kembali
-                    </button>
-                </div>
+            <div className="flex flex-col items-center justify-center py-16 text-gray-400">
+                <User size={48} className="mb-3 opacity-30" />
+                <p className="text-sm">Data pegawai tidak ditemukan</p>
+                <button className="btn btn-sm btn-accent mt-4" onClick={() => navigate(-1)}>
+                    Kembali
+                </button>
             </div>
         );
     }
 
     return (
-        <div className="space-y-6">
-            {/* Tombol Back */}
-            <div>
-                <button className="btn btn-sm btn-accent mb-2 flex items-center gap-2" onClick={() => navigate(-1)}>
-                    <ArrowLeft size={16} />
-                    Kembali
-                </button>
+        <div className="space-y-4 w-full">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div className="flex items-center gap-3">
+                    <button className="btn btn-sm btn-ghost btn-circle" onClick={() => navigate(-1)}>
+                        <ArrowLeft size={16} />
+                    </button>
+                    <div>
+                        <h1 className="text-lg sm:text-xl font-bold">{employee.name}</h1>
+                        <p className="text-xs text-gray-500">NIP: {employee.nip}</p>
+                    </div>
+                </div>
+                <span
+                    className={`badge text-white ${
+                        employee.status === "ACTIVE"
+                            ? "badge-success"
+                            : employee.status === "RESIGN"
+                            ? "badge-neutral"
+                            : "badge-error"
+                    }`}
+                >
+                    {employee.status || "-"}
+                </span>
             </div>
 
-            {/* Informasi Pribadi */}
-            <div className="card bg-base-100 shadow p-5">
-                <h2 className="font-bold text-xl mb-4">Informasi Pribadi</h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
-                    <div>
-                        <p className="text-gray-500">NIP</p>
-                        <p className="font-medium">{employee.nip}</p>
+            {/* Informasi Pribadi Card */}
+            <div className="card bg-base-100 shadow-sm border border-gray-100 overflow-hidden">
+                <div className="p-4 border-b border-gray-100 flex items-center gap-2">
+                    <User size={16} className="text-gray-500" />
+                    <h2 className="font-semibold text-sm">Informasi Pribadi</h2>
+                </div>
+                <div className="p-4">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 text-sm">
+                        <div>
+                            <p className="text-gray-400 text-xs mb-1">NIP</p>
+                            <p className="font-medium">{employee.nip}</p>
+                        </div>
+                        <div>
+                            <p className="text-gray-400 text-xs mb-1">Nama</p>
+                            <p className="font-medium">{employee.name}</p>
+                        </div>
+                        <div>
+                            <p className="text-gray-400 text-xs mb-1">Email</p>
+                            <p className="font-medium">{employee.email || "-"}</p>
+                        </div>
+                        <div>
+                            <p className="text-gray-400 text-xs mb-1">Jenis Kelamin</p>
+                            <p className="font-medium">{translateGender(employee.gender)}</p>
+                        </div>
+                        <div>
+                            <p className="text-gray-400 text-xs mb-1">Status</p>
+                            <span
+                                className={`badge badge-sm text-white ${
+                                    employee.status === "ACTIVE"
+                                        ? "badge-success"
+                                        : employee.status === "RESIGN"
+                                        ? "badge-neutral"
+                                        : "badge-error"
+                                }`}
+                            >
+                                {employee.status || "-"}
+                            </span>
+                        </div>
                     </div>
-                    <div>
-                        <p className="text-gray-500">Nama</p>
-                        <p className="font-medium">{employee.name}</p>
+                </div>
+            </div>
+
+            {/* Informasi Jabatan Card */}
+            <div className="card bg-base-100 shadow-sm border border-gray-100 overflow-hidden">
+                <div className="p-4 border-b border-gray-100 flex items-center gap-2">
+                    <Briefcase size={16} className="text-gray-500" />
+                    <h2 className="font-semibold text-sm">Posisi & Jabatan</h2>
+                </div>
+                <div className="divide-y divide-gray-100">
+                    {/* Jabatan Utama */}
+                    <div className="p-4">
+                        <div className="flex items-center gap-2 mb-3">
+                            <span className="badge badge-sm badge-primary text-white">UTAMA</span>
+                            <span className="font-semibold">{employee.jobName || "-"}</span>
+                        </div>
+                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
+                            <div className="bg-base-200/50 rounded-lg p-3">
+                                <p className="text-gray-400 text-xs mb-1">Unit</p>
+                                <p className="font-medium">{employee.unitName || "-"}</p>
+                            </div>
+                            <div className="bg-base-200/50 rounded-lg p-3">
+                                <p className="text-gray-400 text-xs mb-1">Divisi</p>
+                                <p className="font-medium">{employee.divisionName || "-"}</p>
+                            </div>
+                            <div className="bg-base-200/50 rounded-lg p-3">
+                                <p className="text-gray-400 text-xs mb-1">Regional</p>
+                                <p className="font-medium">{employee.regionalName || "-"}</p>
+                            </div>
+                            <div className="bg-base-200/50 rounded-lg p-3">
+                                <p className="text-gray-400 text-xs mb-1">Tanggal SK</p>
+                                <p className="font-medium">{formatDate(employee.effectiveDate)}</p>
+                            </div>
+                        </div>
                     </div>
-                    <div>
-                        <p className="text-gray-500">Email</p>
-                        <p className="font-medium">{employee.email || "-"}</p>
-                    </div>
-                    <div>
-                        <p className="text-gray-500">Jenis Kelamin</p>
-                        <p className="font-medium">{translateGender(employee.gender)}</p>
-                    </div>
-                    <div>
-                        <p className="text-gray-500">Status</p>
-                        <span
-                            className={`badge badge-sm text-white ${
-                                employee.status === "ACTIVE"
-                                    ? "badge-success"
-                                    : employee.status === "RESIGN"
-                                    ? "badge-neutral"
-                                    : "badge-error"
+
+                    {/* Jabatan Kedua (Optional) */}
+                    {employee.jobPositionId2 && (
+                        <div className="p-4">
+                            <div className="flex items-center gap-2 mb-3">
+                                <span className="badge badge-sm badge-secondary text-white">KEDUA</span>
+                                <span className="font-semibold">{employee.jobName2 || "-"}</span>
+                            </div>
+                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
+                                <div className="bg-base-200/50 rounded-lg p-3">
+                                    <p className="text-gray-400 text-xs mb-1">Unit</p>
+                                    <p className="font-medium">{employee.unitName2 || "-"}</p>
+                                </div>
+                                <div className="bg-base-200/50 rounded-lg p-3">
+                                    <p className="text-gray-400 text-xs mb-1">Divisi</p>
+                                    <p className="font-medium">{employee.divisionName2 || "-"}</p>
+                                </div>
+                                <div className="bg-base-200/50 rounded-lg p-3">
+                                    <p className="text-gray-400 text-xs mb-1">Regional</p>
+                                    <p className="font-medium">{employee.regionalName2 || "-"}</p>
+                                </div>
+                                <div className="bg-base-200/50 rounded-lg p-3">
+                                    <p className="text-gray-400 text-xs mb-1">Tanggal SK</p>
+                                    <p className="font-medium">{formatDate(employee.effectiveDate2)}</p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* Tabs - Pill Style */}
+            <div className="flex flex-wrap gap-2">
+                {TABS.map((t) => {
+                    const Icon = t.icon;
+                    const count = t.id === "certifications" ? certifications.length 
+                                : t.id === "history" ? histories.length 
+                                : eligibilities.length;
+                    return (
+                        <button
+                            key={t.id}
+                            className={`btn btn-sm rounded-full transition-all gap-2 ${
+                                tab === t.id
+                                    ? "btn-primary shadow-md"
+                                    : "btn-ghost border border-gray-200 hover:border-primary/50"
                             }`}
+                            onClick={() => setTab(t.id)}
                         >
-                            {employee.status || "-"}
-                        </span>
-                    </div>
-                </div>
-            </div>
-
-            {/* Informasi Jabatan */}
-            <div className="card bg-base-100 shadow p-5">
-                <h2 className="font-bold text-xl mb-4">Posisi & Jabatan</h2>
-                
-                {/* Jabatan Utama */}
-                <div className="p-4 rounded-lg bg-base-50 border-l-4 border-primary mb-4">
-                    <h3 className="font-semibold mb-3 flex items-center gap-2 text-lg">
-                        <span className="badge badge-primary badge-sm border-0 text-white">UTAMA</span>
-                        {employee.jobName || "-"}
-                    </h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
-                        <div>
-                            <p className="text-gray-500 text-xs uppercase tracking-wide">Unit</p>
-                            <p className="font-medium">{employee.unitName || "-"}</p>
-                        </div>
-                        <div>
-                            <p className="text-gray-500 text-xs uppercase tracking-wide">Divisi</p>
-                            <p className="font-medium">{employee.divisionName || "-"}</p>
-                        </div>
-                        <div>
-                            <p className="text-gray-500 text-xs uppercase tracking-wide">Regional</p>
-                            <p className="font-medium">{employee.regionalName || "-"}</p>
-                        </div>
-                        <div>
-                            <p className="text-gray-500 text-xs uppercase tracking-wide">Tanggal SK</p>
-                            <p className="font-medium">{formatDate(employee.effectiveDate)}</p>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Jabatan Kedua (Optional) */}
-                {employee.jobPositionId2 && (
-                    <div className="p-4 rounded-lg bg-base-50 border-l-4 border-secondary">
-                        <h3 className="font-semibold mb-3 flex items-center gap-2 text-lg">
-                            <span className="badge badge-secondary badge-sm border-0 text-white">KEDUA</span>
-                            {employee.jobName2 || "-"}
-                        </h3>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
-                            <div>
-                                <p className="text-gray-500 text-xs uppercase tracking-wide">Unit</p>
-                                <p className="font-medium">{employee.unitName2 || "-"}</p>
-                            </div>
-                            <div>
-                                <p className="text-gray-500 text-xs uppercase tracking-wide">Divisi</p>
-                                <p className="font-medium">{employee.divisionName2 || "-"}</p>
-                            </div>
-                            <div>
-                                <p className="text-gray-500 text-xs uppercase tracking-wide">Regional</p>
-                                <p className="font-medium">{employee.regionalName2 || "-"}</p>
-                            </div>
-                            <div>
-                                <p className="text-gray-500 text-xs uppercase tracking-wide">Tanggal SK</p>
-                                <p className="font-medium">{formatDate(employee.effectiveDate2)}</p>
-                            </div>
-                        </div>
-                    </div>
-                )}
-            </div>
-
-            {/* Tabs */}
-            <div className="tabs tabs-border w-fit">
-                <button
-                    className={`tab ${tab === "certifications" ? "tab-active" : ""}`}
-                    onClick={() => setTab("certifications")}
-                >
-                    Sertifikasi
-                </button>
-                <button className={`tab ${tab === "history" ? "tab-active" : ""}`} onClick={() => setTab("history")}>
-                    Riwayat Jabatan
-                </button>
-                <button
-                    className={`tab ${tab === "eligibility" ? "tab-active" : ""}`}
-                    onClick={() => setTab("eligibility")}
-                >
-                    Eligibility
-                </button>
+                            <Icon size={14} />
+                            {t.label}
+                            <span className={`badge badge-xs ${tab === t.id ? "badge-ghost" : "badge-primary"}`}>
+                                {count}
+                            </span>
+                        </button>
+                    );
+                })}
             </div>
 
             {/* ===== TAB: CERTIFICATIONS ===== */}
             {tab === "certifications" && (
-                <div className="card bg-base-100 shadow p-5">
-                    <h2 className="font-bold text-lg mb-4">Sertifikasi</h2>
+                <div className="card bg-base-100 shadow-sm border border-gray-100 overflow-hidden">
                     {certifications.length === 0 ? (
-                        <p className="text-gray-400 text-sm">Belum ada sertifikasi</p>
+                        <div className="flex flex-col items-center justify-center py-16 text-gray-400">
+                            <Award size={48} className="mb-3 opacity-30" />
+                            <p className="text-sm">Belum ada sertifikasi</p>
+                        </div>
                     ) : (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div className="divide-y divide-gray-100">
                             {certifications.map((c) => (
-                                <div key={c.id} className="card bg-slate-50 shadow">
-                                    {c.fileUrl && (
-                                        <figure className="h-40 bg-base-300 flex items-center justify-center">
-                                            <img
-                                                src={`/api/employee-certifications/${c.id}/file`}
-                                                alt={c.certificationName}
-                                                className="h-full w-full object-cover rounded"
-                                            />
-                                        </figure>
-                                    )}
-                                    <div className="card-body p-4">
-                                        <h3 className="font-semibold text-base">{c.certificationName}</h3>
-                                        <p className="text-xs text-gray-500">{c.certificationCode}</p>
-                                        <p className="text-xs text-gray-400 italic">
-                                            Jabatan saat menerima: {c.jobPositionTitle || "-"}
-                                        </p>
-
-                                        <div className="mt-2 text-sm space-y-1">
-                                            <p>
-                                                <strong>No:</strong> {c.certNumber || "-"}
-                                            </p>
-                                            <p>
-                                                <strong>Tanggal:</strong> {formatDate(c.certDate)}
-                                            </p>
-                                            <p>
-                                                <strong>Exp:</strong> {formatDate(c.validUntil)}
-                                            </p>
-                                            <p>
-                                                <strong>Lembaga:</strong> {c.institutionName || "-"}
-                                            </p>
-                                            <p>
-                                                <strong>Status:</strong>{" "}
+                                <div
+                                    key={c.id}
+                                    className="p-4 hover:bg-base-200/30 transition-colors"
+                                >
+                                    <div className="flex gap-4">
+                                        {/* Thumbnail */}
+                                        <div className="w-20 h-20 sm:w-24 sm:h-24 bg-base-200 rounded-lg overflow-hidden flex-shrink-0 flex items-center justify-center">
+                                            {c.fileUrl ? (
+                                                <img
+                                                    src={`/api/employee-certifications/${c.id}/file`}
+                                                    alt={c.certificationName}
+                                                    className="w-full h-full object-cover"
+                                                    onError={(e) => {
+                                                        e.target.style.display = 'none';
+                                                        e.target.nextSibling.style.display = 'flex';
+                                                    }}
+                                                />
+                                            ) : null}
+                                            <div className={`flex-col items-center justify-center text-gray-400 ${c.fileUrl ? 'hidden' : 'flex'}`}>
+                                                <FileImage size={24} className="opacity-50" />
+                                                <span className="text-[10px] mt-1">No Image</span>
+                                            </div>
+                                        </div>
+                                        
+                                        {/* Content */}
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-start justify-between gap-2">
+                                                <div>
+                                                    <h3 className="font-semibold text-sm sm:text-base line-clamp-1">
+                                                        {c.certificationName}
+                                                    </h3>
+                                                    <p className="text-xs text-gray-500">{c.certificationCode}</p>
+                                                </div>
                                                 <span
-                                                    className={`badge badge-sm text-white ${
+                                                    className={`badge badge-sm text-white flex-shrink-0 ${
                                                         c.status === "ACTIVE"
                                                             ? "badge-success"
                                                             : c.status === "EXPIRED"
@@ -273,31 +314,38 @@ export default function EmployeeDetailPage() {
                                                 >
                                                     {c.status}
                                                 </span>
-                                            </p>
-                                        </div>
+                                            </div>
+                                            
+                                            <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs text-gray-500">
+                                                <span>No: <span className="text-gray-700 font-medium">{c.certNumber || "-"}</span></span>
+                                                <span>Tanggal: <span className="text-gray-700 font-medium">{formatDate(c.certDate)}</span></span>
+                                                <span>Exp: <span className="text-gray-700 font-medium">{formatDate(c.validUntil)}</span></span>
+                                                <span>Lembaga: <span className="text-gray-700 font-medium">{c.institutionName || "-"}</span></span>
+                                            </div>
 
-                                        <div className="mt-3 flex flex-col gap-2">
-                                            {c.fileUrl ? (
+                                            <div className="flex gap-2 mt-3">
+                                                {c.fileUrl ? (
+                                                    <button
+                                                        className="btn btn-xs btn-primary rounded-full"
+                                                        onClick={() => setViewData(c)}
+                                                    >
+                                                        Lihat
+                                                    </button>
+                                                ) : (
+                                                    <button
+                                                        className="btn btn-xs btn-info rounded-full"
+                                                        onClick={() => setUploadData(c)}
+                                                    >
+                                                        Upload
+                                                    </button>
+                                                )}
                                                 <button
-                                                    className="btn btn-sm btn-primary w-full"
-                                                    onClick={() => setViewData(c)}
+                                                    className="btn btn-xs btn-ghost border border-gray-200 rounded-full"
+                                                    onClick={() => setEditData(c)}
                                                 >
-                                                    Lihat
+                                                    Edit
                                                 </button>
-                                            ) : (
-                                                <button
-                                                    className="btn btn-sm btn-info w-full"
-                                                    onClick={() => setUploadData(c)}
-                                                >
-                                                    Upload
-                                                </button>
-                                            )}
-                                            <button
-                                                className="btn btn-sm btn-secondary w-full"
-                                                onClick={() => setEditData(c)}
-                                            >
-                                                Edit Detail
-                                            </button>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -309,13 +357,15 @@ export default function EmployeeDetailPage() {
 
             {/* ===== TAB: HISTORY ===== */}
             {tab === "history" && (
-                <div className="card bg-base-100 shadow p-5">
-                    <h2 className="font-bold text-lg mb-4">Riwayat Jabatan</h2>
+                <div className="card bg-base-100 shadow-sm border border-gray-100 overflow-hidden">
                     {histories.length === 0 ? (
-                        <p className="text-gray-400 text-sm">Belum ada riwayat jabatan</p>
+                        <div className="flex flex-col items-center justify-center py-16 text-gray-400">
+                            <History size={48} className="mb-3 opacity-30" />
+                            <p className="text-sm">Belum ada riwayat jabatan</p>
+                        </div>
                     ) : (
                         <div className="overflow-x-auto">
-                            <table className="table table-zebra text-xs">
+                            <table className="table table-zebra text-xs w-full">
                                 <thead className="bg-base-200">
                                     <tr>
                                         <th>No</th>
@@ -331,7 +381,7 @@ export default function EmployeeDetailPage() {
                                 </thead>
                                 <tbody>
                                     {histories.map((h, i) => (
-                                        <tr key={h.id}>
+                                        <tr key={h.id} className="hover">
                                             <td>{i + 1}</td>
                                             <td>
                                                 <span
@@ -351,7 +401,7 @@ export default function EmployeeDetailPage() {
                                                 </span>
                                             </td>
                                             <td>{h.oldJobTitle || "-"}</td>
-                                            <td>{h.newJobTitle || "-"}</td>
+                                            <td className="font-medium">{h.newJobTitle || "-"}</td>
                                             <td>{h.newUnitName || "-"}</td>
                                             <td>{h.newDivisionName || "-"}</td>
                                             <td>{h.newRegionalName || "-"}</td>
@@ -368,13 +418,15 @@ export default function EmployeeDetailPage() {
 
             {/* ===== TAB: ELIGIBILITY ===== */}
             {tab === "eligibility" && (
-                <div className="card bg-base-100 shadow p-5">
-                    <h2 className="font-bold text-lg mb-4">Eligibility Sertifikasi</h2>
+                <div className="card bg-base-100 shadow-sm border border-gray-100 overflow-hidden">
                     {eligibilities.length === 0 ? (
-                        <p className="text-gray-400 text-sm">Belum ada data eligibility</p>
+                        <div className="flex flex-col items-center justify-center py-16 text-gray-400">
+                            <CheckCircle size={48} className="mb-3 opacity-30" />
+                            <p className="text-sm">Belum ada data eligibility</p>
+                        </div>
                     ) : (
                         <div className="overflow-x-auto">
-                            <table className="table table-zebra text-xs">
+                            <table className="table table-zebra text-xs w-full">
                                 <thead className="bg-base-200">
                                     <tr>
                                         <th>No</th>
@@ -388,9 +440,9 @@ export default function EmployeeDetailPage() {
                                 </thead>
                                 <tbody>
                                     {eligibilities.map((e, i) => (
-                                        <tr key={e.id || i}>
+                                        <tr key={e.id || i} className="hover">
                                             <td>{i + 1}</td>
-                                            <td>{e.certificationCode || "-"}</td>
+                                            <td className="font-medium">{e.certificationCode || "-"}</td>
                                             <td>{e.certificationName || "-"}</td>
                                             <td>{e.certificationLevelLevel || "-"}</td>
                                             <td>{e.subFieldCode || "-"}</td>

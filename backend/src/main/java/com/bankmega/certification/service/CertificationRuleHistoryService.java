@@ -49,9 +49,6 @@ public class CertificationRuleHistoryService {
                                 .validityMonths(rule.getValidityMonths())
                                 .reminderMonths(rule.getReminderMonths())
                                 .wajibSetelahMasuk(rule.getWajibSetelahMasuk())
-                                .refreshmentTypeName(
-                                                rule.getRefreshmentType() != null ? rule.getRefreshmentType().getName()
-                                                                : null)
                                 .isActive(rule.getIsActive())
                                 .actionType(actionType)
                                 .actionAt(Instant.now())
@@ -79,9 +76,6 @@ public class CertificationRuleHistoryService {
                                 || !Objects.equals(last.getValidityMonths(), rule.getValidityMonths())
                                 || !Objects.equals(last.getReminderMonths(), rule.getReminderMonths())
                                 || !Objects.equals(last.getWajibSetelahMasuk(), rule.getWajibSetelahMasuk())
-                                || !Objects.equals(last.getRefreshmentTypeName(),
-                                                rule.getRefreshmentType() != null ? rule.getRefreshmentType().getName()
-                                                                : null)
                                 || !Objects.equals(last.getIsActive(), rule.getIsActive());
         }
 
@@ -122,7 +116,7 @@ public class CertificationRuleHistoryService {
                                 .validityMonths(h.getValidityMonths())
                                 .reminderMonths(h.getReminderMonths())
                                 .wajibSetelahMasuk(h.getWajibSetelahMasuk())
-                                .refreshmentTypeName(h.getRefreshmentTypeName())
+
                                 .isActive(h.getIsActive())
                                 .actionType(h.getActionType())
                                 .actionAt(h.getActionAt())

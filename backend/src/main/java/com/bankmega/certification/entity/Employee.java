@@ -12,7 +12,11 @@ import java.util.List;
 import java.util.Objects;
 
 @Entity
-@Table(name = "employees")
+@Table(name = "employees", indexes = {
+        @Index(name = "idx_employees_nip", columnList = "nip"),
+        @Index(name = "idx_employees_name", columnList = "name"),
+        @Index(name = "idx_employees_deleted", columnList = "deleted_at")
+})
 @Getter
 @Setter
 @NoArgsConstructor

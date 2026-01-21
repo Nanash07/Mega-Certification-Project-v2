@@ -32,6 +32,9 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long>, JpaSp
 
         List<Employee> findByDeletedAtIsNull();
 
+        // Optimized: Count without loading entities
+        long countByDeletedAtIsNull();
+
         Optional<Employee> findByIdAndDeletedAtIsNull(Long id);
 
         Optional<Employee> findByNipAndDeletedAtIsNull(String nip);
@@ -86,4 +89,9 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long>, JpaSp
                         "LEFT JOIN FETCH p.jobPosition " +
                         "WHERE e.id = :id")
         Optional<Employee> findByIdWithPositions(@Param("id") Long id);
+
+        // Optimized: Load all active employees with positions in single query
+        @EntityGraph(attributePaths = { "positions", "positions.jobPosition",
+                        "positions.regional", "positions.division", "positions.unit" })
+        List<Employee> findWithRelationsByDeletedAtIsNull();
 }

@@ -44,7 +44,7 @@ public class EmployeeCertificationHistorySpecification {
                     cb.like(cb.lower(root.get("subFieldName")), like),
                     cb.like(cb.lower(root.get("certNumber")), like),
                     cb.like(cb.lower(root.get("status").as(String.class)), like),
-                    cb.like(cb.lower(root.get("processType")), like));
+                    cb.like(cb.lower(root.get("institutionName")), like));
         };
     }
 }

@@ -23,7 +23,6 @@ public class CertificationRuleService {
         private final CertificationRepository certificationRepo;
         private final CertificationLevelRepository levelRepo;
         private final SubFieldRepository subFieldRepo;
-        private final RefreshmentTypeRepository refreshmentRepo;
         private final CertificationRuleHistoryService historyService;
 
         // 🔹 Mapper entity -> DTO
@@ -47,12 +46,6 @@ public class CertificationRuleService {
                                 .subFieldCode(entity.getSubField() != null ? entity.getSubField().getCode() : null)
                                 .validityMonths(entity.getValidityMonths())
                                 .reminderMonths(entity.getReminderMonths())
-                                .refreshmentTypeId(entity.getRefreshmentType() != null
-                                                ? entity.getRefreshmentType().getId()
-                                                : null)
-                                .refreshmentTypeName(entity.getRefreshmentType() != null
-                                                ? entity.getRefreshmentType().getName()
-                                                : null)
                                 .wajibSetelahMasuk(entity.getWajibSetelahMasuk())
                                 .isActive(entity.getIsActive())
                                 .updatedAt(entity.getUpdatedAt())
@@ -144,18 +137,12 @@ public class CertificationRuleService {
                                 ? subFieldRepo.findById(Objects.requireNonNull(req.getSubFieldId())).orElse(null)
                                 : null;
 
-                RefreshmentType refreshmentType = req.getRefreshmentTypeId() != null
-                                ? refreshmentRepo.findById(Objects.requireNonNull(req.getRefreshmentTypeId()))
-                                                .orElse(null)
-                                : null;
-
                 CertificationRule entity = CertificationRule.builder()
                                 .certification(cert)
                                 .certificationLevel(level)
                                 .subField(subField)
                                 .validityMonths(req.getValidityMonths())
                                 .reminderMonths(req.getReminderMonths())
-                                .refreshmentType(refreshmentType)
                                 .wajibSetelahMasuk(req.getWajibSetelahMasuk())
                                 .isActive(req.getIsActive() != null ? req.getIsActive() : true)
                                 .createdAt(Instant.now())
@@ -184,12 +171,6 @@ public class CertificationRuleService {
                         existing.setSubField(
                                         subFieldRepo.findById(Objects.requireNonNull(req.getSubFieldId()))
                                                         .orElseThrow(() -> new RuntimeException("SubField not found")));
-                }
-                if (req.getRefreshmentTypeId() != null) {
-                        existing.setRefreshmentType(
-                                        refreshmentRepo.findById(Objects.requireNonNull(req.getRefreshmentTypeId()))
-                                                        .orElseThrow(() -> new RuntimeException(
-                                                                        "Refreshment Type not found")));
                 }
 
                 existing.setValidityMonths(req.getValidityMonths());

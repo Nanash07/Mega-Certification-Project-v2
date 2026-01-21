@@ -135,7 +135,7 @@ export default function ImportJobCertificationMappingModal({ open, onClose, onIm
         <div className="flex justify-end gap-2 pt-4 border-t border-gray-100">
             <button
                 type="button"
-                className="btn btn-sm btn-ghost rounded-lg"
+                className="btn btn-sm btn-ghost rounded-lg border border-gray-200"
                 onClick={handleClose}
                 disabled={loading}
             >

@@ -102,8 +102,7 @@ public class EmployeeBatchService {
     @Transactional(readOnly = true)
     public List<EmployeeBatchResponse> getByBatch(Long batchId) {
         Specification<EmployeeBatch> spec = EmployeeBatchSpecification.notDeleted()
-                .and(EmployeeBatchSpecification.byBatch(batchId))
-                .and(EmployeeBatchSpecification.withOrgFetch());
+                .and(EmployeeBatchSpecification.byBatch(batchId));
 
         return repo.findAll(spec, Sort.by(Sort.Order.asc("employee.nip")))
                 .stream().map(this::toResponse).toList();
@@ -129,8 +128,7 @@ public class EmployeeBatchService {
                 .and(EmployeeBatchSpecification.byRegionalName(regional))
                 .and(EmployeeBatchSpecification.byDivisionName(division))
                 .and(EmployeeBatchSpecification.byUnitName(unit))
-                .and(EmployeeBatchSpecification.byJobName(job))
-                .and(EmployeeBatchSpecification.withOrgFetch());
+                .and(EmployeeBatchSpecification.byJobName(job));
 
         // 🔹 Filter per-pegawai (personal) kalau employeeId tidak null
         if (employeeId != null) {
@@ -418,7 +416,6 @@ public class EmployeeBatchService {
                     .certificationRule(rule)
                     .institution(institution)
                     .certDate(passDate)
-                    .processType(EmployeeCertification.ProcessType.SERTIFIKASI)
                     .status(EmployeeCertification.Status.PENDING)
                     .ruleValidityMonths(rule != null ? rule.getValidityMonths() : null)
                     .ruleReminderMonths(rule != null ? rule.getReminderMonths() : null)
@@ -428,7 +425,6 @@ public class EmployeeBatchService {
             isNew = true;
         } else {
             ec.setCertDate(passDate);
-            ec.setProcessType(EmployeeCertification.ProcessType.SERTIFIKASI);
             ec.setUpdatedAt(Instant.now());
             ec.setStatus((ec.getCertNumber() == null || ec.getCertNumber().isBlank())
                     ? EmployeeCertification.Status.PENDING
@@ -496,7 +492,6 @@ public class EmployeeBatchService {
                     .certificationRule(rule)
                     .institution(institution)
                     .certDate(passDate)
-                    .processType(EmployeeCertification.ProcessType.EXTENSION)
                     .status(EmployeeCertification.Status.PENDING)
                     .ruleValidityMonths(rule != null ? rule.getValidityMonths() : null)
                     .ruleReminderMonths(rule != null ? rule.getReminderMonths() : null)
@@ -506,7 +501,6 @@ public class EmployeeBatchService {
             isNew = true;
         } else {
             ec.setCertDate(passDate);
-            ec.setProcessType(EmployeeCertification.ProcessType.EXTENSION);
             ec.setUpdatedAt(Instant.now());
             ec.setStatus((ec.getCertNumber() == null || ec.getCertNumber().isBlank())
                     ? EmployeeCertification.Status.PENDING

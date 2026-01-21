@@ -28,9 +28,6 @@ public class CertificationRuleResponse {
     private Integer validityMonths;
     private Integer reminderMonths;
 
-    private Long refreshmentTypeId;
-    private String refreshmentTypeName;
-
     private Integer wajibSetelahMasuk;
     private Boolean isActive;
 

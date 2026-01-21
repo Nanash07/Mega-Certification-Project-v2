@@ -34,7 +34,16 @@ public class EmployeeEligibilityExceptionSpecification {
     public static Specification<EmployeeEligibilityException> byJobIds(List<Long> jobIds) {
         if (jobIds == null || jobIds.isEmpty())
             return null;
-        return (root, query, cb) -> root.get("employee").get("jobPosition").get("id").in(jobIds);
+        return (root, query, cb) -> {
+            var emp = root.join("employee", JoinType.LEFT);
+            var positions = emp.join("positions", JoinType.LEFT);
+            if (query != null)
+                query.distinct(true);
+            return cb.and(
+                    cb.isNull(positions.get("deletedAt")),
+                    cb.isTrue(positions.get("isActive")),
+                    positions.get("jobPosition").get("id").in(jobIds));
+        };
     }
 
     public static Specification<EmployeeEligibilityException> byCertCodes(List<String> certCodes) {
@@ -113,7 +122,10 @@ public class EmployeeEligibilityExceptionSpecification {
             String like = "%" + keyword.trim().toLowerCase(Locale.ROOT) + "%";
 
             var emp = root.join("employee", JoinType.LEFT);
-            var job = emp.join("jobPosition", JoinType.LEFT);
+            var positions = emp.join("positions", JoinType.LEFT);
+            var job = positions.join("jobPosition", JoinType.LEFT);
+            if (query != null)
+                query.distinct(true);
 
             var rule = root.join("certificationRule", JoinType.LEFT);
             var cert = rule.join("certification", JoinType.LEFT);
@@ -122,7 +134,10 @@ public class EmployeeEligibilityExceptionSpecification {
 
             var empNip = cb.like(cb.lower(emp.get("nip")), like);
             var empName = cb.like(cb.lower(emp.get("name")), like);
-            var jobName = cb.like(cb.lower(job.get("name")), like);
+            var jobName = cb.and(
+                    cb.isNull(positions.get("deletedAt")),
+                    cb.isTrue(positions.get("isActive")),
+                    cb.like(cb.lower(job.get("name")), like));
 
             var certCode = cb.like(cb.lower(cert.get("code")), like);
             var certName = cb.like(cb.lower(cert.get("name")), like);

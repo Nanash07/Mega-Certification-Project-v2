@@ -27,7 +27,6 @@ public interface BatchRepository extends JpaRepository<Batch, Long>, JpaSpecific
                         "certificationRule.certification",
                         "certificationRule.certificationLevel",
                         "certificationRule.subField",
-                        "certificationRule.refreshmentType",
                         "institution"
         })
         @NonNull
@@ -39,7 +38,6 @@ public interface BatchRepository extends JpaRepository<Batch, Long>, JpaSpecific
                         "certificationRule.certification",
                         "certificationRule.certificationLevel",
                         "certificationRule.subField",
-                        "certificationRule.refreshmentType",
                         "institution"
         })
         @NonNull
@@ -51,7 +49,6 @@ public interface BatchRepository extends JpaRepository<Batch, Long>, JpaSpecific
                         "certificationRule.certification",
                         "certificationRule.certificationLevel",
                         "certificationRule.subField",
-                        "certificationRule.refreshmentType",
                         "institution"
         })
         @NonNull

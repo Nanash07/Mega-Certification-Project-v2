@@ -2,12 +2,11 @@
 import { useEffect, useState, useMemo } from "react";
 import Select from "react-select";
 import toast from "react-hot-toast";
-import { X, Save, Pencil, Award, Layers, Grid3X3, Clock, Calendar, RefreshCw, ShieldCheck } from "lucide-react";
+import { X, Save, Pencil, Award, Layers, Grid3X3, Clock, Calendar, ShieldCheck } from "lucide-react";
 import { updateCertificationRule } from "../../services/certificationRuleService";
 import { fetchCertifications } from "../../services/certificationService";
 import { fetchCertificationLevels } from "../../services/certificationLevelService";
 import { fetchSubFields } from "../../services/subFieldService";
-import { fetchRefreshmentTypes } from "../../services/refreshmentTypeService";
 
 export default function EditCertificationRuleModal({ open, onClose, onSaved, initial }) {
     const [form, setForm] = useState({});
@@ -15,7 +14,6 @@ export default function EditCertificationRuleModal({ open, onClose, onSaved, ini
     const [certs, setCerts] = useState([]);
     const [levels, setLevels] = useState([]);
     const [subs, setSubs] = useState([]);
-    const [refreshments, setRefreshments] = useState([]);
 
     const selectStyles = useMemo(
         () => ({
@@ -52,21 +50,18 @@ export default function EditCertificationRuleModal({ open, onClose, onSaved, ini
                 subFieldId: initial.subFieldId || "",
                 validityMonths: initial.validityMonths || 0,
                 reminderMonths: initial.reminderMonths || 0,
-                refreshmentTypeId: initial.refreshmentTypeId || "",
                 wajibSetelahMasuk: initial.wajibSetelahMasuk || "",
             });
             (async () => {
                 try {
-                    const [c, l, s, r] = await Promise.all([
+                    const [c, l, s] = await Promise.all([
                         fetchCertifications(),
                         fetchCertificationLevels(),
                         fetchSubFields(),
-                        fetchRefreshmentTypes(),
                     ]);
                     setCerts(c);
                     setLevels(l);
                     setSubs(s);
-                    setRefreshments(r);
                 } catch {
                     toast.error("Gagal memuat data master");
                 }
@@ -96,13 +91,12 @@ export default function EditCertificationRuleModal({ open, onClose, onSaved, ini
     if (!open) return null;
 
     const certOptions = certs.map((c) => ({ value: c.id, label: `${c.code} - ${c.name}` }));
-    const levelOptions = levels.map((l) => ({ value: l.id, label: `${l.name} (Level ${l.level})` }));
-    const subFieldOptions = subs.map((s) => ({ value: s.id, label: `${s.name} (${s.code})` }));
-    const refreshmentOptions = refreshments.map((r) => ({ value: r.id, label: r.name }));
+    const levelOptions = levels.map((l) => ({ value: l.id, label: `${l.level} - ${l.name}` }));
+    const subFieldOptions = subs.map((s) => ({ value: s.id, label: `${s.code} - ${s.name}` }));
 
     return (
         <dialog className="modal modal-open" open={open}>
-            <div className="modal-box max-w-3xl bg-base-100 shadow-2xl border border-gray-100 rounded-2xl">
+            <div className="modal-box max-w-3xl">
                 {/* Header */}
                 <div className="flex items-center justify-between pb-4 border-b border-gray-100">
                     <div className="flex items-center gap-3">
@@ -179,7 +173,7 @@ export default function EditCertificationRuleModal({ open, onClose, onSaved, ini
                             <input
                                 type="number"
                                 className="input input-bordered input-sm w-full rounded-lg"
-                                value={form.validityMonths}
+                                value={form.validityMonths ?? ""}
                                 onChange={(e) => setField("validityMonths", e.target.value)}
                                 min={0}
                                 required
@@ -195,27 +189,11 @@ export default function EditCertificationRuleModal({ open, onClose, onSaved, ini
                             <input
                                 type="number"
                                 className="input input-bordered input-sm w-full rounded-lg"
-                                value={form.reminderMonths}
+                                value={form.reminderMonths ?? ""}
                                 onChange={(e) => setField("reminderMonths", e.target.value)}
                                 min={0}
                                 required
                                 placeholder="Contoh: 3"
-                            />
-                        </div>
-
-                        {/* Refreshment */}
-                        <div className="flex flex-col gap-1">
-                            <label className="font-medium text-gray-600 flex items-center gap-1">
-                                <RefreshCw size={14} /> Refreshment
-                            </label>
-                            <Select
-                                options={refreshmentOptions}
-                                value={refreshmentOptions.find(o => o.value === form.refreshmentTypeId) || null}
-                                onChange={(opt) => setField("refreshmentTypeId", opt ? opt.value : "")}
-                                styles={selectStyles}
-                                placeholder="Pilih Tipe Refreshment (Opsional)"
-                                menuPortalTarget={typeof document !== "undefined" ? document.body : undefined}
-                                isClearable
                             />
                         </div>
 
@@ -227,7 +205,7 @@ export default function EditCertificationRuleModal({ open, onClose, onSaved, ini
                             <input
                                 type="number"
                                 className="input input-bordered input-sm w-full rounded-lg"
-                                value={form.wajibSetelahMasuk}
+                                value={form.wajibSetelahMasuk ?? ""}
                                 onChange={(e) => setField("wajibSetelahMasuk", e.target.value)}
                                 min={0}
                                 placeholder="Opsional"
@@ -240,7 +218,7 @@ export default function EditCertificationRuleModal({ open, onClose, onSaved, ini
                 <div className="flex justify-end gap-2 pt-4 border-t border-gray-100">
                     <button
                         type="button"
-                        className="btn btn-sm btn-ghost rounded-lg"
+                        className="btn btn-sm btn-ghost rounded-lg border border-gray-200"
                         onClick={onClose}
                         disabled={submitting}
                     >
@@ -258,7 +236,7 @@ export default function EditCertificationRuleModal({ open, onClose, onSaved, ini
                 </div>
             </div>
 
-            <form method="dialog" className="modal-backdrop bg-black/50">
+            <form method="dialog" className="modal-backdrop">
                 <button onClick={onClose}>close</button>
             </form>
         </dialog>

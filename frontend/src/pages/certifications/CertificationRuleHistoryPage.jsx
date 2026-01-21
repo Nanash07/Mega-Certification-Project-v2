@@ -222,7 +222,6 @@ export default function CertificationRuleHistoryPage() {
                                 <th>Sub Bidang</th>
                                 <th>Masa Berlaku</th>
                                 <th>Reminder</th>
-                                <th>Refreshment</th>
                                 <th>Wajib Setelah Masuk</th>
                                 <th>Status</th>
                             </tr>
@@ -230,13 +229,13 @@ export default function CertificationRuleHistoryPage() {
                         <tbody className="text-xs">
                             {loading ? (
                                 <tr>
-                                    <td colSpan={11} className="text-center py-16">
+                                    <td colSpan={10} className="text-center py-16">
                                         <span className="loading loading-dots loading-lg text-primary" />
                                     </td>
                                 </tr>
                             ) : rows.length === 0 ? (
                                 <tr>
-                                    <td colSpan={11} className="text-center py-16">
+                                    <td colSpan={10} className="text-center py-16">
                                         <div className="flex flex-col items-center text-gray-400">
                                             <HistoryIcon size={48} className="mb-3 opacity-30" />
                                             <p className="text-sm">Tidak ada data histori</p>
@@ -256,7 +255,6 @@ export default function CertificationRuleHistoryPage() {
                                         <td>{r.subFieldCode || "-"}</td>
                                         <td>{r.validityMonths != null ? `${r.validityMonths} bulan` : "-"}</td>
                                         <td>{r.reminderMonths != null ? `${r.reminderMonths} bulan` : "-"}</td>
-                                        <td>{r.refreshmentTypeName || "-"}</td>
                                         <td>{r.wajibSetelahMasuk != null ? `${r.wajibSetelahMasuk} bulan` : "-"}</td>
                                         <td>
                                             {r.isActive ? (

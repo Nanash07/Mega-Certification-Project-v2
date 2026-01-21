@@ -36,8 +36,6 @@ public class BatchResponse {
     // Rule Metadata
     private Integer validityMonths;
     private Integer reminderMonths;
-    private Long refreshmentTypeId;
-    private String refreshmentTypeName;
     private Integer wajibSetelahMasuk;
     private Boolean isActiveRule;
 

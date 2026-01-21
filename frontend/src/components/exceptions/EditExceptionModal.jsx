@@ -127,7 +127,7 @@ export default function EditExceptionModal({ open, onClose, onSaved, initial, pi
                 </div>
 
                 <div className="modal-action">
-                    <button className="btn" onClick={onClose}>
+                    <button className="btn btn-sm btn-ghost rounded-lg border border-gray-200" onClick={onClose}>
                         Batal
                     </button>
                     <button className="btn btn-primary" onClick={onSubmit}>
