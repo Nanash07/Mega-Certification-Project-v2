@@ -27,6 +27,13 @@ public interface EmployeeCertificationRepository extends
         Optional<EmployeeCertification> findTopByEmployeeIdAndCertificationRuleIdAndDeletedAtIsNullOrderByValidUntilDesc(
                         Long employeeId, Long certificationRuleId);
 
+        // For cover-down logic - includes certification and level relations
+        @EntityGraph(attributePaths = {
+                        "employee",
+                        "certificationRule",
+                        "certificationRule.certification",
+                        "certificationRule.certificationLevel"
+        })
         List<EmployeeCertification> findByEmployeeIdInAndDeletedAtIsNull(List<Long> employeeIds);
 
         @EntityGraph(attributePaths = { "employee", "certificationRule" })
@@ -61,11 +68,12 @@ public interface EmployeeCertificationRepository extends
         List<EmployeeCertification> findByValidUntilLessThanEqualAndDeletedAtIsNull(LocalDate date);
 
         // EntityGraph overrides for paging and export
+        // NOTE: Cannot include collections (employee.positions) in paginated queries
+        // due to Hibernate limitation "firstResult/maxResults specified with collection
+        // fetch"
         @Override
         @EntityGraph(attributePaths = {
                         "employee",
-                        "employee.positions",
-                        "employee.positions.jobPosition",
                         "certificationRule",
                         "certificationRule.certification",
                         "certificationRule.certificationLevel",

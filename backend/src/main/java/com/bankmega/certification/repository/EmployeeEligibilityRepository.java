@@ -63,23 +63,23 @@ public interface EmployeeEligibilityRepository
         List<EmployeeEligibility> findByEmployeeId(Long employeeId);
 
         // EntityGraph overrides for paging and export
+        // NOTE: Cannot include collections (employee.positions) in paginated queries
+        // due to Hibernate limitation "firstResult/maxResults specified with collection
+        // fetch"
         @Override
         @EntityGraph(attributePaths = {
                         "employee",
-                        "employee.positions",
-                        "employee.positions.jobPosition",
-                        "employee.positions.regional",
-                        "employee.positions.division",
-                        "employee.positions.unit",
                         "certificationRule",
                         "certificationRule.certification",
                         "certificationRule.certificationLevel",
-                        "certificationRule.subField"
+                        "certificationRule.subField",
+                        "coveredByCertification"
         })
         @NonNull
         Page<EmployeeEligibility> findAll(@Nullable Specification<EmployeeEligibility> spec,
                         @NonNull Pageable pageable);
 
+        // For export (Sort-based, not paginated) - can include collections
         @Override
         @EntityGraph(attributePaths = {
                         "employee",
@@ -91,7 +91,10 @@ public interface EmployeeEligibilityRepository
                         "certificationRule",
                         "certificationRule.certification",
                         "certificationRule.certificationLevel",
-                        "certificationRule.subField"
+                        "certificationRule.subField",
+                        "coveredByCertification",
+                        "coveredByCertification.certificationRule",
+                        "coveredByCertification.certificationRule.certificationLevel"
         })
         @NonNull
         List<EmployeeEligibility> findAll(@Nullable Specification<EmployeeEligibility> spec, @NonNull Sort sort);

@@ -85,6 +85,22 @@ public class EmployeeEligibility {
     @Column(name = "deleted_at")
     private Instant deletedAt;
 
+    // Cover-down fields: track when eligibility is fulfilled by higher-level cert
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "covered_by_certification_id")
+    private EmployeeCertification coveredByCertification;
+
+    @Builder.Default
+    @Column(name = "is_covered_by_higher_level")
+    private Boolean isCoveredByHigherLevel = false;
+
+    // Level yang dimiliki (bisa sama atau lebih tinggi dari yang diwajibkan)
+    @Column(name = "owned_level")
+    private Integer ownedLevel;
+
+    @Column(name = "owned_level_name", length = 100)
+    private String ownedLevelName;
+
     @PrePersist
     @PreUpdate
     void ensureCounters() {

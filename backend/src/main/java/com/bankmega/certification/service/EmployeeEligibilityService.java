@@ -59,6 +59,14 @@ public class EmployeeEligibilityService {
             sisaWaktu = days >= 0 ? days + " hari" : "Kadaluarsa";
         }
 
+        // Determine display level: owned level if available, otherwise required level
+        Integer displayLevel = e.getOwnedLevel() != null ? e.getOwnedLevel()
+                : (rule != null && rule.getCertificationLevel() != null ? rule.getCertificationLevel().getLevel()
+                        : null);
+        String displayLevelName = e.getOwnedLevelName() != null ? e.getOwnedLevelName()
+                : (rule != null && rule.getCertificationLevel() != null ? rule.getCertificationLevel().getName()
+                        : null);
+
         return EmployeeEligibilityResponse.builder()
                 .id(e.getId())
                 .employeeId(emp != null ? emp.getId() : null)
@@ -70,12 +78,8 @@ public class EmployeeEligibilityService {
                 .certificationRuleId(rule != null ? rule.getId() : null)
                 .certificationCode(rule != null ? rule.getCertification().getCode() : null)
                 .certificationName(rule != null ? rule.getCertification().getName() : null)
-                .certificationLevelName(rule != null && rule.getCertificationLevel() != null
-                        ? rule.getCertificationLevel().getName()
-                        : null)
-                .certificationLevelLevel(rule != null && rule.getCertificationLevel() != null
-                        ? rule.getCertificationLevel().getLevel()
-                        : null)
+                .certificationLevelName(displayLevelName)
+                .certificationLevelLevel(displayLevel)
                 .subFieldName(rule != null && rule.getSubField() != null ? rule.getSubField().getName() : null)
                 .subFieldCode(rule != null && rule.getSubField() != null ? rule.getSubField().getCode() : null)
 
@@ -96,6 +100,11 @@ public class EmployeeEligibilityService {
                 .trainingCount(e.getTrainingCount())
                 .refreshmentCount(e.getRefreshmentCount())
                 .extensionCount(e.getExtensionCount())
+
+                // Cover-down fields
+                .isCoveredByHigherLevel(e.getIsCoveredByHigherLevel())
+                .ownedLevel(e.getOwnedLevel())
+                .ownedLevelName(e.getOwnedLevelName())
                 .build();
     }
 
@@ -591,21 +600,13 @@ public class EmployeeEligibilityService {
         List<Long> employeeIds = employees.stream().map(Employee::getId).toList();
         List<EmployeeCertification> certs = employeeCertificationRepo.findByEmployeeIdInAndDeletedAtIsNull(employeeIds);
 
-        Map<String, EmployeeCertification> latestCerts = certs.stream()
-                .collect(Collectors.toMap(
-                        c -> c.getEmployee().getId() + "-" + c.getCertificationRule().getId(),
-                        c -> c,
-                        (c1, c2) -> {
-                            LocalDate d1 = c1.getCertDate();
-                            LocalDate d2 = c2.getCertDate();
-                            if (d1 == null && d2 == null)
-                                return c2;
-                            if (d1 == null)
-                                return c2;
-                            if (d2 == null)
-                                return c1;
-                            return d1.isAfter(d2) ? c1 : c2;
-                        }));
+        // Group certifications by employee + certification (not rule!) to enable
+        // cover-down
+        // Key: employeeId-certificationId
+        Map<String, List<EmployeeCertification>> certsByEmpAndCert = certs.stream()
+                .filter(c -> c.getCertificationRule() != null && c.getCertificationRule().getCertification() != null)
+                .collect(Collectors.groupingBy(
+                        c -> c.getEmployee().getId() + "-" + c.getCertificationRule().getCertification().getId()));
 
         List<EmployeeEligibility> allEligibilities = eligibilityRepo
                 .findByEmployeeIdInAndDeletedAtIsNull(new HashSet<>(employeeIds));
@@ -614,39 +615,76 @@ public class EmployeeEligibilityService {
         List<EmployeeEligibility> changed = new ArrayList<>();
 
         for (EmployeeEligibility ee : allEligibilities) {
-            String key = ee.getEmployee().getId() + "-" + ee.getCertificationRule().getId();
-            EmployeeCertification cert = latestCerts.get(key);
+            CertificationRule rule = ee.getCertificationRule();
+            if (rule == null || rule.getCertification() == null)
+                continue;
 
+            Long certificationId = rule.getCertification().getId();
+            Integer requiredLevel = rule.getCertificationLevel() != null
+                    ? rule.getCertificationLevel().getLevel()
+                    : 0;
+
+            // Save before state for change detection
             EmployeeEligibility.EligibilityStatus beforeStatus = ee.getStatus();
             LocalDate beforeDue = ee.getDueDate();
             String beforeCertNumber = ee.getCertNumber();
             LocalDate beforeCertDate = ee.getCertDate();
+            Boolean beforeCovered = ee.getIsCoveredByHigherLevel();
+            Integer beforeOwnedLevel = ee.getOwnedLevel();
 
-            if (cert != null) {
-                ee.setCertNumber(cert.getCertNumber());
-                ee.setCertDate(cert.getCertDate());
+            // Get all certs for this employee + certification
+            String certKey = ee.getEmployee().getId() + "-" + certificationId;
+            List<EmployeeCertification> candidateCerts = certsByEmpAndCert.getOrDefault(certKey, List.of());
 
-                ee.setDueDate(cert.getValidUntil());
-                if (cert.getValidUntil() == null) {
+            // Find the best covering cert:
+            // - Must have level >= required level
+            // - Must be ACTIVE or DUE (not EXPIRED)
+            // - Pick the one with highest level
+            EmployeeCertification coveringCert = findBestCoveringCert(candidateCerts, requiredLevel, today);
+
+            if (coveringCert != null) {
+                // Apply cover-down logic
+                CertificationLevel ownedCertLevel = coveringCert.getCertificationRule().getCertificationLevel();
+                Integer ownedLevel = ownedCertLevel != null ? ownedCertLevel.getLevel() : requiredLevel;
+                String ownedLevelName = ownedCertLevel != null ? ownedCertLevel.getName() : null;
+
+                ee.setCertNumber(coveringCert.getCertNumber());
+                ee.setCertDate(coveringCert.getCertDate());
+                ee.setDueDate(coveringCert.getValidUntil());
+                ee.setCoveredByCertification(coveringCert);
+                ee.setIsCoveredByHigherLevel(ownedLevel > requiredLevel);
+                ee.setOwnedLevel(ownedLevel);
+                ee.setOwnedLevelName(ownedLevelName);
+
+                // Determine status based on the covering cert
+                if (coveringCert.getValidUntil() == null) {
                     ee.setStatus(EmployeeEligibility.EligibilityStatus.NOT_YET_CERTIFIED);
-                } else if (today.isAfter(cert.getValidUntil())) {
+                } else if (today.isAfter(coveringCert.getValidUntil())) {
                     ee.setStatus(EmployeeEligibility.EligibilityStatus.EXPIRED);
-                } else if (cert.getReminderDate() != null && !today.isBefore(cert.getReminderDate())) {
+                } else if (coveringCert.getReminderDate() != null && !today.isBefore(coveringCert.getReminderDate())) {
                     ee.setStatus(EmployeeEligibility.EligibilityStatus.DUE);
                 } else {
                     ee.setStatus(EmployeeEligibility.EligibilityStatus.ACTIVE);
                 }
             } else {
+                // No covering cert found
                 ee.setCertNumber(null);
                 ee.setCertDate(null);
-                ee.setStatus(EmployeeEligibility.EligibilityStatus.NOT_YET_CERTIFIED);
                 ee.setDueDate(null);
+                ee.setCoveredByCertification(null);
+                ee.setIsCoveredByHigherLevel(false);
+                ee.setOwnedLevel(null);
+                ee.setOwnedLevelName(null);
+                ee.setStatus(EmployeeEligibility.EligibilityStatus.NOT_YET_CERTIFIED);
             }
 
+            // Check if anything changed
             if (!Objects.equals(beforeStatus, ee.getStatus())
                     || !Objects.equals(beforeDue, ee.getDueDate())
                     || !Objects.equals(beforeCertNumber, ee.getCertNumber())
-                    || !Objects.equals(beforeCertDate, ee.getCertDate())) {
+                    || !Objects.equals(beforeCertDate, ee.getCertDate())
+                    || !Objects.equals(beforeCovered, ee.getIsCoveredByHigherLevel())
+                    || !Objects.equals(beforeOwnedLevel, ee.getOwnedLevel())) {
                 changed.add(ee);
             }
         }
@@ -654,6 +692,33 @@ public class EmployeeEligibilityService {
         if (!changed.isEmpty()) {
             eligibilityRepo.saveAll(changed);
         }
+    }
+
+    /**
+     * Find the best certificate that covers the required level.
+     * Rules:
+     * - Level must be >= requiredLevel (cover-down)
+     * - Status must be ACTIVE or DUE (expired cannot cover)
+     * - Among valid certs, pick the one with highest level
+     */
+    private EmployeeCertification findBestCoveringCert(List<EmployeeCertification> certs, Integer requiredLevel,
+            LocalDate today) {
+        return certs.stream()
+                .filter(c -> {
+                    if (c.getCertificationRule() == null || c.getCertificationRule().getCertificationLevel() == null)
+                        return false;
+                    Integer certLevel = c.getCertificationRule().getCertificationLevel().getLevel();
+                    return certLevel != null && certLevel >= requiredLevel;
+                })
+                .filter(c -> {
+                    // Expired certs cannot cover
+                    LocalDate validUntil = c.getValidUntil();
+                    if (validUntil == null)
+                        return false; // No expiry means not properly certified
+                    return !today.isAfter(validUntil); // Must not be expired
+                })
+                .max(Comparator.comparingInt(c -> c.getCertificationRule().getCertificationLevel().getLevel()))
+                .orElse(null);
     }
 
     private byte[] buildEligibilityExcel(List<EmployeeEligibilityResponse> data) {

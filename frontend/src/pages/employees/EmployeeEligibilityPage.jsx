@@ -19,7 +19,7 @@ import { searchEmployees } from "../../services/employeeService";
 import { fetchMyPicScope } from "../../services/picScopeService";
 import { Eye, RotateCw, Eraser, Download, ClipboardList, Search, Briefcase, Award, Layers, Grid3X3, Filter, FileSpreadsheet } from "lucide-react";
 
-const TABLE_COLS = 17;
+const TABLE_COLS = 18;
 
 export default function EmployeeEligibilityPage() {
     const [searchParams] = useSearchParams();
@@ -464,6 +464,7 @@ export default function EmployeeEligibilityPage() {
                                 <th>Tgl Sertifikasi</th>
                                 <th>Jenjang</th>
                                 <th>Sub Bidang</th>
+                                <th>Keterangan</th>
                                 <th>SK Efektif</th>
                                 <th>Status</th>
                                 <th>Due Date</th>
@@ -511,6 +512,15 @@ export default function EmployeeEligibilityPage() {
                                         <td>{formatDate(r.certDate)}</td>
                                         <td>{r.certificationLevelLevel ?? "-"}</td>
                                         <td>{r.subFieldCode ?? "-"}</td>
+                                        <td>
+                                            {r.isCoveredByHigherLevel ? (
+                                                <span className="badge badge-sm badge-accent text-white">Covered</span>
+                                            ) : r.ownedLevel ? (
+                                                <span className="badge badge-sm badge-success text-white">Sesuai</span>
+                                            ) : (
+                                                <span className="text-gray-400">-</span>
+                                            )}
+                                        </td>
                                         <td>{formatDate(r.effectiveDate)}</td>
                                         <td>
                                             <span

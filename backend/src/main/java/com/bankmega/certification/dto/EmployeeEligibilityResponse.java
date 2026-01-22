@@ -46,4 +46,9 @@ public class EmployeeEligibilityResponse {
     private Integer trainingCount;
     private Integer refreshmentCount;
     private Integer extensionCount;
+
+    // Cover-down fields
+    private Boolean isCoveredByHigherLevel;
+    private Integer ownedLevel;
+    private String ownedLevelName;
 }

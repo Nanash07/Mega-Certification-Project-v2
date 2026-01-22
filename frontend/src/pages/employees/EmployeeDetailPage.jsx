@@ -434,6 +434,7 @@ export default function EmployeeDetailPage() {
                                         <th>Nama Sertifikasi</th>
                                         <th>Level</th>
                                         <th>Sub Bidang</th>
+                                        <th>Keterangan</th>
                                         <th>Status</th>
                                         <th>Sisa Waktu</th>
                                     </tr>
@@ -446,6 +447,15 @@ export default function EmployeeDetailPage() {
                                             <td>{e.certificationName || "-"}</td>
                                             <td>{e.certificationLevelLevel || "-"}</td>
                                             <td>{e.subFieldCode || "-"}</td>
+                                            <td>
+                                                {e.isCoveredByHigherLevel ? (
+                                                    <span className="badge badge-sm badge-accent text-white">Covered</span>
+                                                ) : e.ownedLevel ? (
+                                                    <span className="badge badge-sm badge-success text-white">Sesuai</span>
+                                                ) : (
+                                                    <span className="text-gray-400">-</span>
+                                                )}
+                                            </td>
                                             <td>
                                                 <span
                                                     className={`badge badge-sm text-white ${
