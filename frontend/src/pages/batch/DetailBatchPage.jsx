@@ -297,9 +297,11 @@ export default function DetailBatchPage() {
                         <div>
                             <span className="font-medium text-gray-500">Sertifikasi</span>
                             <div className="font-semibold">
-                                {[batch.certificationCode, batch.certificationLevelName, batch.subFieldCode ?? batch.subBidangCode]
-                                    .filter((x) => x && String(x).trim() !== "")
-                                    .join(" - ") || "-"}
+                                {[
+                                    batch.certificationCode,
+                                    batch.certificationLevelLevel ? `Jenjang ${batch.certificationLevelLevel}` : null,
+                                    batch.subFieldCode ?? batch.subBidangCode
+                                ].filter(Boolean).join(" - ") || "-"}
                             </div>
                         </div>
                         <div>

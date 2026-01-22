@@ -70,9 +70,11 @@ export default function EditBatchModal({ open, data, onClose, onSaved }) {
         Promise.all([fetchCertificationRules(), fetchInstitutions()])
             .then(([rulesRes, insts]) => {
                 const rulesOpts = rulesRes.map((r) => {
-                    const parts = [r.certificationCode, r.certificationLevelName, r.subFieldCode].filter(
-                        (x) => x && x.trim() !== ""
-                    );
+                    const parts = [
+                        r.certificationCode,
+                        r.certificationLevelLevel ? `Jenjang ${r.certificationLevelLevel}` : null,
+                        r.subFieldCode || null
+                    ].filter(Boolean);
                     return { value: r.id, label: parts.join(" - ") };
                 });
                 setRules(rulesOpts);

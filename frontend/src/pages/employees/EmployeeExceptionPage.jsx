@@ -512,7 +512,7 @@ export default function EmployeeExceptionPage() {
                                         <td className="font-medium">{r.employeeName}</td>
                                         <td>{r.jobPositionTitle}</td>
                                         <td>{r.certificationCode}</td>
-                                        <td>{r.certificationLevelName || "-"}</td>
+                                        <td>{r.certificationLevelLevel ? `Jenjang ${r.certificationLevelLevel}` : "-"}</td>
                                         <td>{r.subFieldCode || "-"}</td>
                                         <td>{r.notes || "-"}</td>
                                         <td>{renderStatusBadge(r)}</td>

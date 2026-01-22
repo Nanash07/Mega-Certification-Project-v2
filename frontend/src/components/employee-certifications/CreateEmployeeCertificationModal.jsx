@@ -60,10 +60,17 @@ export default function CreateCertificationModal({ open, onClose, onSaved }) {
             Promise.all([fetchCertificationRules(), fetchInstitutions()])
                 .then(([rules, insts]) => {
                     setRules(
-                        rules.map((r) => ({
-                            value: r.id,
-                            label: `${r.certificationCode} - ${r.certificationLevelName || ""} - ${r.subFieldCode || ""}`,
-                        }))
+                        rules.map((r) => {
+                            const parts = [
+                                r.certificationCode,
+                                r.certificationLevelLevel ? `Jenjang ${r.certificationLevelLevel}` : null,
+                                r.subFieldCode || null
+                            ].filter(Boolean);
+                            return {
+                                value: r.id,
+                                label: parts.join(" - "),
+                            };
+                        })
                     );
                     setInstitutions(insts.map((i) => ({ value: i.id, label: i.name })));
                 })

@@ -85,10 +85,14 @@ export default function EditExceptionModal({ open, onClose, onSaved, initial, pi
         label: `${e.nip} - ${e.name} (${e.jobPositionTitle || e.jobName || "-"})`,
     }));
 
-    const ruleOptions = rules.map((r) => ({
-        value: r.id,
-        label: `${r.certificationCode} - ${r.certificationLevelName || "-"} - ${r.subFieldCode || "-"}`,
-    }));
+    const ruleOptions = rules.map((r) => {
+        const parts = [
+            r.certificationCode,
+            r.certificationLevelLevel ? `Jenjang ${r.certificationLevelLevel}` : null,
+            r.subFieldCode || null
+        ].filter(Boolean);
+        return { value: r.id, label: parts.join(" - ") };
+    });
 
     return (
         <dialog className={`modal ${open ? "modal-open" : ""}`}>

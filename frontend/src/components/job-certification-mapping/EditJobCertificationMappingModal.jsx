@@ -69,22 +69,27 @@ export default function EditJobCertificationMappingModal({ open, onClose, onSave
                         return subA.localeCompare(subB);
                     });
 
-                    const ruleOpts = sortedRules.map((r) => ({
-                        value: r.id,
-                        label: `${r.certificationCode}${
-                            r.certificationLevelName ? " - " + r.certificationLevelName : ""
-                        }${r.subFieldCode ? " - " + r.subFieldCode : ""}`,
-                    }));
+                    const ruleOpts = sortedRules.map((r) => {
+                        const parts = [
+                            r.certificationCode,
+                            r.certificationLevelLevel ? `Jenjang ${r.certificationLevelLevel}` : null,
+                            r.subFieldCode || null
+                        ].filter(Boolean);
+                        return { value: r.id, label: parts.join(" - ") };
+                    });
 
                     setJobOptions(jobOpts);
                     setRuleOptions(ruleOpts);
 
                     setJob({ value: initial.jobPositionId, label: initial.jobName });
+                    const initialParts = [
+                        initial.certificationCode,
+                        initial.certificationLevelLevel ? `Jenjang ${initial.certificationLevelLevel}` : null,
+                        initial.subFieldCode || null
+                    ].filter(Boolean);
                     setRule({
                         value: initial.certificationRuleId,
-                        label: `${initial.certificationCode}${
-                            initial.certificationLevelName ? " - " + initial.certificationLevelName : ""
-                        }${initial.subFieldCode ? " - " + initial.subFieldCode : ""}`,
+                        label: initialParts.join(" - "),
                     });
                 } catch (err) {
                     console.error("load master error:", err);

@@ -179,10 +179,10 @@ export default function BatchPage() {
                 }
 
                 const sorted = [...filtered].sort((a, b) => {
-                    const keyA = `${a.certificationCode || ""} ${a.certificationLevelName || ""} ${
+                    const keyA = `${a.certificationCode || ""} ${a.certificationLevelLevel || 0} ${
                         a.subFieldCode || ""
                     }`.toLowerCase();
-                    const keyB = `${b.certificationCode || ""} ${b.certificationLevelName || ""} ${
+                    const keyB = `${b.certificationCode || ""} ${b.certificationLevelLevel || 0} ${
                         b.subFieldCode || ""
                     }`.toLowerCase();
                     return keyA.localeCompare(keyB);
@@ -190,9 +190,11 @@ export default function BatchPage() {
 
                 setRuleOptions(
                     sorted.map((r) => {
-                        const parts = [r.certificationCode, r.certificationLevelName, r.subFieldCode].filter(
-                            (x) => x && x.trim() !== ""
-                        );
+                        const parts = [
+                            r.certificationCode,
+                            r.certificationLevelLevel ? `Jenjang ${r.certificationLevelLevel}` : null,
+                            r.subFieldCode || null
+                        ].filter(Boolean);
                         return { value: r.id, label: parts.join(" - ") };
                     })
                 );
@@ -232,9 +234,9 @@ export default function BatchPage() {
 
                     const labelParts = [
                         b.certificationCode,
-                        b.certificationLevelName,
+                        b.certificationLevelLevel ? `Jenjang ${b.certificationLevelLevel}` : null,
                         b.subFieldCode ?? b.subBidangCode,
-                    ].filter((x) => x && String(x).trim() !== "");
+                    ].filter(Boolean);
 
                     uniqueRules.set(id, { value: id, label: labelParts.join(" - ") });
                 });
@@ -529,9 +531,11 @@ export default function BatchPage() {
                                         <td className="font-medium">{b.batchName}</td>
                                         <td>{renderTypeBadge(b.type)}</td>
                                         <td>
-                                            {[b.certificationCode, b.certificationLevelName, b.subFieldCode ?? b.subBidangCode]
-                                                .filter((x) => x && String(x).trim() !== "")
-                                                .join(" - ") || "-"}
+                                            {[
+                                                b.certificationCode,
+                                                b.certificationLevelLevel ? `Jenjang ${b.certificationLevelLevel}` : null,
+                                                b.subFieldCode ?? b.subBidangCode
+                                            ].filter(Boolean).join(" - ") || "-"}
                                         </td>
                                         <td>{b.institutionName || "-"}</td>
                                         <td>{formatDateId(b.startDate)}</td>
