@@ -2,6 +2,7 @@ package com.bankmega.certification.service;
 
 import com.bankmega.certification.entity.EmployeeCertification;
 import com.bankmega.certification.repository.EmployeeCertificationRepository;
+import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.Resource;
@@ -150,7 +151,7 @@ public class FileStorageService {
                 throw new ResponseStatusException(HttpStatus.NOT_FOUND, "File tidak ditemukan di storage");
             }
 
-            Resource resource = new UrlResource(filePath.toUri());
+            Resource resource = new UrlResource(Objects.requireNonNull(filePath.toUri()));
 
             if (!resource.exists() || !resource.isReadable()) {
                 log.error("Resource not readable: {}", filePath);
@@ -196,15 +197,15 @@ public class FileStorageService {
     }
 
     // ================== CHECK IF FILE EXISTS ==================
-    public boolean hasFile(Long certificationId) {
-        return certificationRepo.findById(certificationId)
+    public boolean hasFile(@NonNull Long certificationId) {
+        return certificationRepo.findById(Objects.requireNonNull(certificationId))
                 .map(ec -> ec.getFileUrl() != null && !ec.getFileUrl().isBlank())
                 .orElse(false);
     }
 
     // ================== CHECK IF PHYSICAL FILE EXISTS ==================
-    public boolean physicalFileExists(Long certificationId) {
-        return certificationRepo.findById(certificationId)
+    public boolean physicalFileExists(@NonNull Long certificationId) {
+        return certificationRepo.findById(Objects.requireNonNull(certificationId))
                 .filter(ec -> ec.getFileUrl() != null && !ec.getFileUrl().isBlank())
                 .map(ec -> {
                     Path filePath = Paths.get(STORAGE_DIR).resolve(ec.getFileUrl());

@@ -41,4 +41,7 @@ public class NotificationScheduleController {
     public void runNow(@PathVariable NotificationTemplate.Code type) {
         schedulerService.runManual(type);
     }
+
 }
+
+    

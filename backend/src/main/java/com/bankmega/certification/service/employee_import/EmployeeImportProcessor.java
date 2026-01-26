@@ -534,6 +534,9 @@ public class EmployeeImportProcessor {
             return true;
 
         // Both exist, check fields
+        if (secondary == null)
+            return true; // Safeguard
+
         return !sameEntity(secondary.getRegional(), r2)
                 || !sameEntity(secondary.getDivision(), d2)
                 || !sameEntity(secondary.getUnit(), u2)
