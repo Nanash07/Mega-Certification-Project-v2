@@ -3,21 +3,50 @@ package com.bankmega.certification.security;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import jakarta.annotation.PostConstruct;
+import lombok.Getter;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
 import java.util.Date;
 import java.util.function.Function;
 
+@Component
 public class JwtUtil {
 
-    private static final String SECRET = "B4nKMegaGantengP4keJwTSecretKey123!!XXSecureKey";
+    // Backward-compatible default for local development
+    private static final String DEFAULT_SECRET = "B4nKMegaGantengP4keJwTSecretKey123!!XXSecureKey";
     private static final long EXPIRATION_MS = 24 * 60 * 60 * 1000; // 24 jam
 
-    private static final SecretKey SECRET_KEY = Keys.hmacShaKeyFor(SECRET.getBytes());
+    @Value("${app.jwt.secret:" + DEFAULT_SECRET + "}")
+    private String secret;
+
+    @Getter
+    private SecretKey secretKey;
+
+    // Static instance untuk backward compatibility
+    private static JwtUtil instance;
+
+    @PostConstruct
+    public void init() {
+        this.secretKey = Keys.hmacShaKeyFor(secret.getBytes());
+        instance = this;
+    }
+
+    // Static methods untuk backward compatibility dengan code existing
+    private static SecretKey getKey() {
+        if (instance == null || instance.secretKey == null) {
+            // Fallback untuk skenario dimana Spring belum initialize
+            return Keys.hmacShaKeyFor(DEFAULT_SECRET.getBytes());
+        }
+        return instance.secretKey;
+    }
 
     private static Claims extractAllClaims(String token) {
         return Jwts.parser()
-                .verifyWith(SECRET_KEY)
+                .verifyWith(getKey())
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();
@@ -59,7 +88,7 @@ public class JwtUtil {
                 .claim("employeeId", employeeId)
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + EXPIRATION_MS))
-                .signWith(SECRET_KEY)
+                .signWith(getKey())
                 .compact();
     }
 

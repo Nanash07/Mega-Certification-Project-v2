@@ -39,9 +39,9 @@ public class SecurityConfig {
                         // auth endpoints public
                         .requestMatchers("/api/auth/**").permitAll()
 
-                        // employee certifications file endpoint public (for preview)
-                        .requestMatchers(HttpMethod.GET, "/api/employee-certifications/{id}/file").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/employee-certifications/*/file").permitAll()
+                        // employee certifications file endpoint - require authentication
+                        // (removed permitAll for security - files should not be publicly accessible)
+                        .requestMatchers(HttpMethod.GET, "/api/employee-certifications/*/file").authenticated()
 
                         // roles
                         .requestMatchers(HttpMethod.GET, "/api/roles/**").hasAnyRole("SUPERADMIN", "PIC")

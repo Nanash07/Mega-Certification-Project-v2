@@ -15,10 +15,14 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.LocalDateTime;
 import java.util.stream.Collectors;
 
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    // ==== KUNCI: handle semua ResponseStatusException (termasuk NotFound/Conflict/BadRequest custom) ====
+    // ==== KUNCI: handle semua ResponseStatusException (termasuk
+    // NotFound/Conflict/BadRequest custom) ====
     @ExceptionHandler(ResponseStatusException.class)
     public ResponseEntity<ErrorResponse> handleResponseStatus(ResponseStatusException ex, HttpServletRequest req) {
         HttpStatusCode sc = ex.getStatusCode();
@@ -64,7 +68,8 @@ public class GlobalExceptionHandler {
 
     // Tipe parameter/path salah (id bukan number, dsb) -> 400
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
-    public ResponseEntity<ErrorResponse> handleTypeMismatch(MethodArgumentTypeMismatchException ex, HttpServletRequest req) {
+    public ResponseEntity<ErrorResponse> handleTypeMismatch(MethodArgumentTypeMismatchException ex,
+            HttpServletRequest req) {
         ErrorResponse body = ErrorResponse.builder()
                 .timestamp(LocalDateTime.now())
                 .status(HttpStatus.BAD_REQUEST.value())
@@ -75,9 +80,11 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(body);
     }
 
-    // Pelanggaran constraint DB (FK/unique) -> 409 (sering kejadian saat delete role dipakai user kalau belum dicek di service)
+    // Pelanggaran constraint DB (FK/unique) -> 409 (sering kejadian saat delete
+    // role dipakai user kalau belum dicek di service)
     @ExceptionHandler(DataIntegrityViolationException.class)
-    public ResponseEntity<ErrorResponse> handleDataIntegrity(DataIntegrityViolationException ex, HttpServletRequest req) {
+    public ResponseEntity<ErrorResponse> handleDataIntegrity(DataIntegrityViolationException ex,
+            HttpServletRequest req) {
         ErrorResponse body = ErrorResponse.builder()
                 .timestamp(LocalDateTime.now())
                 .status(HttpStatus.CONFLICT.value())
@@ -91,11 +98,15 @@ public class GlobalExceptionHandler {
     // Fallback -> 500
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGeneric(Exception ex, HttpServletRequest req) {
+        // Log the actual error for debugging
+        log.error("Internal server error on path {}: {}", req.getRequestURI(), ex.getMessage(), ex);
+
+        // Return sanitized message to client (don't expose internal details)
         ErrorResponse body = ErrorResponse.builder()
                 .timestamp(LocalDateTime.now())
                 .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
                 .error("Internal Server Error")
-                .message(ex.getMessage())
+                .message("Terjadi kesalahan internal. Silakan coba lagi.")
                 .path(req.getRequestURI())
                 .build();
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(body);

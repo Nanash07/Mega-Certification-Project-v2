@@ -1,5 +1,9 @@
 package com.bankmega.certification.security;
 
+import jakarta.annotation.PostConstruct;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
+
 import javax.crypto.Cipher;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
@@ -7,16 +11,36 @@ import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.util.Base64;
 
+@Component
 public class AESUtil {
 
     private static final String ALGORITHM = "AES";
     private static final String TRANSFORMATION = "AES/CBC/PKCS5Padding";
 
-    private static final String SECRET_KEY = "MegaCertKey2025!";
+    // Backward-compatible default for local development
+    private static final String DEFAULT_SECRET = "MegaCertKey2025!";
+
+    @Value("${app.aes.secret:" + DEFAULT_SECRET + "}")
+    private String secretKey;
+
+    // Static instance untuk backward compatibility
+    private static AESUtil instance;
+
+    @PostConstruct
+    public void init() {
+        instance = this;
+    }
+
+    private static String getSecretKey() {
+        if (instance == null || instance.secretKey == null) {
+            return DEFAULT_SECRET;
+        }
+        return instance.secretKey;
+    }
 
     public static String encrypt(String plainText) {
         try {
-            SecretKeySpec secretKey = new SecretKeySpec(SECRET_KEY.getBytes(StandardCharsets.UTF_8), ALGORITHM);
+            SecretKeySpec secretKey = new SecretKeySpec(getSecretKey().getBytes(StandardCharsets.UTF_8), ALGORITHM);
 
             byte[] iv = new byte[16];
             SecureRandom random = new SecureRandom();
@@ -39,7 +63,7 @@ public class AESUtil {
 
     public static String decrypt(String encryptedText) {
         try {
-            SecretKeySpec secretKey = new SecretKeySpec(SECRET_KEY.getBytes(StandardCharsets.UTF_8), ALGORITHM);
+            SecretKeySpec secretKey = new SecretKeySpec(getSecretKey().getBytes(StandardCharsets.UTF_8), ALGORITHM);
 
             byte[] decoded = Base64.getDecoder().decode(encryptedText);
 
