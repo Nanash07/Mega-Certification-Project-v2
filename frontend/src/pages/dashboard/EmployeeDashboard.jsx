@@ -51,7 +51,7 @@ const MONTHS = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "
 /* ========= utils ========= */
 const toNum = (v) => Number(v ?? 0) || 0;
 
-/** ======= QuotaBar ======= */
+
 function QuotaBar({ filled = 0, quota = 0, className }) {
     const f = Math.max(0, Number(filled) || 0);
     const q = Math.max(0, Number(quota) || 0);
@@ -84,7 +84,7 @@ function QuotaBar({ filled = 0, quota = 0, className }) {
     );
 }
 
-/** Hitung "terisi" untuk progress bar ONGOING: onrun + passed + failed (fallback aman) */
+
 function getFilledForBar(b) {
     const onrun = toNum(b.onrun ?? b.registeredOrAttended);
     const passed = toNum(b.totalPassed ?? b.passed);

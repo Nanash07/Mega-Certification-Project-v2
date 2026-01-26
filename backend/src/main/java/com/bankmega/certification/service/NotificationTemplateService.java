@@ -16,13 +16,6 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.TemporalAccessor;
 import java.util.*;
 
-/**
- * Service untuk manajemen & rendering template notifikasi.
- * Placeholder yang didukung (default):
- * {{sapaan}}, {{nama}}, {{namaSertifikasi}}, {{berlakuSampai}}, {{namaBatch}},
- * {{mulaiTanggal}}
- * Bisa nambah placeholder lain via overload generate* dengan "extras".
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -104,12 +97,6 @@ public class NotificationTemplateService {
         return replaceVariables(template.getBody(), employee, namaSertifikasi, berlakuSampai, namaBatch, mulaiTanggal);
     }
 
-    /**
-     * Versi fleksibel (opsional): bisa nyisipin variabel tambahan.
-     * Contoh extras:
-     * Map.of("{{jenisBatch}}","CERTIFICATION", "{{lembaga}}","AAJI",
-     * "{{tanggalSelesai}}", LocalDate.now())
-     */
     @Transactional(readOnly = true)
     public String generateTitle(
             NotificationTemplate.Code code,

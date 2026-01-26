@@ -10,12 +10,10 @@ public class EmployeeSpecification {
 
     // ===== Base filters =====
 
-    /** Data yang "masih ada di sistem" (belum dihapus/soft delete) */
     public static Specification<Employee> notDeleted() {
         return (root, query, cb) -> cb.isNull(root.get("deletedAt"));
     }
 
-    /** Data yang sudah dihapus/soft delete dari sistem */
     public static Specification<Employee> deleted() {
         return (root, query, cb) -> cb.isNotNull(root.get("deletedAt"));
     }
@@ -38,12 +36,10 @@ public class EmployeeSpecification {
         };
     }
 
-    /** Active page: belum dihapus dari sistem DAN bukan resign */
     public static Specification<Employee> activePageOnly() {
         return notDeleted().and(statusNot("RESIGN"));
     }
 
-    /** Resigned page: belum dihapus dari sistem DAN status resign */
     public static Specification<Employee> resignedPageOnly() {
         return notDeleted().and(statusIs("RESIGN"));
     }

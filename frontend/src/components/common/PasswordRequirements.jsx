@@ -1,10 +1,7 @@
 import { Check, X } from "lucide-react";
 import { getPasswordValidationStatus } from "../../utils/passwordUtils";
 
-/**
- * Password requirements checklist component
- * Shows real-time validation status for each password requirement
- */
+
 export default function PasswordRequirements({ password, show = true }) {
     if (!show) return null;
 

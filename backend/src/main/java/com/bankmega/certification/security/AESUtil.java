@@ -37,9 +37,6 @@ public class AESUtil {
         }
     }
 
-    /**
-     * 🔓 Dekripsi string hasil encrypt()
-     */
     public static String decrypt(String encryptedText) {
         try {
             SecretKeySpec secretKey = new SecretKeySpec(SECRET_KEY.getBytes(StandardCharsets.UTF_8), ALGORITHM);

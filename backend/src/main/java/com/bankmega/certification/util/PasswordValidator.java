@@ -6,15 +6,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
 
-/**
- * Utility class untuk validasi keamanan password.
- * 
- * Persyaratan password:
- * - Minimal 8 karakter
- * - Minimal 1 huruf besar (A-Z)
- * - Minimal 1 huruf kecil (a-z)
- * - Minimal 1 angka (0-9)
- */
 public final class PasswordValidator {
 
     private PasswordValidator() {
@@ -27,12 +18,6 @@ public final class PasswordValidator {
     private static final Pattern LOWERCASE_PATTERN = Pattern.compile("[a-z]");
     private static final Pattern DIGIT_PATTERN = Pattern.compile("[0-9]");
 
-    /**
-     * Validasi password dan throw exception jika tidak memenuhi syarat.
-     * 
-     * @param password Password yang akan divalidasi
-     * @throws ConflictException jika password tidak memenuhi syarat
-     */
     public static void validate(String password) {
         List<String> errors = getValidationErrors(password);
         if (!errors.isEmpty()) {
@@ -40,22 +25,10 @@ public final class PasswordValidator {
         }
     }
 
-    /**
-     * Cek apakah password valid tanpa throw exception.
-     * 
-     * @param password Password yang akan dicek
-     * @return true jika password valid
-     */
     public static boolean isValid(String password) {
         return getValidationErrors(password).isEmpty();
     }
 
-    /**
-     * Dapatkan list error validasi password.
-     * 
-     * @param password Password yang akan divalidasi
-     * @return List pesan error (kosong jika valid)
-     */
     public static List<String> getValidationErrors(String password) {
         List<String> errors = new ArrayList<>();
 

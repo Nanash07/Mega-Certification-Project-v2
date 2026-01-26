@@ -74,9 +74,6 @@ public class UserSpecification {
         };
     }
 
-    /**
-     * 🔐 Exclude users dengan role tertentu (misal SUPERADMIN, PIC)
-     */
     public static Specification<User> excludeRoles(List<String> roleNames) {
         return (root, query, cb) -> {
             if (roleNames == null || roleNames.isEmpty()) {

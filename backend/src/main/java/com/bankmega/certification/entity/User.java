@@ -34,9 +34,6 @@ public class User {
     @Column(length = 50, nullable = false, unique = true) // unik cukup di sini
     private String username;
 
-    /**
-     * Email optional — boleh null & duplikat.
-     */
     @Column(length = 100) // tidak unik
     private String email;
 
@@ -82,11 +79,6 @@ public class User {
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<PicCertificationScope> picCertificationScopes = new HashSet<>();
 
-    /**
-     * Returns the resolved email for this user:
-     * - If user is linked to an employee, returns employee's email
-     * - If user has no employee (superadmin/PIC), returns user's own email
-     */
     public String getResolvedEmail() {
         if (employee != null && employee.getEmail() != null && !employee.getEmail().isBlank()) {
             return employee.getEmail().trim();

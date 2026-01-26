@@ -196,10 +196,6 @@ public class EmployeeEligibilitySpecification {
                 : cb.equal(root.get("certificationRule").get("subField").get("id"), subFieldId);
     }
 
-    /**
-     * PIC scope: list id sertifikasi yang diizinkan.
-     * null = full access, empty = 0 rows (disjunction).
-     */
     public static Specification<EmployeeEligibility> byAllowedCertificationIds(List<Long> allowedCertIds) {
         return (root, query, cb) -> {
             if (allowedCertIds == null) {

@@ -25,7 +25,6 @@ public class JdbcDashboardRepository implements DashboardRepository {
         }
     }
 
-    /** WHERE untuk employee alias (e) - sekarang join positions juga */
     private String whereEmployee(String alias, DashboardFilters f, MapSqlParameterSource p) {
         List<String> cond = new ArrayList<>();
 
@@ -56,7 +55,6 @@ public class JdbcDashboardRepository implements DashboardRepository {
         return cond.isEmpty() ? "" : " AND " + String.join(" AND ", cond);
     }
 
-    /** WHERE untuk certification rule alias (cr) */
     private String whereRule(String alias, DashboardFilters f, MapSqlParameterSource p) {
         List<String> cond = new ArrayList<>();
         if (f.getCertificationId() != null) {

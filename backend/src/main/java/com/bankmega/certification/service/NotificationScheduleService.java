@@ -136,9 +136,6 @@ public class NotificationScheduleService {
         log.info("Jadwal {} ditandai executed pada {}", schedule.getType(), schedule.getLastRun());
     }
 
-    /**
-     * Overload: tandai executed berdasar type (fix untuk pemanggilan di Scheduler).
-     */
     public void markExecuted(NotificationTemplate.Code type) {
         try {
             NotificationSchedule schedule = getByTypeEntity(type);

@@ -694,13 +694,6 @@ public class EmployeeEligibilityService {
         }
     }
 
-    /**
-     * Find the best certificate that covers the required level.
-     * Rules:
-     * - Level must be >= requiredLevel (cover-down)
-     * - Status must be ACTIVE or DUE (expired cannot cover)
-     * - Among valid certs, pick the one with highest level
-     */
     private EmployeeCertification findBestCoveringCert(List<EmployeeCertification> certs, Integer requiredLevel,
             LocalDate today) {
         return certs.stream()

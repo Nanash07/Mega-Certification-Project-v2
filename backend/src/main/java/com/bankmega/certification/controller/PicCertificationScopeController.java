@@ -44,14 +44,12 @@ public class PicCertificationScopeController {
 
     /* ============ endpoints ============ */
 
-    /** List semua PIC + scope (khusus SUPERADMIN) */
     @GetMapping
     @PreAuthorize("hasRole('SUPERADMIN')")
     public List<PicCertificationScopeResponse> listAll() {
         return svc.getAll();
     }
 
-    /** Ambil scope milik user yang login (SUPERADMIN/PIC) */
     @GetMapping("/me")
     @PreAuthorize("hasAnyRole('SUPERADMIN','PIC')")
     public PicCertificationScopeResponse getMine(Authentication auth) {
@@ -61,7 +59,6 @@ public class PicCertificationScopeController {
         return svc.getByUser(selfId);
     }
 
-    /** Ambil scope user tertentu (SUPERADMIN bebas, PIC hanya miliknya sendiri) */
     @GetMapping("/{userId}")
     @PreAuthorize("hasAnyRole('SUPERADMIN','PIC')")
     public PicCertificationScopeResponse get(@PathVariable Long userId, Authentication auth) {
@@ -73,7 +70,6 @@ public class PicCertificationScopeController {
         return svc.getByUser(userId);
     }
 
-    /** Update scope (khusus SUPERADMIN) */
     @PutMapping("/{userId}")
     @PreAuthorize("hasRole('SUPERADMIN')")
     public PicCertificationScopeResponse update(@PathVariable Long userId,

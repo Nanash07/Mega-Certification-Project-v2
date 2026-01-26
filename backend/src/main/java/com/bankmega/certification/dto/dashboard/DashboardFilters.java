@@ -20,7 +20,6 @@ public class DashboardFilters {
 
     private List<Long> allowedCertificationIds;
 
-    /** filter tanggal untuk data yang pakai tabel batches */
     private LocalDate startDate;
     private LocalDate endDate;
     private String batchType;

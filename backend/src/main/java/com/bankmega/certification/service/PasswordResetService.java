@@ -42,11 +42,6 @@ public class PasswordResetService {
     @Value("${app.auth.reset-password.expiry-minutes:15}")
     private long expiryMinutes;
 
-    /**
-     * Return:
-     * - true => akun ditemukan & email reset DIUSAHAKAN dikirim
-     * - false => akun tidak ditemukan / tidak aktif / tidak punya email
-     */
     @Transactional
     public boolean requestReset(String email, String username) {
         String cleanedEmail = trimToNull(email);

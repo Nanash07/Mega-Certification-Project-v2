@@ -41,7 +41,6 @@ public class DashboardController {
                 .build();
     }
 
-    /** helper khusus untuk pegawai */
     private DashboardFilters toEmployeeFilters(Long employeeId,
             LocalDate startDate,
             LocalDate endDate,
@@ -54,7 +53,6 @@ public class DashboardController {
                 .build();
     }
 
-    /** true kalau authority mengandung ROLE_PIC / PIC */
     private boolean isPic(Authentication auth) {
         return auth != null && auth.getAuthorities().stream().anyMatch(a -> {
             String r = a.getAuthority();
@@ -62,7 +60,6 @@ public class DashboardController {
         });
     }
 
-    /** ambil userId dari principal (mendukung CustomUserDetails#getId) */
     private Long extractUserId(Authentication auth, Long injectedUserId) {
         if (injectedUserId != null)
             return injectedUserId;
@@ -81,9 +78,6 @@ public class DashboardController {
         return null;
     }
 
-    /**
-     * ambil employeeId dari principal (mendukung CustomUserDetails#getEmployeeId)
-     */
     private Long extractEmployeeId(Authentication auth, Long injectedEmployeeId) {
         if (injectedEmployeeId != null)
             return injectedEmployeeId;
@@ -102,7 +96,6 @@ public class DashboardController {
         return null;
     }
 
-    /** inject daftar certificationId yang diizinkan untuk PIC */
     private DashboardFilters applyPicScope(DashboardFilters f, Authentication auth, Long userIdFromPrincipal) {
         if (!isPic(auth))
             return f;

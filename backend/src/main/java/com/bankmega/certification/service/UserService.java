@@ -496,7 +496,6 @@ public class UserService {
         return affected;
     }
 
-    /** Nonaktifkan akun untuk pegawai resign — chunked & idempotent. */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public int batchDeactivateByEmployeeIds(List<Long> employeeIds) {
         if (employeeIds == null || employeeIds.isEmpty())

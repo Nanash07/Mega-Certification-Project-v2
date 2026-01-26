@@ -37,12 +37,6 @@ public class JobCertificationMappingSpecification {
                 : root.get("certificationRule").get("subField").get("code").in(subCodes);
     }
 
-    /**
-     * Filter berdasarkan daftar certification.id yang diizinkan (misal dari PIC
-     * scope).
-     * Kalau null/empty → cb.conjunction() (no-op), supaya aman digabung dengan
-     * .and().
-     */
     public static Specification<JobCertificationMapping> byAllowedCertificationIds(List<Long> allowedCertificationIds) {
         return (root, query, cb) -> (allowedCertificationIds == null || allowedCertificationIds.isEmpty())
                 ? cb.conjunction()

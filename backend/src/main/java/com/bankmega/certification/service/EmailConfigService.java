@@ -25,26 +25,22 @@ public class EmailConfigService {
 
     private final EmailConfigRepository repository;
 
-    /** Ambil konfigurasi email aktif (DTO) */
     public EmailConfigResponseDTO getActiveConfig() {
         EmailConfig config = getActiveConfigEntity();
         return mapToResponse(config);
     }
 
-    /** Ambil konfigurasi email aktif (Entity) */
     public EmailConfig getActiveConfigEntity() {
         return repository.findByActiveTrue()
                 .orElseThrow(() -> new RuntimeException("Tidak ada konfigurasi email aktif"));
     }
 
-    /** Ambil semua konfigurasi email */
     public List<EmailConfigResponseDTO> getAllConfigs() {
         return repository.findAll().stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
 
-    /** Simpan konfigurasi baru, nonaktifkan yang lama + enkripsi password */
     @Transactional
     public EmailConfigResponseDTO saveConfig(EmailConfigRequestDTO dto) {
         validate(dto);
@@ -65,7 +61,6 @@ public class EmailConfigService {
         return mapToResponse(config);
     }
 
-    /** Bangun JavaMailSender dari konfigurasi aktif */
     public JavaMailSenderImpl createMailSenderFromActive() {
         return buildSender(getActiveConfigEntity());
     }

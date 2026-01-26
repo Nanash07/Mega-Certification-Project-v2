@@ -64,9 +64,6 @@ public class NotificationSchedulerService {
         }
     }
 
-    /**
-     * Run Now dari controller: langsung eksekusi tanpa cek jam/active.
-     */
     public void runManual(NotificationTemplate.Code type) {
         log.info("[Manual Trigger] Menjalankan jadwal {}", type);
         try {
