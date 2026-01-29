@@ -186,7 +186,7 @@ export default function App() {
                 <Route
                     path="/organization/regional"
                     element={
-                        <ProtectedRoute roles={["SUPERADMIN"]}>
+                        <ProtectedRoute roles={["SUPERADMIN", "PIC"]}>
                             <MainLayout>
                                 <RegionalPage />
                             </MainLayout>
@@ -196,7 +196,7 @@ export default function App() {
                 <Route
                     path="/organization/division"
                     element={
-                        <ProtectedRoute roles={["SUPERADMIN"]}>
+                        <ProtectedRoute roles={["SUPERADMIN", "PIC"]}>
                             <MainLayout>
                                 <DivisionPage />
                             </MainLayout>
@@ -206,7 +206,7 @@ export default function App() {
                 <Route
                     path="/organization/unit"
                     element={
-                        <ProtectedRoute roles={["SUPERADMIN"]}>
+                        <ProtectedRoute roles={["SUPERADMIN", "PIC"]}>
                             <MainLayout>
                                 <UnitPage />
                             </MainLayout>
@@ -216,7 +216,7 @@ export default function App() {
                 <Route
                     path="/organization/job-position"
                     element={
-                        <ProtectedRoute roles={["SUPERADMIN"]}>
+                        <ProtectedRoute roles={["SUPERADMIN", "PIC"]}>
                             <MainLayout>
                                 <JobPositionPage />
                             </MainLayout>

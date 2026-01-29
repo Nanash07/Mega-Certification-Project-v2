@@ -86,6 +86,12 @@ public class UserService {
         return "SUPERADMIN".equals(name) || "PIC".equals(name) || "ROLE_PIC".equals(name);
     }
 
+    private static boolean isSuperAdminRole(Role role) {
+        if (role == null || role.getName() == null)
+            return false;
+        return "SUPERADMIN".equals(role.getName().toUpperCase());
+    }
+
     private static void ensurePicCannotManageRole(boolean callerIsPic, Role targetRole) {
         if (callerIsPic && isPrivilegedRole(targetRole)) {
             throw new IllegalArgumentException("PIC tidak diperbolehkan mengelola user dengan role " +
@@ -105,9 +111,9 @@ public class UserService {
                 .and(UserSpecification.byIsActive(isActive))
                 .and(UserSpecification.bySearch(q));
 
-        // PIC tidak boleh lihat user SUPERADMIN / PIC
+        // PIC tidak boleh lihat user SUPERADMIN, tapi KINI BOLEH lihat sesama PIC
         if (callerIsPic) {
-            spec = spec.and(UserSpecification.excludeRoles(List.of("SUPERADMIN", "PIC", "ROLE_PIC")));
+            spec = spec.and(UserSpecification.excludeRoles(List.of("SUPERADMIN")));
         }
 
         Pageable sorted = pageable.getSort().isUnsorted()
@@ -132,8 +138,8 @@ public class UserService {
         User user = userRepo.findByIdAndDeletedAtIsNull(id)
                 .orElseThrow(() -> new NotFoundException("User dengan id " + id + " tidak ditemukan"));
 
-        if (callerIsPic && isPrivilegedRole(user.getRole())) {
-            // dari perspektif PIC pura-pura not found
+        if (callerIsPic && isSuperAdminRole(user.getRole())) {
+            // dari perspektif PIC pura-pura not found jika target adalah SUPERADMIN
             throw new NotFoundException("User dengan id " + id + " tidak ditemukan");
         }
 
@@ -550,7 +556,7 @@ public class UserService {
                 .and(UserSpecification.bySearch(q));
 
         if (callerIsPic) {
-            spec = spec.and(UserSpecification.excludeRoles(List.of("SUPERADMIN", "PIC", "ROLE_PIC")));
+            spec = spec.and(UserSpecification.excludeRoles(List.of("SUPERADMIN")));
         }
 
         return userRepo.findAll(spec).stream()

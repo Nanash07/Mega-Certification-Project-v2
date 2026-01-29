@@ -56,4 +56,5 @@ public class BatchResponse {
 
     private Long totalParticipants;
     private Long totalPassed;
+    private Long totalFailed;
 }

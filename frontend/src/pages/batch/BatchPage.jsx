@@ -7,7 +7,7 @@ import AsyncSelect from "react-select/async";
 import Pagination from "../../components/common/Pagination";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
 import { getCurrentRole, formatDate } from "../../utils/helpers";
-import { Plus, Pencil, Trash2, Eye, ChevronDown, Eraser, Download, Package } from "lucide-react";
+import { Plus, Pencil, Trash2, Menu, ChevronDown, Eraser, Download, Package } from "lucide-react";
 
 import { fetchBatches, deleteBatch, searchBatches, updateBatch, exportBatchesExcel } from "../../services/batchService";
 import { fetchCertificationRules } from "../../services/certificationRuleService";
@@ -498,12 +498,12 @@ export default function BatchPage() {
                                         <td>{startIdx + idx}</td>
                                         <td>
                                             <div className="flex gap-1">
-                                                <div className="tooltip" data-tip="Lihat detail batch">
+                                                <div className="tooltip" data-tip="Detail batch">
                                                     <Link
                                                         to={`/batch/${b.id}`}
                                                         className="btn btn-xs btn-info btn-soft border border-info rounded-lg"
                                                     >
-                                                        <Eye className="w-3 h-3" />
+                                                        <Menu className="w-3 h-3" />
                                                     </Link>
                                                 </div>
                                                 {!isEmployee && (

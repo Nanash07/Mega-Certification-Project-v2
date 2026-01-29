@@ -191,6 +191,10 @@ public class EmployeeBatchService {
         Batch batch = batchRepo.findByIdAndDeletedAtIsNull(batchId)
                 .orElseThrow(() -> new NotFoundException("Batch not found"));
 
+        if (batch.getCertificationRule() == null) {
+            throw new IllegalStateException("Batch tidak memiliki aturan sertifikasi yang valid.");
+        }
+
         long currentCount = repo.countByBatch_IdAndDeletedAtIsNull(batchId);
         Integer quota = batch.getQuota();
         int remaining = quota == null ? Integer.MAX_VALUE : Math.max(0, quota - (int) currentCount);
@@ -218,17 +222,19 @@ public class EmployeeBatchService {
             if (chunk.isEmpty())
                 break;
 
+            // Handle potential duplicates in repository results using merge function (e1,
+            // e2) -> e1
             Map<Long, Employee> employees = employeeRepo
                     .findByIdInAndDeletedAtIsNull(chunk).stream()
-                    .collect(Collectors.toMap(Employee::getId, e -> e));
+                    .collect(Collectors.toMap(Employee::getId, e -> e, (e1, e2) -> e1));
 
             Map<Long, EmployeeBatch> existingByEmpId = repo
                     .findByBatch_IdAndEmployee_IdIn(batchId, chunk).stream()
-                    .collect(Collectors.toMap(eb -> eb.getEmployee().getId(), eb -> eb));
+                    .collect(Collectors.toMap(eb -> eb.getEmployee().getId(), eb -> eb, (e1, e2) -> e1));
 
             Map<Long, EmployeeEligibility> eligByEmpId = eligibilityRepo
                     .findByEmployee_IdInAndCertificationRule_IdAndDeletedAtIsNull(chunk, ruleId).stream()
-                    .collect(Collectors.toMap(e -> e.getEmployee().getId(), e -> e));
+                    .collect(Collectors.toMap(e -> e.getEmployee().getId(), e -> e, (e1, e2) -> e1));
 
             Set<Long> hasCert = certificationRepo
                     .findByEmployeeIdInAndDeletedAtIsNull(chunk).stream()
@@ -254,6 +260,10 @@ public class EmployeeBatchService {
                 int t = ee.getTrainingCount() == null ? 0 : ee.getTrainingCount();
                 int r = ee.getRefreshmentCount() == null ? 0 : ee.getRefreshmentCount();
                 boolean alreadyCert = hasCert.contains(empId);
+
+                if (batch.getType() == null) {
+                    throw new IllegalStateException("Tipe Batch tidak valid/kosong.");
+                }
 
                 switch (batch.getType()) {
                     case TRAINING -> {
@@ -307,11 +317,17 @@ public class EmployeeBatchService {
             }
 
             if (!toSave.isEmpty()) {
-                repo.saveAll(toSave);
+                List<EmployeeBatch> savedBatches = repo.saveAll(toSave);
                 em.flush();
+
+                // 🔹 FIX: Convert to response BEFORE clearing context to avoid
+                // LazyInitializationException
+                // because em.clear() detaches entities, and accessing lazy collections
+                // (positions) on detached entity fails.
+                savedBatches.forEach(eb -> responses.add(toResponse(eb)));
+
                 em.clear();
-                toSave.forEach(eb -> responses.add(toResponse(eb)));
-                added += toSave.size();
+                added += savedBatches.size();
             }
         }
 

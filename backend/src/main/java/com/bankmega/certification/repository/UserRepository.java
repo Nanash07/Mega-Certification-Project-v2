@@ -47,12 +47,12 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
 
     // EntityGraph override for paging with eager fetch
     @Override
-    @EntityGraph(attributePaths = { "role", "employee" })
+    @EntityGraph(attributePaths = { "role", "employee", "employee.positions", "employee.positions.jobPosition" })
     @NonNull
     Page<User> findAll(@Nullable Specification<User> spec, @NonNull Pageable pageable);
 
     @Override
-    @EntityGraph(attributePaths = { "role", "employee" })
+    @EntityGraph(attributePaths = { "role", "employee", "employee.positions", "employee.positions.jobPosition" })
     @NonNull
     List<User> findAll(@Nullable Specification<User> spec);
 }

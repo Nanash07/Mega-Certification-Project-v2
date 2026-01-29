@@ -737,7 +737,7 @@ export default function EmployeeDashboard() {
                                                         <div className="text-[9px] text-gray-400">Lulus</div>
                                                     </div>
                                                     <div className="flex-1 text-center border-r border-gray-200 last:border-0">
-                                                        <div className="text-red-500 font-bold">{Math.max(toNum(b.totalParticipants)-toNum(b.totalPassed ?? b.passed), 0)}</div>
+                                                        <div className="text-red-500 font-bold">{toNum(b.totalFailed ?? b.failed)}</div>
                                                         <div className="text-[9px] text-gray-400">Gagal</div>
                                                     </div>
                                                     <div className="flex-1 text-center">

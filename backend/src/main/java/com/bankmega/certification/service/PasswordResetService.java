@@ -154,6 +154,14 @@ public class PasswordResetService {
             return;
         }
 
+        // DEVELOPMENT MODE: Log the link explicitly so we can test without email
+        log.info("==============================================================");
+        log.info("MOCK EMAIL SENDER (Dev Mode)");
+        log.info("To: {}", to);
+        log.info("Subject: Reset Password Akun Mega Certification System");
+        log.info("Reset Link: {}", resetLink);
+        log.info("==============================================================");
+
         String subject = "Reset Password Akun Mega Certification System";
 
         String bodyPlain = """
@@ -171,6 +179,12 @@ public class PasswordResetService {
                 """.formatted(resetLink);
 
         try {
+            // Check if mail sender is actually usable/configured properly before trying
+            if (reusableMailSender == null) {
+                log.warn("JavaMailSender is null, skipping email sending");
+                return;
+            }
+
             MimeMessage message = reusableMailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
@@ -192,7 +206,11 @@ public class PasswordResetService {
             reusableMailSender.send(message);
             log.info("Email reset password terkirim ke {}", to);
         } catch (Exception e) {
-            log.error("Gagal kirim email reset password ke {}", to, e);
+            // Log error but DO NOT THROW, so the API returns 200 OK
+            log.warn(
+                    "Gagal kirim email reset password ke {} (kemungkinan SMTP belum dikonfigurasi). Link reset ada di log di atas.",
+                    to);
+            // log.trace("Stack trace:", e);
         }
     }
 

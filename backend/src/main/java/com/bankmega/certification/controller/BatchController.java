@@ -273,6 +273,18 @@ public class BatchController {
         return ResponseEntity.ok(result);
     }
 
+    @GetMapping("/{id}/export-participants")
+    public ResponseEntity<byte[]> exportParticipants(@PathVariable Long id) {
+        byte[] bytes = batchService.exportParticipants(id);
+        String filename = "Batch_Participants_Export.xlsx";
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                .contentType(
+                        MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(bytes);
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<BatchResponse> getById(@PathVariable Long id) {
         return ResponseEntity.ok(batchService.getByIdResponse(id));

@@ -8,13 +8,13 @@ import {
     deleteEmployeeFromBatch,
     retryEmployeeBatch,
 } from "../../services/employeeBatchService";
-import { fetchBatchById, sendBatchNotifications } from "../../services/batchService";
+import { fetchBatchById, sendBatchNotifications, exportBatchParticipants } from "../../services/batchService";
 import AddEmployeeBatchModal from "../../components/batches/AddEmployeeBatchModal";
 import EditBatchModal from "../../components/batches/EditBatchModal";
 import Pagination from "../../components/common/Pagination";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
 import { getCurrentRole } from "../../utils/helpers";
-import { ArrowLeft, Plus, Send, RotateCcw, Pencil, Users, Eraser, Filter } from "lucide-react";
+import { ArrowLeft, Plus, Send, RotateCcw, Pencil, Users, Eraser, Filter, Download } from "lucide-react";
 import Select from "react-select";
 
 function getStoredUser() {
@@ -194,6 +194,16 @@ export default function DetailBatchPage() {
         }
     }
 
+    async function handleExport() {
+        try {
+            await exportBatchParticipants(id, batch?.batchName);
+            toast.success("Export berhasil didownload");
+        } catch (e) {
+            console.error(e);
+            toast.error("Gagal export data");
+        }
+    }
+
     // ================== FILTER OPTIONS ==================
     const employeeOptions = useMemo(
         () =>
@@ -254,6 +264,13 @@ export default function DetailBatchPage() {
                     <div className="flex flex-wrap gap-2">
                         {canManageBatch && (
                             <>
+                                <button
+                                    className="btn btn-sm btn-neutral rounded-lg"
+                                    onClick={handleExport}
+                                >
+                                    <Download size={14} />
+                                    Export Excel
+                                </button>
                                 <button
                                     className="btn btn-sm btn-primary rounded-lg"
                                     onClick={() => setOpenAdd(true)}
@@ -346,6 +363,10 @@ export default function DetailBatchPage() {
                         <div>
                             <span className="font-medium text-gray-500">Total Lulus</span>
                             <div className="font-semibold text-success">{batch.totalPassed ?? 0}</div>
+                        </div>
+                        <div>
+                            <span className="font-medium text-gray-500">Total Gagal</span>
+                            <div className="font-semibold text-error">{batch.totalFailed ?? 0}</div>
                         </div>
                     </div>
                 </div>

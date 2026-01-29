@@ -1,11 +1,11 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import Select from "react-select";
 import AsyncSelect from "react-select/async";
 import Pagination from "../../components/common/Pagination";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
-import { getCurrentRole } from "../../utils/helpers";
+import { getCurrentRole, debounce } from "../../utils/helpers";
 import { fetchUsers, deleteUser, toggleUser, fetchActiveUsers } from "../../services/userService";
 import { fetchRoles } from "../../services/roleService";
 import CreateUserModal from "../../components/users/CreateUserModal";
@@ -85,16 +85,23 @@ export default function UserPage() {
     }, [loadUsers]);
 
     // ===================== ASYNC SEARCH USER =====================
-    const loadUserOptions = async (inputValue) => {
-        try {
-            const users = await fetchActiveUsers(inputValue);
-            return users.slice(0, 20).map((u) => ({
-                value: u.id,
-                label: `${u.username}${u.employeeName ? ` - ${u.employeeName}` : ""}`,
-            }));
-        } catch {
-            return [];
-        }
+    // Debounce wrapper
+    const debouncedFetchUserOptions = useRef(
+        debounce((inputValue, callback) => {
+            fetchActiveUsers(inputValue)
+                .then((users) => {
+                    const options = users.slice(0, 20).map((u) => ({
+                        value: u.id,
+                        label: `${u.username}${u.employeeName ? ` - ${u.employeeName}` : ""}`,
+                    }));
+                    callback(options);
+                })
+                .catch(() => callback([]));
+        }, 800)
+    ).current;
+
+    const loadUserOptions = (inputValue, callback) => {
+        debouncedFetchUserOptions(inputValue, callback);
     };
 
     // ===================== STATUS STYLE =====================

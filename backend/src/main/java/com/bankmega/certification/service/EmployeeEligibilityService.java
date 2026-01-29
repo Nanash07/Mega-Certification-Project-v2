@@ -282,7 +282,8 @@ public class EmployeeEligibilityService {
     @Transactional(readOnly = true)
     public List<EmployeeEligibilityResponse> getByEmployeeId(Long employeeId) {
         Employee emp = employeeRepo.findById(java.util.Objects.requireNonNull(employeeId))
-                .orElseThrow(() -> new RuntimeException("Employee not found"));
+                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.NOT_FOUND, "Employee not found"));
         if (isResigned(emp))
             return List.of();
 
@@ -296,13 +297,15 @@ public class EmployeeEligibilityService {
     public EmployeeEligibilityResponse getById(Long id) {
         return eligibilityRepo.findById(java.util.Objects.requireNonNull(id))
                 .map(this::toResponse)
-                .orElseThrow(() -> new RuntimeException("Eligibility not found"));
+                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.NOT_FOUND, "Eligibility not found"));
     }
 
     @Transactional
     public EmployeeEligibilityResponse toggleActive(Long id) {
         EmployeeEligibility eligibility = eligibilityRepo.findById(java.util.Objects.requireNonNull(id))
-                .orElseThrow(() -> new RuntimeException("Eligibility not found"));
+                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.NOT_FOUND, "Eligibility not found"));
 
         eligibility.setIsActive(!Boolean.TRUE.equals(eligibility.getIsActive()));
         eligibility.setDeletedAt(Boolean.TRUE.equals(eligibility.getIsActive()) ? null : Instant.now());
@@ -313,7 +316,8 @@ public class EmployeeEligibilityService {
     @Transactional
     public void softDelete(Long id) {
         EmployeeEligibility eligibility = eligibilityRepo.findById(java.util.Objects.requireNonNull(id))
-                .orElseThrow(() -> new RuntimeException("Eligibility not found"));
+                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.NOT_FOUND, "Eligibility not found"));
         eligibility.setIsActive(false);
         eligibility.setDeletedAt(Instant.now());
         eligibilityRepo.save(eligibility);
@@ -373,7 +377,8 @@ public class EmployeeEligibilityService {
     public void refreshEligibilityForEmployee(Long employeeId) {
         // Optimized: Use EntityGraph to load employee with positions in single query
         Employee employee = employeeRepo.findByIdWithPositions(java.util.Objects.requireNonNull(employeeId))
-                .orElseThrow(() -> new RuntimeException("Employee not found"));
+                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.NOT_FOUND, "Employee not found"));
 
         if (isResigned(employee)) {
             List<EmployeeEligibility> deactivated = deactivateEligibilitiesForEmployee(employee);

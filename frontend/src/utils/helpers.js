@@ -62,3 +62,12 @@ export function isEmployee() {
     const role = getCurrentRole();
     return role === "EMPLOYEE" || role === "PEGAWAI";
 }
+
+export function debounce(func, wait) {
+    let timeout;
+    return function (...args) {
+        const context = this;
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(context, args), wait);
+    };
+}

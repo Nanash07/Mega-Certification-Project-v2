@@ -147,7 +147,6 @@ export const filterMenuByRole = (menu, roleRaw) => {
 
     if (role === "PIC") {
         return menu
-            .filter((item) => item.key !== "organization")
             .map((item) => {
                 if (item.key === "sertifikat") {
                     return {

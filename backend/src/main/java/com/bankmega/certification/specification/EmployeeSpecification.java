@@ -57,10 +57,22 @@ public class EmployeeSpecification {
             if (query != null)
                 query.distinct(true);
 
+            // Optimasi: Split search di Java, jangan CONCAT di DB
+            jakarta.persistence.criteria.Predicate splitMatch = cb.disjunction();
+            if (search.contains(" - ")) {
+                String[] parts = search.split(" - ", 2);
+                if (parts.length == 2) {
+                    splitMatch = cb.and(
+                            cb.like(cb.lower(root.get("nip")), "%" + parts[0].trim().toLowerCase() + "%"),
+                            cb.like(cb.lower(root.get("name")), "%" + parts[1].trim().toLowerCase() + "%"));
+                }
+            }
+
             return cb.or(
                     cb.like(cb.lower(root.get("nip")), like),
                     cb.like(cb.lower(root.get("name")), like),
                     cb.like(cb.lower(root.get("email")), like),
+                    splitMatch,
                     cb.and(
                             cb.isNull(positions.get("deletedAt")),
                             cb.isTrue(positions.get("isActive")),

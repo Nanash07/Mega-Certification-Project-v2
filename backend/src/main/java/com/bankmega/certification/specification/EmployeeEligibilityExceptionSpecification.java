@@ -32,13 +32,14 @@ public class EmployeeEligibilityExceptionSpecification {
     }
 
     public static Specification<EmployeeEligibilityException> byJobIds(List<Long> jobIds) {
-        if (jobIds == null || jobIds.isEmpty())
-            return null;
         return (root, query, cb) -> {
+            if (jobIds == null || jobIds.isEmpty())
+                return cb.conjunction();
+
+            // Match pattern from EmployeeEligibilitySpecification
             var emp = root.join("employee", JoinType.LEFT);
             var positions = emp.join("positions", JoinType.LEFT);
-            if (query != null)
-                query.distinct(true);
+
             return cb.and(
                     cb.isNull(positions.get("deletedAt")),
                     cb.isTrue(positions.get("isActive")),
@@ -122,33 +123,26 @@ public class EmployeeEligibilityExceptionSpecification {
             String like = "%" + keyword.trim().toLowerCase(Locale.ROOT) + "%";
 
             var emp = root.join("employee", JoinType.LEFT);
-            var positions = emp.join("positions", JoinType.LEFT);
-            var job = positions.join("jobPosition", JoinType.LEFT);
-            if (query != null)
-                query.distinct(true);
 
             var rule = root.join("certificationRule", JoinType.LEFT);
             var cert = rule.join("certification", JoinType.LEFT);
             var level = rule.join("certificationLevel", JoinType.LEFT);
             var sub = rule.join("subField", JoinType.LEFT);
 
-            var empNip = cb.like(cb.lower(emp.get("nip")), like);
-            var empName = cb.like(cb.lower(emp.get("name")), like);
-            var jobName = cb.and(
-                    cb.isNull(positions.get("deletedAt")),
-                    cb.isTrue(positions.get("isActive")),
-                    cb.like(cb.lower(job.get("name")), like));
+            // Basic searches without positions join to avoid complexity
+            var empNip = cb.like(cb.coalesce(cb.lower(emp.get("nip")), ""), like);
+            var empName = cb.like(cb.coalesce(cb.lower(emp.get("name")), ""), like);
 
-            var certCode = cb.like(cb.lower(cert.get("code")), like);
-            var certName = cb.like(cb.lower(cert.get("name")), like);
+            var certCode = cb.like(cb.coalesce(cb.lower(cert.get("code")), ""), like);
+            var certName = cb.like(cb.coalesce(cb.lower(cert.get("name")), ""), like);
 
-            var levelName = cb.like(cb.lower(level.get("name")), like);
-            var subCode = cb.like(cb.lower(sub.get("code")), like);
-            var subName = cb.like(cb.lower(sub.get("name")), like);
+            var levelName = cb.like(cb.coalesce(cb.lower(level.get("name")), ""), like);
+            var subCode = cb.like(cb.coalesce(cb.lower(sub.get("code")), ""), like);
+            var subName = cb.like(cb.coalesce(cb.lower(sub.get("name")), ""), like);
 
             var notes = cb.like(cb.coalesce(cb.lower(root.get("notes")), ""), like);
 
-            return cb.or(empNip, empName, jobName, certCode, certName, levelName, subCode, subName, notes);
+            return cb.or(empNip, empName, certCode, certName, levelName, subCode, subName, notes);
         };
     }
 

@@ -142,8 +142,8 @@ export default function BatchListCard({ title, status, filters = {}, initialRows
                             {rows.map((b) => {
                                 const quota = toNum(b.quota);
                                 const passed = toNum(b.totalPassed ?? b.passed);
+                                const failed = toNum(b.totalFailed ?? b.failed);
                                 const total = toNum(b.totalParticipants);
-                                const failed = Math.max(total - passed, 0);
                                 const filled = isOngoing ? total : passed + failed;
 
                                 return (

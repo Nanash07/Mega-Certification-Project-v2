@@ -156,6 +156,144 @@ public class BatchService {
     }
 
     @Transactional(readOnly = true)
+    public byte[] exportParticipants(Long batchId) {
+        Batch batch = batchRepository.findByIdAndDeletedAtIsNull(batchId)
+                .orElseThrow(() -> new NotFoundException("Batch not found with id " + batchId));
+
+        List<EmployeeBatch> participants = employeeBatchRepository
+                .findWithEmployeeByBatch_IdAndDeletedAtIsNull(batchId);
+
+        try (Workbook wb = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            Sheet sheet = wb.createSheet("Peserta Batch");
+
+            Font headerFont = wb.createFont();
+            headerFont.setBold(true);
+
+            CellStyle headerStyle = wb.createCellStyle();
+            headerStyle.setFont(headerFont);
+            headerStyle.setFillForegroundColor(IndexedColors.GREY_25_PERCENT.getIndex());
+            headerStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+            headerStyle.setBorderBottom(BorderStyle.THIN);
+            headerStyle.setBorderTop(BorderStyle.THIN);
+            headerStyle.setBorderLeft(BorderStyle.THIN);
+            headerStyle.setBorderRight(BorderStyle.THIN);
+
+            CellStyle boldStyle = wb.createCellStyle();
+            boldStyle.setFont(headerFont);
+
+            DateTimeFormatter df = DateTimeFormatter.ofPattern("dd-MM-yyyy");
+
+            // --- HEADER BATCH INFO ---
+            int rowIdx = 0;
+
+            Row rName = sheet.createRow(rowIdx++);
+            rName.createCell(0).setCellValue("Nama Batch");
+            rName.getCell(0).setCellStyle(boldStyle);
+            rName.createCell(1).setCellValue(batch.getBatchName());
+
+            Row rType = sheet.createRow(rowIdx++);
+            rType.createCell(0).setCellValue("Jenis");
+            rType.getCell(0).setCellStyle(boldStyle);
+            rType.createCell(1).setCellValue(batch.getType() != null ? batch.getType().name() : "-");
+
+            Row rStart = sheet.createRow(rowIdx++);
+            rStart.createCell(0).setCellValue("Tanggal Mulai");
+            rStart.getCell(0).setCellStyle(boldStyle);
+            rStart.createCell(1).setCellValue(batch.getStartDate() != null ? df.format(batch.getStartDate()) : "-");
+
+            Row rEnd = sheet.createRow(rowIdx++);
+            rEnd.createCell(0).setCellValue("Tanggal Selesai");
+            rEnd.getCell(0).setCellStyle(boldStyle);
+            rEnd.createCell(1).setCellValue(batch.getEndDate() != null ? df.format(batch.getEndDate()) : "-");
+
+            Row rCert = sheet.createRow(rowIdx++);
+            rCert.createCell(0).setCellValue("Sertifikasi");
+            rCert.getCell(0).setCellStyle(boldStyle);
+
+            String certInfo = "-";
+            if (batch.getCertificationRule() != null) {
+                var r = batch.getCertificationRule();
+                var c = r.getCertification() != null ? r.getCertification().getCode() : "";
+                var l = r.getCertificationLevel() != null ? "Jenjang " + r.getCertificationLevel().getLevel() : "";
+                var s = r.getSubField() != null ? r.getSubField().getCode() : "";
+                // Join non-empty
+                certInfo = java.util.stream.Stream.of(c, l, s)
+                        .filter(str -> str != null && !str.isEmpty())
+                        .collect(Collectors.joining(" - "));
+            }
+            rCert.createCell(1).setCellValue(certInfo);
+
+            Row rInst = sheet.createRow(rowIdx++);
+            rInst.createCell(0).setCellValue("Lembaga");
+            rInst.getCell(0).setCellStyle(boldStyle);
+            rInst.createCell(1).setCellValue(batch.getInstitution() != null ? batch.getInstitution().getName() : "-");
+
+            // Empty row
+            rowIdx++;
+
+            // --- TABLE HEADER ---
+            Row tableHeader = sheet.createRow(rowIdx++);
+            String[] headers = { "No", "NIP", "Nama Pegawai", "Regional", "Divisi", "Unit", "Jabatan", "Status" };
+            for (int i = 0; i < headers.length; i++) {
+                Cell c = tableHeader.createCell(i);
+                c.setCellValue(headers[i]);
+                c.setCellStyle(headerStyle);
+            }
+
+            // --- TABLE DATA ---
+            int no = 1;
+            for (EmployeeBatch eb : participants) {
+                Row row = sheet.createRow(rowIdx++);
+
+                // No
+                row.createCell(0).setCellValue(no++);
+
+                var emp = eb.getEmployee();
+                if (emp != null) {
+                    // NIP
+                    row.createCell(1).setCellValue(emp.getNip());
+                    // Nama
+                    row.createCell(2).setCellValue(emp.getName());
+
+                    var pos = emp.getPrimaryPosition();
+                    if (pos != null) {
+                        row.createCell(3).setCellValue(pos.getRegional() != null ? pos.getRegional().getName() : "-");
+                        row.createCell(4).setCellValue(pos.getDivision() != null ? pos.getDivision().getName() : "-");
+                        row.createCell(5).setCellValue(pos.getUnit() != null ? pos.getUnit().getName() : "-");
+                        row.createCell(6)
+                                .setCellValue(pos.getJobPosition() != null ? pos.getJobPosition().getName() : "-");
+                    } else {
+                        row.createCell(3).setCellValue("-");
+                        row.createCell(4).setCellValue("-");
+                        row.createCell(5).setCellValue("-");
+                        row.createCell(6).setCellValue("-");
+                    }
+                } else {
+                    row.createCell(1).setCellValue("-");
+                    row.createCell(2).setCellValue("-");
+                    row.createCell(3).setCellValue("-");
+                    row.createCell(4).setCellValue("-");
+                    row.createCell(5).setCellValue("-");
+                    row.createCell(6).setCellValue("-");
+                }
+
+                // Status
+                row.createCell(7).setCellValue(eb.getStatus() != null ? eb.getStatus().name() : "-");
+            }
+
+            // Auto size
+            for (int i = 0; i < headers.length; i++) {
+                sheet.autoSizeColumn(i);
+            }
+
+            wb.write(out);
+            return out.toByteArray();
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed to export participants", e);
+        }
+    }
+
+    @Transactional(readOnly = true)
     public long countForDashboard(
             List<Batch.Status> statuses,
             Batch.BatchType type,
@@ -407,6 +545,9 @@ public class BatchService {
         long totalPassed = (b.getId() == null) ? 0L
                 : employeeBatchRepository.countByBatch_IdAndStatusAndDeletedAtIsNull(
                         b.getId(), EmployeeBatch.Status.PASSED);
+        long totalFailed = (b.getId() == null) ? 0L
+                : employeeBatchRepository.countByBatch_IdAndStatusAndDeletedAtIsNull(
+                        b.getId(), EmployeeBatch.Status.FAILED);
 
         return BatchResponse.builder()
                 .id(b.getId())
@@ -445,6 +586,7 @@ public class BatchService {
                 .updatedAt(b.getUpdatedAt())
                 .totalParticipants(totalParticipants)
                 .totalPassed(totalPassed)
+                .totalFailed(totalFailed)
                 .build();
     }
 

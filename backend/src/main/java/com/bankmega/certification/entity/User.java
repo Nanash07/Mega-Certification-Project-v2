@@ -13,6 +13,7 @@ import java.util.Set;
 @Entity
 @Table(name = "users", indexes = {
         @Index(name = "idx_users_email", columnList = "email"),
+        @Index(name = "idx_users_username", columnList = "username"),
         @Index(name = "idx_users_deleted", columnList = "deleted_at"),
         @Index(name = "idx_users_role", columnList = "role_id"),
         @Index(name = "idx_users_is_active", columnList = "is_active")

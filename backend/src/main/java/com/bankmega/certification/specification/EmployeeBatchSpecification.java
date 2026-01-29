@@ -28,9 +28,24 @@ public class EmployeeBatchSpecification {
             if (search == null || search.trim().isEmpty())
                 return cb.conjunction();
             String like = "%" + search.toLowerCase() + "%";
+
+            var emp = root.join("employee", JoinType.LEFT);
+
+            // Optimasi split
+            jakarta.persistence.criteria.Predicate splitMatch = cb.disjunction();
+            if (search.contains(" - ")) {
+                String[] parts = search.split(" - ", 2);
+                if (parts.length == 2) {
+                    splitMatch = cb.and(
+                            cb.like(cb.lower(emp.get("nip")), "%" + parts[0].trim().toLowerCase() + "%"),
+                            cb.like(cb.lower(emp.get("name")), "%" + parts[1].trim().toLowerCase() + "%"));
+                }
+            }
+
             return cb.or(
-                    cb.like(cb.lower(root.get("employee").get("name")), like),
-                    cb.like(cb.lower(root.get("employee").get("nip")), like));
+                    cb.like(cb.lower(emp.get("name")), like),
+                    cb.like(cb.lower(emp.get("nip")), like),
+                    splitMatch);
         };
     }
 

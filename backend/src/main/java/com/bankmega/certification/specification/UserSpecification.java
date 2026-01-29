@@ -63,14 +63,26 @@ public class UserSpecification {
 
             String like = "%" + keyword.trim().toLowerCase() + "%";
 
-            // left join ke employee (karena gak semua user punya employee)
+            // left join ke employee
             var empJoin = root.join("employee", JoinType.LEFT);
+
+            // Optimasi: Jangan pakai CONCAT di DB karena lambat, logic split di Java
+            jakarta.persistence.criteria.Predicate splitMatch = cb.disjunction(); // default false
+            if (keyword.contains(" - ")) {
+                String[] parts = keyword.split(" - ", 2);
+                if (parts.length == 2) {
+                    splitMatch = cb.and(
+                            cb.like(cb.lower(empJoin.get("nip")), "%" + parts[0].trim().toLowerCase() + "%"),
+                            cb.like(cb.lower(empJoin.get("name")), "%" + parts[1].trim().toLowerCase() + "%"));
+                }
+            }
 
             return cb.or(
                     cb.like(cb.lower(root.get("username")), like),
                     cb.like(cb.lower(root.get("email")), like),
                     cb.like(cb.lower(empJoin.get("name")), like),
-                    cb.like(cb.lower(empJoin.get("nip")), like));
+                    cb.like(cb.lower(empJoin.get("nip")), like),
+                    splitMatch);
         };
     }
 

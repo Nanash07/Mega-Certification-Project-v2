@@ -255,3 +255,20 @@ export async function exportBatchesExcel(params = {}) {
     downloadBlob(blob, filename);
     return true;
 }
+
+export async function exportBatchParticipants(id, batchName) {
+    const res = await api.get(`${BASE}/${id}/export-participants`, {
+        responseType: "blob",
+        transformResponse: (r) => r,
+    });
+
+    const safeName = batchName ? safeSlug(batchName) : id;
+    const filename = `batch_${safeName}.xlsx`;
+
+    const blob = new Blob([res.data], {
+        type: res?.headers?.["content-type"] || "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+
+    downloadBlob(blob, filename);
+    return true;
+}
