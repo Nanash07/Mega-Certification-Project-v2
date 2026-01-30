@@ -6,7 +6,10 @@ import lombok.*;
 import java.time.Instant;
 
 @Entity
-@Table(name = "employee_import_logs")
+@Table(name = "employee_import_logs", indexes = {
+        @Index(name = "idx_eil_user", columnList = "user_id"),
+        @Index(name = "idx_eil_date", columnList = "createdAt")
+})
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

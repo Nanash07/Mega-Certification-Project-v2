@@ -308,7 +308,8 @@ public class NotificationService {
         final Batch batch = batchRepository.findByIdAndDeletedAtIsNull(batchId)
                 .orElseThrow(() -> new RuntimeException("Batch not found with id " + batchId));
 
-        List<EmployeeBatch> participants = employeeBatchRepository.findByBatch_IdAndDeletedAtIsNull(batchId);
+        List<EmployeeBatch> participants = employeeBatchRepository
+                .findWithEmployeeByBatch_IdAndDeletedAtIsNull(batchId);
         if (onlyStatus != null) {
             participants = participants.stream()
                     .filter(p -> onlyStatus.equals(p.getStatus()))
@@ -317,8 +318,9 @@ public class NotificationService {
         if (participants.isEmpty())
             return 0;
 
-        final Set<Long> uniqueEmployeeIds = new LinkedHashSet<Long>();
-        int sent = 0;
+        final Set<Long> uniqueEmployeeIds = new LinkedHashSet<>();
+        List<Notification> notificationsToSave = new ArrayList<>();
+        List<EmailRequest> emailRequests = new ArrayList<>();
 
         for (EmployeeBatch eb : participants) {
             final Employee emp = eb.getEmployee();
@@ -327,10 +329,52 @@ public class NotificationService {
             if (!uniqueEmployeeIds.add(emp.getId()))
                 continue;
 
-            sendBatchNotification(emp, batch);
-            sent++;
+            // Prepare content (Inline logic from sendBatchNotification for bulk
+            // optimization)
+            final Map<String, Object> extras = new LinkedHashMap<>();
+            extras.put("{{namaBatch}}", batch.getBatchName());
+            extras.put("{{mulaiTanggal}}", batch.getStartDate());
+            extras.put("{{jenisBatch}}", mapJenisBatch(batch.getType()));
+
+            final String subject = templateService.generateTitle(
+                    NotificationTemplate.Code.BATCH_NOTIFICATION, emp, extras);
+            final String bodyPlain = templateService.generateMessage(
+                    NotificationTemplate.Code.BATCH_NOTIFICATION, emp, extras);
+
+            Map<String, String> vars = buildCommonVars(emp);
+            vars.put("{{namaBatch}}", Objects.toString(extras.get("{{namaBatch}}"), "-"));
+            vars.put("{{mulaiTanggal}}", formatDateId((LocalDate) extras.get("{{mulaiTanggal}}")));
+            vars.put("{{jenisBatch}}", Objects.toString(extras.get("{{jenisBatch}}"), "-"));
+
+            final String bodyHtml = buildHtmlWithBold(bodyPlain, vars);
+
+            Notification notif = Notification.builder()
+                    .userId(emp.getId())
+                    .title(subject)
+                    .message(bodyPlain)
+                    .type(Notification.Type.BATCH_NOTIFICATION)
+                    .isRead(false)
+                    .relatedEntity("Batch")
+                    .relatedEntityId(batch.getId())
+                    .createdAt(LocalDateTime.now())
+                    .sentAt(LocalDateTime.now())
+                    .build();
+
+            notificationsToSave.add(notif);
+            emailRequests.add(new EmailRequest(emp.getEmail(), subject, bodyHtml));
         }
-        return sent;
+
+        if (!notificationsToSave.isEmpty()) {
+            notificationRepository.saveAll(notificationsToSave);
+            log.info("Bulk saved {} notifications for batch {}", notificationsToSave.size(), batchId);
+        }
+
+        // Send emails async
+        for (EmailRequest req : emailRequests) {
+            sendEmailAsync(req.to, req.subject, req.html);
+        }
+
+        return notificationsToSave.size();
     }
 
     public void sendBatchNotification(Employee employee, Batch batch) {
@@ -339,7 +383,7 @@ public class NotificationService {
         if (batch == null)
             return;
 
-        final Map<String, Object> extras = new LinkedHashMap<String, Object>();
+        final Map<String, Object> extras = new LinkedHashMap<>();
         extras.put("{{namaBatch}}", batch.getBatchName());
         extras.put("{{mulaiTanggal}}", batch.getStartDate());
         extras.put("{{jenisBatch}}", mapJenisBatch(batch.getType()));
@@ -365,6 +409,9 @@ public class NotificationService {
                 Notification.Type.BATCH_NOTIFICATION,
                 "Batch",
                 batch.getId());
+    }
+
+    private record EmailRequest(String to, String subject, String html) {
     }
 
     public List<Notification> getUserNotifications(Long userId) {

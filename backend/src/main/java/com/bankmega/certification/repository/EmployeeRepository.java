@@ -53,6 +53,15 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long>, JpaSp
 
         List<Employee> findByNipIn(Collection<String> nips);
 
+        @EntityGraph(attributePaths = {
+                        "positions",
+                        "positions.regional",
+                        "positions.division",
+                        "positions.unit",
+                        "positions.jobPosition"
+        })
+        List<Employee> findWithPositionsByNipIn(Collection<String> nips);
+
         List<Employee> findByDeletedAtIsNotNull();
 
         Page<Employee> findByDeletedAtIsNotNull(Pageable pageable);

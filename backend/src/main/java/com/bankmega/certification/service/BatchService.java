@@ -152,7 +152,10 @@ public class BatchService {
                     Sort.by(Sort.Order.desc("startDate"), Sort.Order.asc("batchName")));
         }
 
-        return batchRepository.findAll(spec, pageable).map(this::toResponse);
+        Page<Batch> page = batchRepository.findAll(spec, pageable);
+        Map<Long, BatchStats> stats = fetchStats(page.getContent());
+
+        return page.map(b -> toResponse(b, stats));
     }
 
     @Transactional(readOnly = true)
@@ -415,6 +418,8 @@ public class BatchService {
                 spec,
                 Sort.by(Sort.Order.desc("startDate"), Sort.Order.asc("batchName")));
 
+        Map<Long, BatchStats> stats = fetchStats(batches);
+
         try (Workbook wb = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             Sheet sheet = wb.createSheet("Batches");
             DateTimeFormatter df = DateTimeFormatter.ISO_LOCAL_DATE;
@@ -462,7 +467,7 @@ public class BatchService {
 
             int rowIdx = 1;
             for (Batch b : batches) {
-                BatchResponse r = toResponse(b);
+                BatchResponse r = toResponse(b, stats);
                 Row row = sheet.createRow(rowIdx++);
 
                 setCell(row, 0, r.getId(), numberStyle);
@@ -538,16 +543,29 @@ public class BatchService {
     }
 
     private BatchResponse toResponse(Batch b) {
+        return toResponse(b, null);
+    }
+
+    private BatchResponse toResponse(Batch b, Map<Long, BatchStats> statsMap) {
         CertificationRule rule = b.getCertificationRule();
 
-        long totalParticipants = (b.getId() == null) ? 0L
-                : employeeBatchRepository.countByBatch_IdAndDeletedAtIsNull(b.getId());
-        long totalPassed = (b.getId() == null) ? 0L
-                : employeeBatchRepository.countByBatch_IdAndStatusAndDeletedAtIsNull(
-                        b.getId(), EmployeeBatch.Status.PASSED);
-        long totalFailed = (b.getId() == null) ? 0L
-                : employeeBatchRepository.countByBatch_IdAndStatusAndDeletedAtIsNull(
-                        b.getId(), EmployeeBatch.Status.FAILED);
+        long totalParticipants = 0;
+        long totalPassed = 0;
+        long totalFailed = 0;
+
+        if (statsMap != null && statsMap.containsKey(b.getId())) {
+            BatchStats s = statsMap.get(b.getId());
+            totalParticipants = s.total();
+            totalPassed = s.passed();
+            totalFailed = s.failed();
+        } else if (b.getId() != null) {
+            // Fallback to N+1 if stats not provided (e.g. create/update)
+            totalParticipants = employeeBatchRepository.countByBatch_IdAndDeletedAtIsNull(b.getId());
+            totalPassed = employeeBatchRepository.countByBatch_IdAndStatusAndDeletedAtIsNull(
+                    b.getId(), EmployeeBatch.Status.PASSED);
+            totalFailed = employeeBatchRepository.countByBatch_IdAndStatusAndDeletedAtIsNull(
+                    b.getId(), EmployeeBatch.Status.FAILED);
+        }
 
         return BatchResponse.builder()
                 .id(b.getId())
@@ -588,6 +606,32 @@ public class BatchService {
                 .totalPassed(totalPassed)
                 .totalFailed(totalFailed)
                 .build();
+    }
+
+    private Map<Long, BatchStats> fetchStats(List<Batch> batches) {
+        if (batches == null || batches.isEmpty())
+            return java.util.Collections.emptyMap();
+
+        List<Long> ids = batches.stream().map(Batch::getId).distinct().toList();
+        Map<Long, BatchStats> map = new java.util.HashMap<>();
+
+        // Chunking just in case of IN clause limit (e.g. > 2000)
+        int chunkSize = 2000;
+        for (int i = 0; i < ids.size(); i += chunkSize) {
+            List<Long> chunk = ids.subList(i, Math.min(i + chunkSize, ids.size()));
+            List<Object[]> results = employeeBatchRepository.countStatsByBatchIds(chunk);
+            for (Object[] row : results) {
+                Long batchId = (Long) row[0];
+                long total = ((Number) row[1]).longValue();
+                long passed = ((Number) row[2]).longValue();
+                long failed = ((Number) row[3]).longValue();
+                map.put(batchId, new BatchStats(total, passed, failed));
+            }
+        }
+        return map;
+    }
+
+    private record BatchStats(long total, long passed, long failed) {
     }
 
     private void validateQuota(Integer quota) {

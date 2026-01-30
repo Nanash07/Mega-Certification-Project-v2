@@ -25,4 +25,17 @@ public interface JobCertificationMappingRepository extends
 
     @EntityGraph(attributePaths = { "jobPosition", "certificationRule" })
     List<JobCertificationMapping> findWithRelationsByDeletedAtIsNull();
+
+    @Override
+    @EntityGraph(attributePaths = {
+            "jobPosition",
+            "certificationRule",
+            "certificationRule.certification",
+            "certificationRule.certificationLevel",
+            "certificationRule.subField"
+    })
+    @org.springframework.lang.NonNull
+    org.springframework.data.domain.Page<JobCertificationMapping> findAll(
+            @org.springframework.lang.Nullable org.springframework.data.jpa.domain.Specification<JobCertificationMapping> spec,
+            @org.springframework.lang.NonNull org.springframework.data.domain.Pageable pageable);
 }

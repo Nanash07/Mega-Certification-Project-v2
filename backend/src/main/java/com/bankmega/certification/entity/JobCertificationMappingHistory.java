@@ -8,7 +8,11 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 import java.time.Instant;
 
 @Entity
-@Table(name = "job_certification_mapping_histories")
+@Table(name = "job_certification_mapping_histories", indexes = {
+        @Index(name = "idx_jcmh_mapping", columnList = "mapping_id"),
+        @Index(name = "idx_jcmh_action", columnList = "action_type"),
+        @Index(name = "idx_jcmh_date", columnList = "action_at")
+})
 @Getter
 @Setter
 @NoArgsConstructor

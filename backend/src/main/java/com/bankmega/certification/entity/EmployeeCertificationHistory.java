@@ -9,7 +9,13 @@ import java.time.Instant;
 import java.time.LocalDate;
 
 @Entity
-@Table(name = "employee_certification_histories")
+@Table(name = "employee_certification_histories", indexes = {
+        @Index(name = "idx_ech_cert_id", columnList = "employee_certification_id"),
+        @Index(name = "idx_ech_emp_id", columnList = "employeeId"),
+        @Index(name = "idx_ech_rule_id", columnList = "certificationRuleId"),
+        @Index(name = "idx_ech_action", columnList = "actionType"),
+        @Index(name = "idx_ech_date", columnList = "actionAt")
+})
 @Getter
 @Setter
 @NoArgsConstructor

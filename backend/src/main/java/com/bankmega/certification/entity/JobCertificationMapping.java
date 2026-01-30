@@ -10,7 +10,10 @@ import java.time.Instant;
 
 @Entity
 @Table(name = "job_certification_mappings", uniqueConstraints = {
-        @UniqueConstraint(columnNames = {"job_position_id", "certification_rule_id"})
+        @UniqueConstraint(columnNames = { "job_position_id", "certification_rule_id" })
+}, indexes = {
+        @Index(name = "idx_jcm_rule", columnList = "certification_rule_id"),
+        @Index(name = "idx_jcm_deleted", columnList = "deleted_at")
 })
 @Getter
 @Setter

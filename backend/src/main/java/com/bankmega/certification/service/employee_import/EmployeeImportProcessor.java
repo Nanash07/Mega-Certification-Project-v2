@@ -178,7 +178,7 @@ public class EmployeeImportProcessor {
                 .map(r -> r.nip)
                 .collect(Collectors.toCollection(LinkedHashSet::new));
 
-        Map<String, Employee> existingByNip = empRepo.findByNipIn(importedNips).stream()
+        Map<String, Employee> existingByNip = empRepo.findWithPositionsByNipIn(importedNips).stream()
                 .collect(Collectors.toMap(Employee::getNip, Function.identity()));
 
         for (ImportRow r : rows) {

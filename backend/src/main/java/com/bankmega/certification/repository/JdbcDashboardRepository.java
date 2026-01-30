@@ -105,18 +105,20 @@ public class JdbcDashboardRepository implements DashboardRepository {
         String ruleWhere = whereRule("cr", f, p);
 
         String sql = """
-                WITH latest_ec AS (
-                  SELECT DISTINCT ON (ec.employee_id, ec.certification_rule_id)
-                         ec.employee_id, ec.certification_rule_id, ec.status
-                  FROM employee_certifications ec
-                  WHERE ec.deleted_at IS NULL
-                  ORDER BY ec.employee_id, ec.certification_rule_id, COALESCE(ec.updated_at, ec.created_at) DESC
-                ),
-                scoped_emp AS (
+                WITH scoped_emp AS (
                   SELECT e.id
                   FROM employees e
                   WHERE e.deleted_at IS NULL
                   %s
+                ),
+                latest_ec AS (
+                  SELECT DISTINCT ON (ec.employee_id, ec.certification_rule_id)
+                         ec.employee_id, ec.certification_rule_id, ec.status
+                  FROM employee_certifications ec
+                  JOIN scoped_emp se ON se.id = ec.employee_id
+                  WHERE ec.deleted_at IS NULL
+                  %s
+                  ORDER BY ec.employee_id, ec.certification_rule_id, COALESCE(ec.updated_at, ec.created_at) DESC
                 ),
                 scoped_elg AS (
                   SELECT elg.employee_id, elg.certification_rule_id
@@ -137,29 +139,16 @@ public class JdbcDashboardRepository implements DashboardRepository {
                 SELECT
                   (SELECT COUNT(*) FROM scoped_emp) AS employee_count,
                   (SELECT COUNT(*) FROM scoped_elg) AS eligible_population,
-
                   COUNT(CASE WHEN j.status IN ('ACTIVE','DUE') THEN 1 END) AS certified_count,
-
                   COUNT(CASE WHEN j.status IS NULL OR j.status = 'NOT_YET_CERTIFIED' THEN 1 END) AS not_yet_count,
-
                   (SELECT COUNT(*)
                      FROM latest_ec lec
-                     JOIN scoped_emp se ON se.id = lec.employee_id
-                     JOIN certification_rules cr ON cr.id = lec.certification_rule_id
-                    WHERE 1=1
-                      %s
-                      AND lec.status = 'DUE'
+                    WHERE lec.status = 'DUE'
                   ) AS due_count,
-
                   (SELECT COUNT(*)
                      FROM latest_ec lec
-                     JOIN scoped_emp se ON se.id = lec.employee_id
-                     JOIN certification_rules cr ON cr.id = lec.certification_rule_id
-                    WHERE 1=1
-                      %s
-                      AND lec.status = 'EXPIRED'
+                    WHERE lec.status = 'EXPIRED'
                   ) AS expired_count,
-
                   (SELECT COUNT(*)
                      FROM batches b
                      JOIN certification_rules cr ON cr.id = b.certification_rule_id
@@ -167,7 +156,7 @@ public class JdbcDashboardRepository implements DashboardRepository {
                       %s
                   ) AS ongoing_batch_count
                 FROM joined j;
-                """.formatted(empWhere, ruleWhere, ruleWhere, ruleWhere, ruleWhere);
+                """.formatted(empWhere, whereRule("ec", f, p), ruleWhere, ruleWhere);
 
         Map<String, Object> r = jdbc.queryForMap(java.util.Objects.requireNonNull(sql),
                 java.util.Objects.requireNonNull(p));
