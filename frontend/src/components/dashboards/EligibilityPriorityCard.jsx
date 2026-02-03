@@ -90,13 +90,33 @@ export default function EligibilityPriorityCard({
 
     // Define accent colors and icons based on status for consistency with BatchListCard style
     const getStatusConfig = () => {
-        if (isNotYet) return { color: "text-sky-600", borderColor: "border-l-sky-500", Icon: Clock };
-        if (isDue) return { color: "text-amber-600", borderColor: "border-l-amber-500", Icon: AlertTriangle };
-        if (isExpired) return { color: "text-red-600", borderColor: "border-l-red-500", Icon: XCircle };
-        return { color: "text-gray-600", borderColor: "border-l-gray-500", Icon: FileWarning };
+        if (isNotYet) return { 
+            color: "text-sky-600",
+            bg: "bg-sky-50/50",
+            badge: "text-sky-600 bg-sky-100",
+            Icon: Clock 
+        };
+        if (isDue) return { 
+            color: "text-amber-600", 
+            bg: "bg-amber-50/50",
+            badge: "text-amber-600 bg-amber-100",
+            Icon: AlertTriangle 
+        };
+        if (isExpired) return { 
+            color: "text-red-600", 
+            bg: "bg-red-50/50",
+            badge: "text-red-600 bg-red-100",
+            Icon: XCircle 
+        };
+        return { 
+            color: "text-gray-600",
+            bg: "bg-gray-50/50",
+            badge: "text-gray-600 bg-gray-100",
+            Icon: FileWarning 
+        };
     };
 
-    const { color, Icon } = getStatusConfig();
+    const { color, bg, badge, Icon } = getStatusConfig();
 
     const handleHeaderClick = () => {
         const p = new URLSearchParams();
@@ -112,22 +132,19 @@ export default function EligibilityPriorityCard({
     };
 
     return (
-        <div className="card bg-base-100 shadow-sm border border-gray-200 h-full flex flex-col min-h-[480px]">
-            <div className="p-4 border-b border-gray-100 flex justify-between items-center group/header">
+        <div className="card bg-white shadow-sm border border-gray-100 rounded-xl overflow-hidden h-full flex flex-col min-h-[480px]">
+            <div className={`p-4 border-b border-gray-100 flex items-center justify-between ${bg}`}>
                 <h2
-                    className="font-semibold text-base flex items-center gap-2 text-gray-800 cursor-pointer hover:underline decoration-dashed underline-offset-4"
+                    className="font-semibold text-sm flex items-center gap-2 text-gray-800 cursor-pointer hover:underline decoration-dashed underline-offset-4"
                     onClick={handleHeaderClick}
                     title="Lihat selengkapnya"
                 >
-                    <Icon size={18} className={color} />
+                    <Icon size={16} className={color} />
                     {title}
                 </h2>
-                <button
-                    onClick={handleHeaderClick}
-                    className="btn btn-xs btn-ghost btn-circle opacity-0 group-hover/header:opacity-100 transition-opacity"
-                >
-                    <ArrowRight size={14} />
-                </button>
+                <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${badge}`}>
+                    {totalElements}
+                </span>
             </div>
 
             <div className="flex-1">

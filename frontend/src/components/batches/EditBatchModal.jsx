@@ -1,10 +1,10 @@
 import { useEffect, useState, useMemo } from "react";
 import toast from "react-hot-toast";
 import Select from "react-select";
-import { updateBatch } from "../../services/batchService";
+import { updateBatch, fetchNextBatchSequence } from "../../services/batchService";
 import { fetchCertificationRules } from "../../services/certificationRuleService";
 import { fetchInstitutions } from "../../services/institutionService";
-import { X, Pencil, Save, Calendar, Users, Building, FileCheck, Tag, Package } from "lucide-react";
+import { X, Pencil, Save, Calendar, Users, Building, FileCheck, Tag, Package, Wand2 } from "lucide-react";
 
 const initialForm = {
     id: null,
@@ -20,9 +20,11 @@ const initialForm = {
 
 export default function EditBatchModal({ open, data, onClose, onSaved }) {
     const [rules, setRules] = useState([]);
+    const [rulesData, setRulesData] = useState([]); // Store full rule data for name generation
     const [institutions, setInstitutions] = useState([]);
     const [form, setForm] = useState(initialForm);
     const [saving, setSaving] = useState(false);
+    const [generating, setGenerating] = useState(false);
 
     const menuPortalTarget = useMemo(() => (typeof document !== "undefined" ? document.body : null), []);
 
@@ -41,6 +43,71 @@ export default function EditBatchModal({ open, data, onClose, onSaved }) {
         { value: "REFRESHMENT", label: "Refreshment" },
         { value: "EXTENSION", label: "Perpanjang" },
     ];
+
+    // Type abbreviations for batch name
+    const typeAbbr = {
+        CERTIFICATION: "CERT",
+        TRAINING: "TRN",
+        REFRESHMENT: "REF",
+        EXTENSION: "EXT",
+    };
+
+    // Generate base batch name (without sequence)
+    function generateBaseName(type, ruleId, startDate) {
+        if (!ruleId) return "";
+        
+        const rule = rulesData.find((r) => r.id === ruleId);
+        if (!rule) return "";
+
+        const parts = [typeAbbr[type] || "BATCH"];
+        
+        // Add certification code
+        if (rule.certificationCode) {
+            parts.push(rule.certificationCode);
+        }
+        
+        // Add level if exists
+        if (rule.certificationLevelLevel) {
+            parts.push(`J${rule.certificationLevelLevel}`);
+        }
+        
+        // Add sub field if exists
+        if (rule.subFieldCode) {
+            parts.push(rule.subFieldCode);
+        }
+        
+        // Add month-year from startDate (or current date if not set)
+        const dateToUse = startDate ? new Date(startDate) : new Date();
+        const monthNames = ["JAN", "FEB", "MAR", "APR", "MEI", "JUN", "JUL", "AGU", "SEP", "OKT", "NOV", "DES"];
+        parts.push(`${monthNames[dateToUse.getMonth()]}${dateToUse.getFullYear()}`);
+        
+        return parts.join("-");
+    }
+
+    // Generate full batch name with sequence number
+    async function generateBatchNameWithSequence(type, ruleId, startDate) {
+        const baseName = generateBaseName(type, ruleId, startDate);
+        if (!baseName) return "";
+        
+        const seq = await fetchNextBatchSequence(baseName);
+        const seqStr = String(seq).padStart(2, "0");
+        return `${baseName}-${seqStr}`;
+    }
+
+    // Regenerate batch name button handler
+    async function handleRegenerateName() {
+        if (!form.certificationRuleId) {
+            toast.error("Pilih aturan sertifikasi terlebih dahulu");
+            return;
+        }
+        setGenerating(true);
+        const generatedName = await generateBatchNameWithSequence(form.type, form.certificationRuleId, form.startDate);
+        if (generatedName) {
+            setForm((prev) => ({ ...prev, batchName: generatedName }));
+            toast.success("Nama batch di-generate ulang");
+        }
+        setGenerating(false);
+    }
 
     const toYMD = (v) => {
         if (!v) return "";
@@ -69,6 +136,9 @@ export default function EditBatchModal({ open, data, onClose, onSaved }) {
 
         Promise.all([fetchCertificationRules(), fetchInstitutions()])
             .then(([rulesRes, insts]) => {
+                // Store full rule data for name generation
+                setRulesData(rulesRes);
+
                 const rulesOpts = rulesRes.map((r) => {
                     const parts = [
                         r.certificationCode,
@@ -148,13 +218,29 @@ export default function EditBatchModal({ open, data, onClose, onSaved }) {
                         <label className="font-medium text-gray-600 flex items-center gap-1">
                             <Tag size={14} /> Nama Batch
                         </label>
-                        <input
-                            type="text"
-                            value={form.batchName ?? ""}
-                            onChange={(e) => setForm({ ...form, batchName: e.target.value })}
-                            className="input input-bordered input-sm w-full rounded-lg"
-                            placeholder="Contoh: Batch AAJI Januari 2025"
-                        />
+                        <div className="flex gap-2">
+                            <input
+                                type="text"
+                                value={form.batchName ?? ""}
+                                onChange={(e) => setForm({ ...form, batchName: e.target.value })}
+                                className="input input-bordered input-sm w-full rounded-lg"
+                                placeholder="Nama batch"
+                            />
+                            <div className="tooltip" data-tip="Generate ulang nama batch">
+                                <button
+                                    type="button"
+                                    className="btn btn-sm btn-accent rounded-lg"
+                                    onClick={handleRegenerateName}
+                                    disabled={generating}
+                                >
+                                    {generating ? (
+                                        <span className="loading loading-spinner loading-xs" />
+                                    ) : (
+                                        <Wand2 size={14} />
+                                    )}
+                                </button>
+                            </div>
+                        </div>
                     </div>
 
                     <div className="flex flex-col gap-1">

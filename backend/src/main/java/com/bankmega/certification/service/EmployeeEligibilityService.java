@@ -59,6 +59,11 @@ public class EmployeeEligibilityService {
             sisaWaktu = days >= 0 ? days + " hari" : "Kadaluarsa";
         }
 
+        LocalDate reminderDate = null;
+        if (e.getDueDate() != null && rule != null && rule.getReminderMonths() != null) {
+            reminderDate = e.getDueDate().minusMonths(rule.getReminderMonths());
+        }
+
         // Determine display level: owned level if available, otherwise required level
         Integer displayLevel = e.getOwnedLevel() != null ? e.getOwnedLevel()
                 : (rule != null && rule.getCertificationLevel() != null ? rule.getCertificationLevel().getLevel()
@@ -84,8 +89,11 @@ public class EmployeeEligibilityService {
                 .subFieldCode(rule != null && rule.getSubField() != null ? rule.getSubField().getCode() : null)
 
                 .status(e.getStatus() != null ? e.getStatus().name() : null)
+
                 .dueDate(e.getDueDate())
+                .reminderDate(reminderDate)
                 .source(e.getSource() != null ? e.getSource().name() : null)
+
                 .isActive(e.getIsActive())
 
                 .wajibPunyaSertifikasiSampai(wajibPunya)
@@ -105,6 +113,7 @@ public class EmployeeEligibilityService {
                 .isCoveredByHigherLevel(e.getIsCoveredByHigherLevel())
                 .ownedLevel(e.getOwnedLevel())
                 .ownedLevelName(e.getOwnedLevelName())
+                .fileUrl(e.getCoveredByCertification() != null ? e.getCoveredByCertification().getFileUrl() : null)
                 .build();
     }
 
@@ -663,7 +672,8 @@ public class EmployeeEligibilityService {
 
                 // Determine status based on the covering cert
                 if (coveringCert.getValidUntil() == null) {
-                    ee.setStatus(EmployeeEligibility.EligibilityStatus.NOT_YET_CERTIFIED);
+                    // Permanent certificate - always active
+                    ee.setStatus(EmployeeEligibility.EligibilityStatus.ACTIVE);
                 } else if (today.isAfter(coveringCert.getValidUntil())) {
                     ee.setStatus(EmployeeEligibility.EligibilityStatus.EXPIRED);
                 } else if (coveringCert.getReminderDate() != null && !today.isBefore(coveringCert.getReminderDate())) {
@@ -699,20 +709,24 @@ public class EmployeeEligibilityService {
         }
     }
 
-    private EmployeeCertification findBestCoveringCert(List<EmployeeCertification> certs, Integer requiredLevel,
+    public EmployeeCertification findBestCoveringCert(List<EmployeeCertification> certs, Integer requiredLevel,
             LocalDate today) {
         return certs.stream()
                 .filter(c -> {
-                    if (c.getCertificationRule() == null || c.getCertificationRule().getCertificationLevel() == null)
+                    if (c.getCertificationRule() == null)
                         return false;
-                    Integer certLevel = c.getCertificationRule().getCertificationLevel().getLevel();
-                    return certLevel != null && certLevel >= requiredLevel;
+                    CertificationLevel certLevel = c.getCertificationRule().getCertificationLevel();
+                    // If cert has no level, treat as level 0 (base level)
+                    Integer certLevelVal = (certLevel != null) ? certLevel.getLevel() : 0;
+                    return certLevelVal != null && certLevelVal >= requiredLevel;
                 })
                 .filter(c -> {
-                    // Expired certs cannot cover
+                    // Check if cert is valid (not expired)
                     LocalDate validUntil = c.getValidUntil();
-                    if (validUntil == null)
-                        return false; // No expiry means not properly certified
+                    if (validUntil == null) {
+                        // Null validUntil means permanent/lifetime certificate - always valid
+                        return true;
+                    }
                     return !today.isAfter(validUntil); // Must not be expired
                 })
                 .max(Comparator.comparingInt(c -> c.getCertificationRule().getCertificationLevel().getLevel()))
@@ -734,10 +748,10 @@ public class EmployeeEligibilityService {
 
             String[] headers = new String[] {
                     "NIP", "Nama", "Jabatan",
-                    "Kode Sertifikasi", "Nama Sertifikasi", "Level", "Sub Bidang",
+                    "Sertifikat", "Jenjang", "Sub Bidang",
                     "No Sertifikat", "Tgl Sertifikasi",
-                    "Status", "Due Date", "Sumber",
-                    "SK Efektif", "Wajib Punya Sampai", "Masa Berlaku (Bulan)",
+                    "Status", "Expired Date", "Due Date", "Sumber",
+                    "SK Efektif", "Wajib Memiliki", "Masa Berlaku (Bulan)",
                     "Training", "Refreshment", "Perpanjang"
             };
 
@@ -758,16 +772,27 @@ public class EmployeeEligibilityService {
                 row.createCell(col++).setCellValue(nz(e.getJobPositionTitle()));
 
                 row.createCell(col++).setCellValue(nz(e.getCertificationCode()));
-                row.createCell(col++).setCellValue(nz(e.getCertificationName()));
                 row.createCell(col++)
                         .setCellValue(e.getCertificationLevelLevel() != null ? e.getCertificationLevelLevel() : 0);
                 row.createCell(col++).setCellValue(nz(e.getSubFieldCode()));
+
+                // Certification Name removed from frontend? Wait, user removed "Nama
+                // Sertifikasi" from frontend headers in step 381?
+                // Let's check step 381. There is ONE "Sertifikat" column.
+                // In row (step 382), it shows `r.certificationCode`.
+                // So "Nama Sertifikasi" is NOT shown anymore.
+                // I should remove "Nama Sertifikasi" from Excel too to match frontend? Or keep
+                // it?
+                // Usually Excel has MORE info. But user asked for order "Sertifikat Jenjang Sub
+                // Bidang".
+                // I will keep logic consistent: Sertifikat = Code.
 
                 row.createCell(col++).setCellValue(nz(e.getCertNumber()));
                 setDateCell(row, col++, e.getCertDate(), dateStyle);
 
                 row.createCell(col++).setCellValue(nz(e.getStatus()));
                 setDateCell(row, col++, e.getDueDate(), dateStyle);
+                setDateCell(row, col++, e.getReminderDate(), dateStyle);
                 row.createCell(col++).setCellValue(nz(e.getSource()));
 
                 setDateCell(row, col++, e.getEffectiveDate(), dateStyle);

@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Select from "react-select";
 import api from "../../services/api";
-import { Users, Award, AlertTriangle, XCircle, Clock, Layers, Filter, CalendarDays, LayoutDashboard } from "lucide-react";
+import { Users, Award, AlertTriangle, XCircle, Clock, Layers, Filter, CalendarDays, LayoutDashboard, PieChart as PieChartIcon, BarChart3 } from "lucide-react";
 
 import { fetchRegionals } from "../../services/regionalService";
 import { fetchUnits } from "../../services/unitService";
@@ -56,6 +56,47 @@ export default function PicDashboard() {
 
     // untuk menuPortal react-select
     const menuPortalTarget = typeof document !== "undefined" ? document.body : null;
+
+    // Custom styles for smaller react-select
+    const selectStyles = {
+        control: (base) => ({
+            ...base,
+            minHeight: '32px',
+            height: '32px',
+            fontSize: '12px',
+        }),
+        valueContainer: (base) => ({
+            ...base,
+            height: '32px',
+            padding: '0 8px',
+        }),
+        input: (base) => ({
+            ...base,
+            margin: '0px',
+            padding: '0px',
+        }),
+        indicatorsContainer: (base) => ({
+            ...base,
+            height: '32px',
+        }),
+        dropdownIndicator: (base) => ({
+            ...base,
+            padding: '4px',
+        }),
+        clearIndicator: (base) => ({
+            ...base,
+            padding: '4px',
+        }),
+        option: (base) => ({
+            ...base,
+            fontSize: '12px',
+            padding: '6px 10px',
+        }),
+        menu: (base) => ({
+            ...base,
+            fontSize: '12px',
+        }),
+    };
 
     // ===== filter organisasi =====
     const [divisionSel, setDivisionSel] = useState(null);
@@ -445,6 +486,7 @@ export default function PicDashboard() {
                     <Select
                         className="w-full"
                         classNamePrefix="react-select"
+                        styles={selectStyles}
                         menuPortalTarget={menuPortalTarget}
                         menuPosition="fixed"
                         options={regionalOptions}
@@ -457,6 +499,7 @@ export default function PicDashboard() {
                     <Select
                         className="w-full"
                         classNamePrefix="react-select"
+                        styles={selectStyles}
                         menuPortalTarget={menuPortalTarget}
                         menuPosition="fixed"
                         options={divisionOptions}
@@ -469,6 +512,7 @@ export default function PicDashboard() {
                     <Select
                         className="w-full"
                         classNamePrefix="react-select"
+                        styles={selectStyles}
                         menuPortalTarget={menuPortalTarget}
                         menuPosition="fixed"
                         options={unitOptions}
@@ -481,6 +525,7 @@ export default function PicDashboard() {
                     <Select
                         className="w-full"
                         classNamePrefix="react-select"
+                        styles={selectStyles}
                         menuPortalTarget={menuPortalTarget}
                         menuPosition="fixed"
                         options={certOptions}
@@ -493,6 +538,7 @@ export default function PicDashboard() {
                     <Select
                         className="w-full"
                         classNamePrefix="react-select"
+                        styles={selectStyles}
                         menuPortalTarget={menuPortalTarget}
                         menuPosition="fixed"
                         options={levelOptions}
@@ -505,6 +551,7 @@ export default function PicDashboard() {
                     <Select
                         className="w-full"
                         classNamePrefix="react-select"
+                        styles={selectStyles}
                         menuPortalTarget={menuPortalTarget}
                         menuPosition="fixed"
                         options={subFieldOptions}
@@ -571,9 +618,12 @@ export default function PicDashboard() {
             {/* Charts Row */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {/* Pie Chart */}
-                <div className="card bg-base-100 shadow-sm border border-gray-100">
-                    <div className="card-body p-4">
-                        <h2 className="font-semibold text-base">Capaian Sertifikasi Wajib</h2>
+                <div className="card bg-white shadow-sm border border-gray-100 rounded-xl overflow-hidden">
+                    <div className="p-4 border-b border-gray-100 flex items-center gap-2">
+                        <PieChartIcon size={16} className="text-gray-500" />
+                        <h2 className="font-semibold text-sm text-gray-800">Capaian Sertifikasi Wajib</h2>
+                    </div>
+                    <div className="p-5">
                         {!kpi ? (
                             <div className="skeleton h-64 w-full rounded-xl" />
                         ) : (
@@ -593,6 +643,8 @@ export default function PicDashboard() {
                                                 innerRadius={50}
                                                 outerRadius={80}
                                                 paddingAngle={2}
+                                                startAngle={-90}
+                                                endAngle={270}
                                             >
                                                 {PIE_COLORS.map((color, i) => (
                                                     <Cell key={i} fill={color} />
@@ -637,24 +689,28 @@ export default function PicDashboard() {
                 </div>
 
                 {/* Bar Chart */}
-                <div className="card bg-base-100 shadow-sm border border-gray-100">
-                    <div className="card-body p-4">
-                        <div className="flex items-center justify-between gap-2 mb-2">
-                            <h2 className="font-semibold text-base">Pelaksanaan Batch</h2>
-                            <div className="min-w-[150px]">
-                                <Select
-                                    classNamePrefix="react-select"
-                                    menuPortalTarget={menuPortalTarget}
-                                    menuPosition="fixed"
-                                    options={batchTypeOptions}
-                                    value={batchType}
-                                    onChange={(v) => setBatchType(v || batchTypeOptions[0])}
-                                    placeholder="Jenis Batch"
-                                    isClearable={false}
-                                    isSearchable={false}
-                                />
-                            </div>
+                <div className="card bg-white shadow-sm border border-gray-100 rounded-xl overflow-hidden">
+                    <div className="p-4 border-b border-gray-100 flex items-center justify-between gap-2">
+                        <h2 className="font-semibold text-sm flex items-center gap-2 text-gray-800">
+                            <BarChart3 size={16} className="text-gray-500" />
+                            Pelaksanaan Batch
+                        </h2>
+                        <div className="min-w-[150px]">
+                            <Select
+                                classNamePrefix="react-select"
+                                styles={selectStyles}
+                                menuPortalTarget={menuPortalTarget}
+                                menuPosition="fixed"
+                                options={batchTypeOptions}
+                                value={batchType}
+                                onChange={(v) => setBatchType(v || batchTypeOptions[0])}
+                                placeholder="Jenis Batch"
+                                isClearable={false}
+                                isSearchable={false}
+                            />
                         </div>
+                    </div>
+                    <div className="p-5">
                         <div className="h-64">
                             {!monthly || monthly.length === 0 ? (
                                 <div className="skeleton h-full w-full rounded-xl" />

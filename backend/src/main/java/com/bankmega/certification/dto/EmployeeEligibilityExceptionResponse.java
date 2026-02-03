@@ -4,6 +4,7 @@ import lombok.Builder;
 import lombok.Data;
 
 import java.time.Instant;
+import java.time.LocalDate;
 
 @Data
 @Builder
@@ -24,6 +25,10 @@ public class EmployeeEligibilityExceptionResponse {
 
     private Boolean isActive;
     private String notes;
+
+    private LocalDate targetMemiliki;
+    private LocalDate expiredDate;
+    private LocalDate reminderDate;
 
     private Instant createdAt;
     private Instant updatedAt;

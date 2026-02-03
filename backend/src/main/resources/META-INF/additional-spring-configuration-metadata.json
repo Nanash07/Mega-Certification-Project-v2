@@ -1,0 +1,29 @@
+{
+  "properties": [
+    {
+      "name": "app.cors.allowed-origins",
+      "type": "java.lang.String",
+      "description": "Comma-separated list of allowed CORS origins"
+    },
+    {
+      "name": "app.jwt.secret",
+      "type": "java.lang.String",
+      "description": "Secret key for JWT token generation and validation"
+    },
+    {
+      "name": "app.aes.secret",
+      "type": "java.lang.String",
+      "description": "Secret key for AES encryption/decryption"
+    },
+    {
+      "name": "app.rate-limit.auth.requests",
+      "type": "java.lang.Integer",
+      "description": "Maximum number of authentication requests allowed per time window"
+    },
+    {
+      "name": "app.rate-limit.auth.duration-seconds",
+      "type": "java.lang.Integer",
+      "description": "Duration of the rate limit time window in seconds"
+    }
+  ]
+}

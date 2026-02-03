@@ -143,6 +143,16 @@ export async function createBatch(payload) {
     return data;
 }
 
+// Get next sequence number for batch name auto-generation
+export async function fetchNextBatchSequence(prefix) {
+    try {
+        const { data } = await api.get(`${BASE}/next-sequence`, { params: { prefix } });
+        return data?.nextSequence || 1;
+    } catch {
+        return 1;
+    }
+}
+
 export async function updateBatch(id, payload) {
     const { data } = await api.put(`${BASE}/${id}`, payload);
     return data;

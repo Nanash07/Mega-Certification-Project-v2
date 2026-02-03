@@ -39,6 +39,7 @@ public class EmployeeEligibilityResponse {
 
     private String certNumber;
     private LocalDate certDate;
+    private LocalDate reminderDate;
 
     private Instant createdAt;
     private Instant updatedAt;
@@ -51,4 +52,5 @@ public class EmployeeEligibilityResponse {
     private Boolean isCoveredByHigherLevel;
     private Integer ownedLevel;
     private String ownedLevelName;
+    private String fileUrl;
 }

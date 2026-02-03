@@ -44,7 +44,11 @@ const Login = () => {
             };
             localStorage.setItem("user", JSON.stringify(userPayload));
 
-            navigate("/dashboard", { replace: true });
+            if (userPayload.isFirstLogin) {
+                navigate("/first-login/change-password", { replace: true });
+            } else {
+                navigate("/dashboard", { replace: true });
+            }
         } catch (err) {
             const msg =
                 err?.response?.data?.message || err?.response?.data?.error || "Login gagal. Cek username/password!";

@@ -17,9 +17,9 @@ import { fetchCertificationLevels } from "../../services/certificationLevelServi
 import { fetchSubFields } from "../../services/subFieldService";
 import { searchEmployees } from "../../services/employeeService";
 import { fetchMyPicScope } from "../../services/picScopeService";
-import { Eye, RotateCw, Eraser, Download, ClipboardList, Search, Briefcase, Award, Layers, Grid3X3, Filter, FileSpreadsheet } from "lucide-react";
+import { RotateCw, Eraser, Download, ClipboardList, Search, Briefcase, Award, Layers, Grid3X3, Filter, FileSpreadsheet } from "lucide-react";
 
-const TABLE_COLS = 18;
+const TABLE_COLS = 19;
 
 export default function EmployeeEligibilityPage() {
     const [searchParams] = useSearchParams();
@@ -455,19 +455,20 @@ export default function EmployeeEligibilityPage() {
                         <thead className="bg-base-200 text-xs">
                             <tr>
                                 <th className="w-12">No</th>
-                                <th className="w-16">Aksi</th>
                                 <th>NIP</th>
                                 <th>Nama Pegawai</th>
                                 <th>Jabatan</th>
                                 <th>Sertifikat</th>
-                                <th>No Sertifikat</th>
-                                <th>Tgl Sertifikasi</th>
                                 <th>Jenjang</th>
                                 <th>Sub Bidang</th>
+                                <th>No Sertifikat</th>
+                                <th>Tgl Sertifikasi</th>
                                 <th>Keterangan</th>
                                 <th>SK Efektif</th>
                                 <th>Status</th>
+                                <th>Expired Date</th>
                                 <th>Due Date</th>
+                                <th>Wajib Memiliki</th>
                                 <th>Sumber</th>
                                 <th>Training</th>
                                 <th>Refreshment</th>
@@ -494,24 +495,23 @@ export default function EmployeeEligibilityPage() {
                                 rows.map((r, idx) => (
                                     <tr key={r.id ?? `${r.employeeId}-${r.certificationRuleId}`} className="hover">
                                         <td>{startIdx + idx}</td>
-                                        <td>
+                                        <td>{r.nip}</td>
+                                        <td className="font-medium">
                                             <div className="tooltip" data-tip="Lihat detail pegawai">
                                                 <Link
                                                     to={`/employee/${r.employeeId}`}
-                                                    className="btn btn-xs btn-info btn-soft border border-info rounded-lg"
+                                                    className="hover:underline cursor-pointer"
                                                 >
-                                                    <Eye size={12} />
+                                                    {r.employeeName}
                                                 </Link>
                                             </div>
                                         </td>
-                                        <td>{r.nip}</td>
-                                        <td className="font-medium">{r.employeeName}</td>
-                                        <td>{r.jobPositionTitle}</td>
-                                        <td>{r.certificationCode}</td>
+                                        <td>{r.jobPositionTitle || "-"}</td>
+                                        <td>{r.certificationCode || "-"}</td>
+                                        <td>{r.certificationLevelLevel || "-"}</td>
+                                        <td>{r.subFieldCode || "-"}</td>
                                         <td>{r.certNumber || "-"}</td>
                                         <td>{formatDate(r.certDate)}</td>
-                                        <td>{r.certificationLevelLevel ?? "-"}</td>
-                                        <td>{r.subFieldCode ?? "-"}</td>
                                         <td>
                                             {r.isCoveredByHigherLevel ? (
                                                 <span className="badge badge-sm badge-accent text-white">Covered</span>
@@ -533,6 +533,8 @@ export default function EmployeeEligibilityPage() {
                                             </span>
                                         </td>
                                         <td>{formatDate(r.dueDate)}</td>
+                                        <td>{formatDate(r.reminderDate)}</td>
+                                        <td>{formatDate(r.wajibPunyaSertifikasiSampai)}</td>
                                         <td>
                                             <span
                                                 className={`badge badge-sm text-white whitespace-nowrap ${

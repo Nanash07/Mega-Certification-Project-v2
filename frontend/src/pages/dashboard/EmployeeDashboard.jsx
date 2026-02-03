@@ -14,6 +14,8 @@ import {
     Building2,
     ArrowRight,
     Users,
+    PieChart as PieChartIcon,
+    BarChart3,
 } from "lucide-react";
 
 import StatCard from "../../components/dashboards/StatCard";
@@ -443,13 +445,13 @@ export default function EmployeeDashboard() {
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Dashboard</h1>
+                    <h1 className="text-xl md:text-2xl font-bold text-gray-900">Dashboard</h1>
                     <p className="text-gray-500 mt-1">
                         Selamat datang kembali! Ini ringkasan aktivitas dan sertifikasi Anda.
                     </p>
                 </div>
                 {computedAt && (
-                    <div className="text-xs text-gray-400 font-mono bg-white px-3 py-1.5 rounded-full border border-gray-200 shadow-sm">
+                    <div className="text-xs text-gray-400 bg-white px-3 py-1.5 rounded-full border border-gray-200 shadow-sm">
                         Updated: {formatShortIdDateTime(computedAt)}
                     </div>
                 )}
@@ -476,9 +478,12 @@ export default function EmployeeDashboard() {
                     {/* Charts Grid */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         {/* Ownership Pie */}
-                        <div className="card bg-white shadow-sm border border-gray-100 rounded-xl h-full">
-                            <div className="p-5 border-b border-gray-100">
-                                 <h2 className="font-semibold text-lg text-gray-800">Kepemilikan Sertifikat</h2>
+                        <div className="card bg-white shadow-sm border border-gray-100 rounded-xl overflow-hidden h-full">
+                            <div className="p-4 border-b border-gray-100 bg-emerald-50/50 flex items-center justify-between gap-2">
+                                 <h2 className="font-semibold text-sm flex items-center gap-2 text-gray-800">
+                                      <PieChartIcon size={16} className="text-emerald-500" />
+                                      Kepemilikan Sertifikat
+                                 </h2>
                             </div>
                             <div className="p-5">
                                 {!kpi ? (
@@ -492,9 +497,11 @@ export default function EmployeeDashboard() {
                                                         data={pieData}
                                                         dataKey="value"
                                                         nameKey="name"
-                                                        innerRadius={60}
-                                                        outerRadius={85}
+                                                        innerRadius={50}
+                                                        outerRadius={80}
                                                         paddingAngle={2}
+                                                        startAngle={-90}
+                                                        endAngle={270}
                                                     >
                                                         <Cell fill="#16a34a" /> {/* Aktif */}
                                                         <Cell fill="#f97316" /> {/* Due */}
@@ -506,7 +513,7 @@ export default function EmployeeDashboard() {
                                             </ResponsiveContainer>
                                             <div className="absolute inset-0 flex items-center justify-center flex-col pointer-events-none">
                                                 <span className="text-3xl font-bold text-gray-800">{kpiPercent}%</span>
-                                                <span className="text-[10px] text-gray-400 uppercase tracking-widest">Compliance</span>
+                                                <span className="text-xs text-gray-500">Tercapai</span>
                                             </div>
                                         </div>
                                         <div className="space-y-3 text-xs w-full">
@@ -530,9 +537,12 @@ export default function EmployeeDashboard() {
                         </div>
 
                         {/* Batch Execution Bar */}
-                        <div className="card bg-white shadow-sm border border-gray-100 rounded-xl h-full">
-                            <div className="p-5 border-b border-gray-100 flex items-center justify-between gap-2 flex-wrap">
-                                 <h2 className="font-semibold text-lg text-gray-800">Pelaksanaan Batch</h2>
+                        <div className="card bg-white shadow-sm border border-gray-100 rounded-xl overflow-hidden h-full">
+                            <div className="p-4 border-b border-gray-100 bg-blue-50/50 flex items-center justify-between gap-2 flex-wrap">
+                                 <h2 className="font-semibold text-sm flex items-center gap-2 text-gray-800">
+                                      <BarChart3 size={16} className="text-blue-500" />
+                                      Pelaksanaan Batch
+                                 </h2>
                                  <div className="w-36">
                                      <Select
                                         className="text-xs"
@@ -543,7 +553,41 @@ export default function EmployeeDashboard() {
                                         isClearable={false}
                                         isSearchable={false}
                                         menuPortalTarget={document.body}
-                                        styles={{ control: (base) => ({ ...base, minHeight: '32px', height: '32px' }) }}
+                                        styles={{
+                                            control: (base) => ({
+                                                ...base,
+                                                minHeight: '32px',
+                                                height: '32px',
+                                                fontSize: '12px',
+                                            }),
+                                            valueContainer: (base) => ({
+                                                ...base,
+                                                height: '32px',
+                                                padding: '0 8px',
+                                            }),
+                                            input: (base) => ({
+                                                ...base,
+                                                margin: '0px',
+                                                padding: '0px',
+                                            }),
+                                            indicatorsContainer: (base) => ({
+                                                ...base,
+                                                height: '32px',
+                                            }),
+                                            dropdownIndicator: (base) => ({
+                                                ...base,
+                                                padding: '4px',
+                                            }),
+                                            option: (base) => ({
+                                                ...base,
+                                                fontSize: '12px',
+                                                padding: '6px 10px',
+                                            }),
+                                            menu: (base) => ({
+                                                ...base,
+                                                fontSize: '12px',
+                                            }),
+                                        }}
                                      />
                                  </div>
                             </div>
@@ -568,22 +612,61 @@ export default function EmployeeDashboard() {
 
                     {/* Eligibility Table Card */}
                     <div className="card bg-white shadow-sm border border-gray-100 rounded-xl overflow-hidden">
-                         <div className="p-5 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                             <h2 className="font-semibold text-lg flex items-center gap-2 text-gray-800">
-                                  <Layers size={20} className="text-indigo-500" />
+                         <div className="p-4 border-b border-gray-100 bg-indigo-50/50 flex items-center justify-between gap-4">
+                             <h2 className="font-semibold text-sm flex items-center gap-2 text-gray-800">
+                                  <Layers size={16} className="text-indigo-500" />
                                   Eligibility Sertifikasi
                              </h2>
-                             <div className="w-full sm:w-44">
-                                 <Select
-                                      className="text-xs"
-                                      classNamePrefix="react-select"
-                                      options={statusFilterOptions}
-                                      value={statusFilter}
-                                      onChange={(opt) => setStatusFilter(opt || statusFilterOptions[0])}
-                                      isSearchable={false}
-                                      menuPortalTarget={document.body}
-                                      styles={{ control: (base) => ({ ...base, minHeight: '32px', height: '32px' }) }}
-                                 />
+                             <div className="flex items-center gap-2">
+                                 <span className="text-xs font-medium px-2 py-0.5 rounded-full text-indigo-600 bg-indigo-100">
+                                     {eligTotalElements}
+                                 </span>
+                                 <div className="w-36">
+                                     <Select
+                                          className="text-xs"
+                                          classNamePrefix="react-select"
+                                          options={statusFilterOptions}
+                                          value={statusFilter}
+                                          onChange={(opt) => setStatusFilter(opt || statusFilterOptions[0])}
+                                          isSearchable={false}
+                                          menuPortalTarget={document.body}
+                                          styles={{
+                                              control: (base) => ({
+                                                  ...base,
+                                                  minHeight: '32px',
+                                                  height: '32px',
+                                                  fontSize: '12px',
+                                              }),
+                                              valueContainer: (base) => ({
+                                                  ...base,
+                                                  height: '32px',
+                                                  padding: '0 8px',
+                                              }),
+                                              input: (base) => ({
+                                                  ...base,
+                                                  margin: '0px',
+                                                  padding: '0px',
+                                              }),
+                                              indicatorsContainer: (base) => ({
+                                                  ...base,
+                                                  height: '32px',
+                                              }),
+                                              dropdownIndicator: (base) => ({
+                                                  ...base,
+                                                  padding: '4px',
+                                              }),
+                                              option: (base) => ({
+                                                  ...base,
+                                                  fontSize: '12px',
+                                                  padding: '6px 10px',
+                                              }),
+                                              menu: (base) => ({
+                                                  ...base,
+                                                  fontSize: '12px',
+                                              }),
+                                          }}
+                                     />
+                                 </div>
                              </div>
                          </div>
                          
@@ -614,14 +697,14 @@ export default function EmployeeDashboard() {
                                                          if(eid) navigate(`/employee/${eid}?tab=eligibility`);
                                                     }}
                                                 >
-                                                     <td className="w-12 text-gray-400 text-center font-mono text-xs">{(eligPage - 1) * eligRowsPerPage + idx + 1}</td>
+                                                     <td className="w-12 text-gray-400 text-center text-xs">{(eligPage - 1) * eligRowsPerPage + idx + 1}</td>
                                                      <td>
-                                                          <div className="font-medium text-gray-800 line-clamp-1">{e.certificationName}</div>
-                                                          <div className="text-[11px] text-gray-400 font-mono mt-0.5">{e.certificationCode}</div>
+                                                          <div className="font-medium text-gray-800 line-clamp-1">{e.certificationName || "-"}</div>
+                                                          <div className="text-xs text-gray-400 mt-0.5">{e.certificationCode || "-"}</div>
                                                      </td>
                                                      <td className="text-center">
                                                           <span className="inline-flex items-center justify-center px-2 py-1 rounded-md text-xs font-semibold bg-gray-100 text-gray-700 border border-gray-200 min-w-[40px]">
-                                                              {e.certificationLevelLevel ?? e.certificationLevel?.level ?? "-"}
+                                                              {(e.certificationLevelLevel || e.certificationLevel?.level) || "-"}
                                                           </span>
                                                      </td>
                                                      <td className="text-center">
@@ -634,7 +717,7 @@ export default function EmployeeDashboard() {
                                                              {statusLabel(e.status)}
                                                          </span>
                                                      </td>
-                                                     <td className="text-center text-gray-500 text-xs font-mono">{e.sisaWaktu || "-"}</td>
+                                                     <td className="text-center text-gray-500 text-xs">{e.sisaWaktu || "-"}</td>
                                                 </tr>
                                             ))
                                        )}

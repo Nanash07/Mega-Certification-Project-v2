@@ -30,7 +30,7 @@ const FirstLoginChangePassword = () => {
 
             const parsed = JSON.parse(raw);
 
-            if (!parsed || String(parsed.role).toUpperCase() !== "PEGAWAI" || parsed.isFirstLogin !== true) {
+            if (!parsed || parsed.isFirstLogin !== true) {
                 navigate("/dashboard", { replace: true });
                 return;
             }
@@ -56,8 +56,8 @@ const FirstLoginChangePassword = () => {
             return;
         }
 
-        if (newPassword.length < 6) {
-            setError("Password baru minimal 6 karakter.");
+        if (newPassword.length < 8) {
+            setError("Password baru minimal 8 karakter.");
             return;
         }
 
@@ -127,7 +127,7 @@ const FirstLoginChangePassword = () => {
                                 <input
                                     type={showPassword ? "text" : "password"}
                                     className="input input-bordered w-full pl-4 pr-10 h-11 rounded-xl focus:border-primary focus:ring-1 focus:ring-primary transition-all bg-white"
-                                    placeholder="Minimal 6 karakter"
+                                    placeholder="Minimal 8 karakter"
                                     value={newPassword}
                                     onChange={(e) => setNewPassword(e.target.value)}
                                     required

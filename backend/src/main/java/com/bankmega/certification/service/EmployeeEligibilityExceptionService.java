@@ -20,7 +20,12 @@ import java.io.ByteArrayOutputStream;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
+import java.util.Collections;
+import com.bankmega.certification.entity.EmployeeCertification;
+import com.bankmega.certification.repository.EmployeeCertificationRepository;
 
 @Service
 @RequiredArgsConstructor
@@ -30,8 +35,14 @@ public class EmployeeEligibilityExceptionService {
         private final EmployeeRepository employeeRepo;
         private final CertificationRuleRepository ruleRepo;
         private final EmployeeEligibilityService eligibilityService;
+        private final EmployeeCertificationRepository employeeCertificationRepo;
 
         private EmployeeEligibilityExceptionResponse toResponse(EmployeeEligibilityException e) {
+                return toResponse(e, Collections.emptyList());
+        }
+
+        private EmployeeEligibilityExceptionResponse toResponse(EmployeeEligibilityException e,
+                        List<EmployeeCertification> employeeCerts) {
                 if (e == null)
                         return null;
 
@@ -41,6 +52,41 @@ public class EmployeeEligibilityExceptionService {
                 String jobTitle = primary != null && primary.getJobPosition() != null
                                 ? primary.getJobPosition().getName()
                                 : null;
+
+                LocalDate targetMemiliki = null;
+                LocalDate expiredDate = null;
+                LocalDate reminderDate = null;
+
+                if (emp != null && primary != null && primary.getEffectiveDate() != null
+                                && rule != null && rule.getWajibSetelahMasuk() != null) {
+                        targetMemiliki = primary.getEffectiveDate().plusMonths(rule.getWajibSetelahMasuk());
+                }
+
+                if (rule != null && employeeCerts != null) {
+                        // Filter certs relevant to this rule's certification
+                        Long requiredCertId = rule.getCertification() != null ? rule.getCertification().getId() : null;
+                        Integer requiredLevel = rule.getCertificationLevel() != null
+                                        ? rule.getCertificationLevel().getLevel()
+                                        : 0;
+
+                        if (requiredCertId != null) {
+                                List<EmployeeCertification> candidateCerts = employeeCerts.stream()
+                                                .filter(c -> c.getCertificationRule() != null
+                                                                && c.getCertificationRule().getCertification() != null
+                                                                && c.getCertificationRule().getCertification().getId()
+                                                                                .equals(requiredCertId))
+                                                .toList();
+
+                                EmployeeCertification bestCert = eligibilityService.findBestCoveringCert(candidateCerts,
+                                                requiredLevel, LocalDate.now());
+                                if (bestCert != null) {
+                                        expiredDate = bestCert.getValidUntil();
+                                        if (expiredDate != null && rule.getReminderMonths() != null) {
+                                                reminderDate = expiredDate.minusMonths(rule.getReminderMonths());
+                                        }
+                                }
+                        }
+                }
 
                 return EmployeeEligibilityExceptionResponse.builder()
                                 .id(e.getId())
@@ -63,6 +109,11 @@ public class EmployeeEligibilityExceptionService {
                                                 : null)
                                 .isActive(e.getIsActive())
                                 .notes(e.getNotes())
+
+                                .targetMemiliki(targetMemiliki)
+                                .expiredDate(expiredDate)
+                                .reminderDate(reminderDate)
+
                                 .createdAt(e.getCreatedAt())
                                 .updatedAt(e.getUpdatedAt())
                                 .build();
@@ -91,7 +142,20 @@ public class EmployeeEligibilityExceptionService {
                                         Objects.requireNonNull(defaultSort()));
                 }
 
-                return exceptionRepo.findAll(spec, pageable).map(this::toResponse);
+                Page<EmployeeEligibilityException> page = exceptionRepo.findAll(spec, pageable);
+
+                List<Long> pageEmployeeIds = page.getContent().stream()
+                                .map(e -> e.getEmployee().getId())
+                                .distinct()
+                                .toList();
+
+                List<EmployeeCertification> allCerts = employeeCertificationRepo
+                                .findByEmployeeIdInAndDeletedAtIsNull(pageEmployeeIds);
+                Map<Long, List<EmployeeCertification>> certsByEmp = allCerts.stream()
+                                .collect(Collectors.groupingBy(c -> c.getEmployee().getId()));
+
+                return page.map(e -> toResponse(e,
+                                certsByEmp.getOrDefault(e.getEmployee().getId(), Collections.emptyList())));
         }
 
         @Transactional(readOnly = true)
@@ -173,8 +237,9 @@ public class EmployeeEligibilityExceptionService {
 
                         String[] headers = new String[] {
                                         "NIP", "Nama", "Jabatan",
-                                        "Kode Sertifikasi", "Nama Sertifikasi", "Level", "Sub Bidang",
-                                        "Notes", "Status", "Updated At"
+                                        "Sertifikat", "Jenjang", "Sub Bidang",
+                                        "Status", "Expired Date", "Due Date", "Wajib Memiliki",
+                                        "Notes", "Updated At"
                         };
 
                         Row hr = sh.createRow(0);
@@ -194,16 +259,20 @@ public class EmployeeEligibilityExceptionService {
                                 row.createCell(col++).setCellValue(nz(e.getJobPositionTitle()));
 
                                 row.createCell(col++).setCellValue(nz(e.getCertificationCode()));
-                                row.createCell(col++).setCellValue(nz(e.getCertificationName()));
                                 row.createCell(col++)
                                                 .setCellValue(e.getCertificationLevelLevel() != null
                                                                 ? e.getCertificationLevelLevel()
                                                                 : 0);
                                 row.createCell(col++).setCellValue(nz(e.getSubFieldCode()));
 
-                                row.createCell(col++).setCellValue(nz(e.getNotes()));
                                 row.createCell(col++).setCellValue(
                                                 Boolean.TRUE.equals(e.getIsActive()) ? "Active" : "Nonactive");
+                                setDateCell(row, col++, e.getExpiredDate(), dateStyle);
+                                setDateCell(row, col++, e.getReminderDate(), dateStyle);
+                                setDateCell(row, col++, e.getTargetMemiliki(), dateStyle);
+
+                                row.createCell(col++).setCellValue(nz(e.getNotes()));
+
                                 setDateCell(row, col++,
                                                 e.getUpdatedAt() != null
                                                                 ? e.getUpdatedAt()

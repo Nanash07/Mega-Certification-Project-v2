@@ -12,6 +12,7 @@ import { fetchEligibilityByEmployee } from "../../services/employeeEligibilitySe
 import ViewEmployeeCertificationModal from "../../components/employee-certifications/ViewEmployeeCertificationModal";
 import UploadCertificationModal from "../../components/employee-certifications/UploadEmployeeCertificationModal";
 import EditCertificationModal from "../../components/employee-certifications/EditEmployeeCertificationModal";
+import SecureImage from "../../components/common/SecureImage";
 
 const TABS = [
     { id: "certifications", label: "Sertifikasi", icon: Award },
@@ -272,20 +273,17 @@ export default function EmployeeDetailPage() {
                                         {/* Thumbnail */}
                                         <div className="w-20 h-20 sm:w-24 sm:h-24 bg-base-200 rounded-lg overflow-hidden flex-shrink-0 flex items-center justify-center">
                                             {c.fileUrl ? (
-                                                <img
-                                                    src={`/api/employee-certifications/${c.id}/file`}
+                                                <SecureImage
+                                                    src={`/employee-certifications/${c.id}/file`}
                                                     alt={c.certificationName}
                                                     className="w-full h-full object-cover"
-                                                    onError={(e) => {
-                                                        e.target.style.display = 'none';
-                                                        e.target.nextSibling.style.display = 'flex';
-                                                    }}
                                                 />
-                                            ) : null}
-                                            <div className={`flex-col items-center justify-center text-gray-400 ${c.fileUrl ? 'hidden' : 'flex'}`}>
-                                                <FileImage size={24} className="opacity-50" />
-                                                <span className="text-[10px] mt-1">No Image</span>
-                                            </div>
+                                            ) : (
+                                                <div className="flex flex-col items-center justify-center text-gray-400">
+                                                    <FileImage size={24} className="opacity-50" />
+                                                    <span className="text-[10px] mt-1">No Image</span>
+                                                </div>
+                                            )}
                                         </div>
                                         
                                         {/* Content */}

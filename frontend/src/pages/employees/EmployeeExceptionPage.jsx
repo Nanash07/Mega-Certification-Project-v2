@@ -5,7 +5,7 @@ import Select from "react-select";
 import AsyncSelect from "react-select/async";
 import Pagination from "../../components/common/Pagination";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
-import { getCurrentRole } from "../../utils/helpers";
+import { getCurrentRole, formatDate } from "../../utils/helpers";
 import {
     fetchExceptions,
     deleteException,
@@ -23,9 +23,9 @@ import { fetchMyPicScope } from "../../services/picScopeService";
 import CreateExceptionModal from "../../components/exceptions/CreateExceptionModal";
 import EditExceptionModal from "../../components/exceptions/EditExceptionModal";
 import ImportExceptionModal from "../../components/exceptions/ImportExceptionModal";
-import { Plus, Upload, Download, Eraser, Eye, Pencil, Trash2, ChevronDown, UserCog, Search, Briefcase, Award, Layers, Grid3X3, Filter } from "lucide-react";
+import { Plus, Upload, Download, Eraser, Pencil, Trash2, ChevronDown, UserCog, Search, Briefcase, Award, Layers, Grid3X3, Filter } from "lucide-react";
 
-const TABLE_COLS = 11;
+const TABLE_COLS = 14;
 
 export default function EmployeeExceptionPage() {
     const navigate = useNavigate();
@@ -447,11 +447,14 @@ export default function EmployeeExceptionPage() {
                                 <th>NIP</th>
                                 <th>Nama Pegawai</th>
                                 <th>Jabatan</th>
-                                <th>Kode Sertifikasi</th>
-                                <th>Level</th>
+                                <th>Sertifikat</th>
+                                <th>Jenjang</th>
                                 <th>Sub Bidang</th>
                                 <th>Notes</th>
                                 <th>Status</th>
+                                <th>Expired Date</th>
+                                <th>Due Date</th>
+                                <th>Wajib Memiliki</th>
                                 <th>Updated At</th>
                             </tr>
                         </thead>
@@ -477,15 +480,6 @@ export default function EmployeeExceptionPage() {
                                         <td>{startIdx + idx}</td>
                                         <td>
                                             <div className="flex gap-1">
-                                                <div className="tooltip" data-tip="Lihat detail pegawai">
-                                                    <Link
-                                                        to={`/employee/${r.employeeId}`}
-                                                        className="btn btn-xs btn-info btn-soft border border-info rounded-lg"
-                                                    >
-                                                        <Eye size={12} />
-                                                    </Link>
-                                                </div>
-
                                                 <div className="tooltip" data-tip="Edit eligibility manual">
                                                     <button
                                                         className="btn btn-xs btn-warning btn-soft border border-warning rounded-lg"
@@ -508,14 +502,26 @@ export default function EmployeeExceptionPage() {
                                                 </div>
                                             </div>
                                         </td>
-                                        <td>{r.nip}</td>
-                                        <td className="font-medium">{r.employeeName}</td>
-                                        <td>{r.jobPositionTitle}</td>
-                                        <td>{r.certificationCode}</td>
+                                        <td>{r.nip || "-"}</td>
+                                        <td className="font-medium">
+                                            <div className="tooltip" data-tip="Lihat detail pegawai">
+                                                <Link
+                                                    to={`/employee/${r.employeeId}`}
+                                                    className="hover:underline cursor-pointer"
+                                                >
+                                                    {r.employeeName || "-"}
+                                                </Link>
+                                            </div>
+                                        </td>
+                                        <td>{r.jobPositionTitle || "-"}</td>
+                                        <td>{r.certificationCode || "-"}</td>
                                         <td>{r.certificationLevelLevel ? `Jenjang ${r.certificationLevelLevel}` : "-"}</td>
                                         <td>{r.subFieldCode || "-"}</td>
                                         <td>{r.notes || "-"}</td>
                                         <td>{renderStatusBadge(r)}</td>
+                                        <td>{formatDate(r.expiredDate)}</td>
+                                        <td>{formatDate(r.reminderDate)}</td>
+                                        <td>{formatDate(r.targetMemiliki)}</td>
                                         <td className="text-gray-500 whitespace-nowrap">
                                             {r.updatedAt
                                                 ? new Date(r.updatedAt).toLocaleDateString("id-ID", {

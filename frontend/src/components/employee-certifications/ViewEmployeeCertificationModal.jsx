@@ -1,7 +1,7 @@
 import { useRef, useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import { X, Eye, Upload, Trash2, Download, AlertTriangle, FileText } from "lucide-react";
-import { reuploadCertificationFile, deleteCertificationFile } from "../../services/employeeCertificationService";
+import { reuploadCertificationFile, deleteCertificationFile, viewCertificationFile, getCertificationDetail } from "../../services/employeeCertificationService";
 
 export default function ViewEmployeeCertificationModal({ open, certId, onClose, onUpdated }) {
     const fileInputRef = useRef(null);
@@ -11,16 +11,61 @@ export default function ViewEmployeeCertificationModal({ open, certId, onClose, 
     const [fileError, setFileError] = useState(false);
     const [imageLoaded, setImageLoaded] = useState(false);
 
-    const fileUrl = `/api/employee-certifications/${certId}/file`;
+    const [blobUrl, setBlobUrl] = useState(null);
+    const [fileName, setFileName] = useState("certificate");
 
-    // Reset state when modal opens/closes
+    // Fetch secure blob when modal opens
     useEffect(() => {
-        if (open && certId) {
-            setConfirmDelete(false);
-            setFileError(false);
-            setFileType('image'); // Default to image first
-            setImageLoaded(false);
-        }
+        let active = true;
+        const loadFile = async () => {
+             if (open && certId) {
+                setConfirmDelete(false);
+                setFileError(false);
+                setFileType('image'); 
+                setImageLoaded(false);
+                setLoading(true);
+                
+                try {
+                    // Parallel fetch: file blob and certification details (for filename)
+                    const [blob, detail] = await Promise.all([
+                        viewCertificationFile(certId),
+                        getCertificationDetail(certId).catch(() => null)
+                    ]);
+                    
+                    if (active) {
+                        const url = URL.createObjectURL(blob);
+                        setBlobUrl(url);
+                        
+                        if (detail) {
+                            // Use fileUrl (formatted system name) if available, otherwise original fileName
+                            setFileName(detail.fileUrl || detail.fileName || "certificate");
+                        }
+                        
+                        // Detect type from blob if possible, or fallback to state
+                        if (blob.type === 'application/pdf') {
+                            setFileType('pdf');
+                        } else {
+                            setFileType('image');
+                        }
+                        setLoading(false);
+                    }
+                } catch (err) {
+                    console.error("Failed to load certification file", err);
+                    if (active) {
+                        setFileError(true);
+                        setLoading(false);
+                    }
+                }
+            }
+        };
+        loadFile();
+
+        return () => {
+            active = false;
+            if (blobUrl) URL.revokeObjectURL(blobUrl);
+            setBlobUrl(null);
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open, certId]);
 
     const handleImageLoad = () => {
@@ -29,11 +74,10 @@ export default function ViewEmployeeCertificationModal({ open, certId, onClose, 
     };
 
     const handleImageError = () => {
-        // If image fails, try PDF
+        // If image fails, try PDF as fallback if we haven't already detected it
         if (fileType === 'image' && !imageLoaded) {
             setFileType('pdf');
         } else {
-            // Both failed
             setFileError(true);
         }
     };
@@ -157,27 +201,22 @@ export default function ViewEmployeeCertificationModal({ open, certId, onClose, 
                 {/* Preview Area */}
                 <div className="flex-1 overflow-auto py-4 min-h-0">
                     <div className="h-full w-full flex items-center justify-center bg-gray-50 rounded-xl overflow-auto p-4">
-                        {fileError ? (
+                        {loading ? (
+                             <div className="flex flex-col items-center justify-center text-gray-400">
+                                <span className="loading loading-spinner loading-lg text-primary" />
+                                <p className="text-sm mt-3">Memuat file...</p>
+                            </div>
+                        ) : fileError || !blobUrl ? (
                             // Error State
                             <div className="flex flex-col items-center justify-center text-gray-400 p-8">
                                 <FileText size={64} className="mb-4 opacity-30" />
                                 <p className="text-sm font-medium mb-2">Preview Tidak Tersedia</p>
                                 <p className="text-xs text-center mb-4">File tidak dapat ditampilkan atau tidak ada.</p>
-                                <div className="flex gap-2">
-                                    <a
-                                        href={`${fileUrl}?download=true`}
-                                        className="btn btn-sm btn-primary rounded-lg gap-1"
-                                        download
-                                    >
-                                        <Download size={14} />
-                                        Coba Unduh
-                                    </a>
-                                </div>
                             </div>
                         ) : fileType === 'pdf' ? (
                             // PDF Preview
                             <iframe
-                                src={`${fileUrl}#toolbar=1&navpanes=0`}
+                                src={`${blobUrl}#toolbar=1&navpanes=0`}
                                 className="w-full h-full rounded-lg border-0"
                                 title="PDF Sertifikat"
                                 onError={() => setFileError(true)}
@@ -185,14 +224,8 @@ export default function ViewEmployeeCertificationModal({ open, certId, onClose, 
                         ) : (
                             // Image Preview (supports jpg, png, gif, webp, etc)
                             <div className="relative w-full h-full flex items-center justify-center">
-                                {!imageLoaded && !fileError && (
-                                    <div className="absolute flex flex-col items-center justify-center text-gray-400">
-                                        <span className="loading loading-dots loading-lg text-primary" />
-                                        <p className="text-sm mt-3">Memuat gambar...</p>
-                                    </div>
-                                )}
                                 <img
-                                    src={`${fileUrl}?t=${Date.now()}`}
+                                    src={blobUrl}
                                     alt="Sertifikat"
                                     className={`w-auto h-auto max-w-full max-h-full object-contain rounded-lg shadow-lg transition-opacity duration-300 ${!imageLoaded ? 'opacity-0' : 'opacity-100'}`}
                                     style={{ minWidth: '200px', minHeight: '200px' }}
@@ -235,9 +268,11 @@ export default function ViewEmployeeCertificationModal({ open, certId, onClose, 
 
                     <div className="flex gap-2">
                         <a
-                            href={`${fileUrl}?download=true`}
+                            href={blobUrl}
                             className="btn btn-sm btn-success rounded-lg gap-1"
-                            download
+                            download={fileName}
+                            target="_blank"
+                            rel="noopener noreferrer"
                         >
                             <Download size={14} />
                             Unduh

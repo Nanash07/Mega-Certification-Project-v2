@@ -7,6 +7,7 @@ import com.bankmega.certification.dto.dashboard.BatchCountResponse;
 import com.bankmega.certification.dto.dashboard.MonthlyPoint;
 import com.bankmega.certification.entity.Batch;
 import com.bankmega.certification.entity.PicCertificationScope;
+import com.bankmega.certification.repository.BatchRepository;
 import com.bankmega.certification.repository.PicCertificationScopeRepository;
 import com.bankmega.certification.service.BatchService;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +24,7 @@ import org.springframework.web.bind.annotation.*;
 import java.lang.reflect.Method;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @RestController
@@ -31,6 +33,7 @@ import java.util.stream.Collectors;
 public class BatchController {
 
     private final BatchService batchService;
+    private final BatchRepository batchRepository;
     private final PicCertificationScopeRepository scopeRepo;
 
     private boolean isPic(Authentication auth) {
@@ -75,6 +78,13 @@ public class BatchController {
                 .collect(Collectors.toList());
 
         return ids.isEmpty() ? List.of(-1L) : ids;
+    }
+
+    @GetMapping("/next-sequence")
+    public ResponseEntity<Map<String, Object>> getNextSequence(@RequestParam String prefix) {
+        long count = batchRepository.countByBatchNameStartingWithAndDeletedAtIsNull(prefix);
+        int nextSeq = (int) count + 1;
+        return ResponseEntity.ok(Map.of("count", count, "nextSequence", nextSeq));
     }
 
     @PostMapping

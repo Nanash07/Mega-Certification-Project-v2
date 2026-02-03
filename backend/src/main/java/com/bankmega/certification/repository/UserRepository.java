@@ -24,7 +24,7 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
 
     Optional<User> findByUsernameAndDeletedAtIsNull(String username);
 
-    @Query("SELECT u FROM User u LEFT JOIN FETCH u.role WHERE u.username = :username AND u.deletedAt IS NULL")
+    @Query("SELECT u FROM User u LEFT JOIN FETCH u.role LEFT JOIN FETCH u.employee WHERE u.username = :username AND u.deletedAt IS NULL")
     Optional<User> findByUsernameWithRoleAndDeletedAtIsNull(@Param("username") String username);
 
     List<User> findByDeletedAtIsNotNull();

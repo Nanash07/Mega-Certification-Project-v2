@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Eraser, Eye, Filter, UserX } from "lucide-react";
+import { Eraser, Filter, UserX } from "lucide-react";
 import toast from "react-hot-toast";
 import Select from "react-select";
 import AsyncSelect from "react-select/async";
@@ -23,7 +23,7 @@ export default function EmployeeResignedPage() {
     const [totalPages, setTotalPages] = useState(0);
     const [totalElements, setTotalElements] = useState(0);
 
-    const TABLE_COLS = 13;
+    const TABLE_COLS = 12;
 
     const [filterEmployee, setFilterEmployee] = useState(null);
     const [regionalIds, setRegionalIds] = useState(null);
@@ -210,7 +210,6 @@ export default function EmployeeResignedPage() {
                                 <th className="w-12">No</th>
                                 <th>NIP</th>
                                 <th>Nama</th>
-                                <th className="w-16">Detail</th>
                                 <th className="w-24">Status</th>
                                 <th>Email</th>
                                 <th>Gender</th>
@@ -225,13 +224,13 @@ export default function EmployeeResignedPage() {
                         <tbody className="text-xs">
                             {loading ? (
                                 <tr>
-                                    <td colSpan={13} className="text-center py-16">
+                                    <td colSpan={12} className="text-center py-16">
                                         <span className="loading loading-dots loading-lg text-primary" />
                                     </td>
                                 </tr>
                             ) : rows.length === 0 ? (
                                 <tr>
-                                    <td colSpan={13} className="text-center py-16">
+                                    <td colSpan={12} className="text-center py-16">
                                         <div className="flex flex-col items-center text-gray-400">
                                             <UserX size={48} className="mb-3 opacity-30" />
                                             <p className="text-sm">Tidak ada data pegawai resign</p>
@@ -244,14 +243,13 @@ export default function EmployeeResignedPage() {
                                         <tr key={`${e.id}-primary`} className="hover">
                                             <td>{startIdx + idx}</td>
                                             <td>{e.nip}</td>
-                                            <td className="font-medium">{e.name}</td>
-                                            <td>
+                                            <td className="font-medium">
                                                 <div className="tooltip" data-tip="Lihat detail pegawai">
                                                     <Link
                                                         to={`/employee/${e.id}`}
-                                                        className="btn btn-xs btn-info btn-soft border border-info rounded-lg"
+                                                        className="hover:underline cursor-pointer"
                                                     >
-                                                        <Eye size={12} />
+                                                        {e.name}
                                                     </Link>
                                                 </div>
                                             </td>
@@ -289,7 +287,7 @@ export default function EmployeeResignedPage() {
                                     if (e.jobPositionId2) {
                                         const secondaryRow = (
                                             <tr key={`${e.id}-secondary`} className="hover bg-base-50">
-                                                <td colSpan={7} className="text-right border-r border-base-200" />
+                                                <td colSpan={6} className="text-right border-r border-base-200" />
                                                 <td>
                                                     <span className="badge badge-secondary badge-sm border-0 text-white">
                                                         KEDUA

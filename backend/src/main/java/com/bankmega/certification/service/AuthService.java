@@ -14,6 +14,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.bcrypt.BCrypt;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.bankmega.certification.util.PasswordValidator;
@@ -23,6 +24,7 @@ import java.time.Instant;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@Transactional
 public class AuthService {
 
     private final UserRepository userRepository;
@@ -113,12 +115,6 @@ public class AuthService {
 
         if (!Boolean.TRUE.equals(user.getIsActive())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "User tidak aktif");
-        }
-
-        if (user.getRole() != null &&
-                user.getRole().getName() != null &&
-                !"PEGAWAI".equalsIgnoreCase(user.getRole().getName())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Hanya pegawai yang wajib ganti password awal");
         }
 
         if (!Boolean.TRUE.equals(user.getIsFirstLogin())) {

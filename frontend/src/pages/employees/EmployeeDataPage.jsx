@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { Download, Upload, History, Eraser, Filter, Users } from "lucide-react";
 import toast from "react-hot-toast";
 import Select from "react-select";
@@ -19,7 +19,6 @@ import {
 import ImportEmployeeModal from "../../components/employees/ImportEmployeeModal";
 
 export default function EmployeePage() {
-    const navigate = useNavigate();
     const [rows, setRows] = useState([]);
     const [loading, setLoading] = useState(false);
 
@@ -305,14 +304,19 @@ export default function EmployeePage() {
                             ) : (
                                 rows.map((e, idx) => {
                                     const primaryRow = (
-                                        <tr
-                                            key={`${e.id}-primary`}
-                                            className="hover cursor-pointer"
-                                            onClick={() => navigate(`/employee/${e.id}`)}
-                                        >
+                                        <tr key={`${e.id}-primary`} className="hover">
                                             <td>{startIdx + idx}</td>
                                             <td>{e.nip}</td>
-                                            <td className="font-medium">{e.name}</td>
+                                            <td className="font-medium">
+                                                <div className="tooltip" data-tip="Lihat detail pegawai">
+                                                    <Link
+                                                        to={`/employee/${e.id}`}
+                                                        className="hover:underline cursor-pointer"
+                                                    >
+                                                        {e.name}
+                                                    </Link>
+                                                </div>
+                                            </td>
                                             <td>
                                                 <span className="badge badge-primary badge-sm text-white">
                                                     UTAMA
@@ -353,11 +357,7 @@ export default function EmployeePage() {
 
                                     if (e.jobPositionId2) {
                                         const secondaryRow = (
-                                            <tr
-                                                key={`${e.id}-secondary`}
-                                                className="hover cursor-pointer bg-base-50"
-                                                onClick={() => navigate(`/employee/${e.id}`)}
-                                            >
+                                            <tr key={`${e.id}-secondary`} className="hover bg-base-50">
                                                 <td></td>
                                                 <td className="opacity-50 text-xs"></td>
                                                 <td className="opacity-50 text-xs"></td>

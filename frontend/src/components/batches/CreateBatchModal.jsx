@@ -1,16 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import Select from "react-select";
-import { createBatch } from "../../services/batchService";
+import { createBatch, fetchNextBatchSequence } from "../../services/batchService";
 import { fetchCertificationRules } from "../../services/certificationRuleService";
 import { fetchInstitutions } from "../../services/institutionService";
-import { X, Package, Save, Calendar, Users, Building, FileCheck, Tag } from "lucide-react";
+import { X, Package, Save, Calendar, Users, Building, FileCheck, Tag, Wand2 } from "lucide-react";
 
 export default function CreateBatchModal({ open, onClose, onSaved }) {
     const [rules, setRules] = useState([]);
+    const [rulesData, setRulesData] = useState([]); // Store full rule data for name generation
     const [institutions, setInstitutions] = useState([]);
     const [form, setForm] = useState(defaultForm());
     const [saving, setSaving] = useState(false);
+    const [generating, setGenerating] = useState(false);
 
     function defaultForm() {
         return {
@@ -23,6 +25,104 @@ export default function CreateBatchModal({ open, onClose, onSaved }) {
             status: "PLANNED",
             type: "CERTIFICATION",
         };
+    }
+
+    // Type abbreviations for batch name
+    const typeAbbr = {
+        CERTIFICATION: "CERT",
+        TRAINING: "TRN",
+        REFRESHMENT: "REF",
+        EXTENSION: "EXT",
+    };
+
+    // Generate base batch name (without sequence)
+    function generateBaseName(type, ruleId, startDate) {
+        if (!ruleId) return "";
+        
+        const rule = rulesData.find((r) => r.id === ruleId);
+        if (!rule) return "";
+
+        const parts = [typeAbbr[type] || "BATCH"];
+        
+        // Add certification code
+        if (rule.certificationCode) {
+            parts.push(rule.certificationCode);
+        }
+        
+        // Add level if exists
+        if (rule.certificationLevelLevel) {
+            parts.push(`J${rule.certificationLevelLevel}`);
+        }
+        
+        // Add sub field if exists
+        if (rule.subFieldCode) {
+            parts.push(rule.subFieldCode);
+        }
+        
+        // Add month-year from startDate (or current date if not set)
+        const dateToUse = startDate ? new Date(startDate) : new Date();
+        const monthNames = ["JAN", "FEB", "MAR", "APR", "MEI", "JUN", "JUL", "AGU", "SEP", "OKT", "NOV", "DES"];
+        parts.push(`${monthNames[dateToUse.getMonth()]}${dateToUse.getFullYear()}`);
+        
+        return parts.join("-");
+    }
+
+    // Generate full batch name with sequence number
+    async function generateBatchNameWithSequence(type, ruleId, startDate) {
+        const baseName = generateBaseName(type, ruleId, startDate);
+        if (!baseName) return "";
+        
+        const seq = await fetchNextBatchSequence(baseName);
+        const seqStr = String(seq).padStart(2, "0");
+        return `${baseName}-${seqStr}`;
+    }
+
+    // Auto-generate batch name when type changes
+    async function handleTypeChange(newType) {
+        setForm((prev) => ({ ...prev, type: newType }));
+        if (form.certificationRuleId) {
+            setGenerating(true);
+            const generatedName = await generateBatchNameWithSequence(newType, form.certificationRuleId, form.startDate);
+            setForm((prev) => ({ ...prev, batchName: generatedName || prev.batchName }));
+            setGenerating(false);
+        }
+    }
+
+    // Auto-generate batch name when rule changes
+    async function handleRuleChange(ruleId) {
+        setForm((prev) => ({ ...prev, certificationRuleId: ruleId }));
+        if (ruleId) {
+            setGenerating(true);
+            const generatedName = await generateBatchNameWithSequence(form.type, ruleId, form.startDate);
+            setForm((prev) => ({ ...prev, batchName: generatedName || prev.batchName }));
+            setGenerating(false);
+        }
+    }
+
+    // Auto-generate when startDate changes
+    async function handleStartDateChange(startDate) {
+        setForm((prev) => ({ ...prev, startDate }));
+        if (form.certificationRuleId) {
+            setGenerating(true);
+            const generatedName = await generateBatchNameWithSequence(form.type, form.certificationRuleId, startDate);
+            setForm((prev) => ({ ...prev, batchName: generatedName || prev.batchName }));
+            setGenerating(false);
+        }
+    }
+
+    // Regenerate batch name button handler
+    async function handleRegenerateName() {
+        if (!form.certificationRuleId) {
+            toast.error("Pilih aturan sertifikasi terlebih dahulu");
+            return;
+        }
+        setGenerating(true);
+        const generatedName = await generateBatchNameWithSequence(form.type, form.certificationRuleId, form.startDate);
+        if (generatedName) {
+            setForm((prev) => ({ ...prev, batchName: generatedName }));
+            toast.success("Nama batch di-generate ulang");
+        }
+        setGenerating(false);
     }
 
     const menuPortalTarget = useMemo(() => (typeof document !== "undefined" ? document.body : null), []);
@@ -41,6 +141,9 @@ export default function CreateBatchModal({ open, onClose, onSaved }) {
             setForm(defaultForm());
             Promise.all([fetchCertificationRules(), fetchInstitutions()])
                 .then(([rules, insts]) => {
+                    // Store full rule data for name generation
+                    setRulesData(rules);
+                    
                     setRules(
                         rules.map((r) => {
                             const parts = [
@@ -65,6 +168,7 @@ export default function CreateBatchModal({ open, onClose, onSaved }) {
                 .catch(() => toast.error("Gagal memuat data dropdown"));
         }
     }, [open]);
+
 
     async function handleSave() {
         setSaving(true);
@@ -130,13 +234,30 @@ export default function CreateBatchModal({ open, onClose, onSaved }) {
                         <label className="font-medium text-gray-600 flex items-center gap-1">
                             <Tag size={14} /> Nama Batch
                         </label>
-                        <input
-                            type="text"
-                            value={form.batchName}
-                            onChange={(e) => setForm({ ...form, batchName: e.target.value })}
-                            className="input input-bordered input-sm w-full rounded-lg"
-                            placeholder="Contoh: Batch AAJI Januari 2025"
-                        />
+                        <div className="flex gap-2">
+                            <input
+                                type="text"
+                                value={form.batchName}
+                                onChange={(e) => setForm({ ...form, batchName: e.target.value })}
+                                className="input input-bordered input-sm w-full rounded-lg"
+                                placeholder="Otomatis saat pilih jenis & aturan"
+                            />
+                            <div className="tooltip" data-tip="Generate ulang nama batch">
+                                <button
+                                    type="button"
+                                    className="btn btn-sm btn-accent rounded-lg"
+                                    onClick={handleRegenerateName}
+                                    disabled={generating}
+                                >
+                                    {generating ? (
+                                        <span className="loading loading-spinner loading-xs" />
+                                    ) : (
+                                        <Wand2 size={14} />
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+                        <p className="text-xs text-gray-400">Nama auto-generate dengan nomor urut, bisa diedit manual</p>
                     </div>
 
                     <div className="flex flex-col gap-1">
@@ -149,7 +270,7 @@ export default function CreateBatchModal({ open, onClose, onSaved }) {
                             styles={selectStyles}
                             options={typeOptions}
                             value={typeOptions.find((t) => t.value === form.type) || null}
-                            onChange={(opt) => setForm({ ...form, type: opt?.value || "CERTIFICATION" })}
+                            onChange={(opt) => handleTypeChange(opt?.value || "CERTIFICATION")}
                             placeholder="Pilih Jenis Batch"
                             isClearable={false}
                             classNamePrefix="react-select"
@@ -166,7 +287,7 @@ export default function CreateBatchModal({ open, onClose, onSaved }) {
                             styles={selectStyles}
                             options={rules}
                             value={rules.find((r) => r.value === form.certificationRuleId) || null}
-                            onChange={(opt) => setForm({ ...form, certificationRuleId: opt?.value || null })}
+                            onChange={(opt) => handleRuleChange(opt?.value || null)}
                             placeholder="Pilih Aturan Sertifikasi"
                             isClearable
                             classNamePrefix="react-select"
@@ -229,7 +350,7 @@ export default function CreateBatchModal({ open, onClose, onSaved }) {
                         <input
                             type="date"
                             value={form.startDate}
-                            onChange={(e) => setForm({ ...form, startDate: e.target.value })}
+                            onChange={(e) => handleStartDateChange(e.target.value)}
                             className="input input-bordered input-sm w-full rounded-lg"
                         />
                     </div>

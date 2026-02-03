@@ -3,7 +3,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import PaginationSimple from "../common/PaginationSimple";
 import { fetchBatches } from "../../services/batchService";
-import { Calendar, Users, CheckCircle2, XCircle, Building2, ArrowRight, Play, CircleCheck } from "lucide-react";
+import { Calendar, Users, CheckCircle2, XCircle, Building2, ArrowRight, Play, CircleCheck, Clock } from "lucide-react";
 
 function toNum(v) {
     return Number(v ?? 0) || 0;
@@ -87,8 +87,10 @@ export default function BatchListCard({ title, status, filters = {}, initialRows
     }, [load]);
 
     const isOngoing = status === "ONGOING";
+    const headerBg = isOngoing ? "bg-blue-50/50" : "bg-green-50/50";
     const titleColor = isOngoing ? "text-blue-600" : "text-green-600";
-    const TitleIcon = isOngoing ? Play : CircleCheck;
+    const badgeClass = isOngoing ? "text-blue-600 bg-blue-100" : "text-green-600 bg-green-100";
+    const TitleIcon = isOngoing ? Clock : CheckCircle2;
 
     const handleHeaderClick = () => {
         const p = new URLSearchParams();
@@ -104,22 +106,19 @@ export default function BatchListCard({ title, status, filters = {}, initialRows
     };
 
     return (
-        <div className="card bg-base-100 shadow-sm border border-gray-100 h-full flex flex-col">
-            <div className="p-4 border-b border-gray-100 flex justify-between items-center group/header">
+        <div className="card bg-white shadow-sm border border-gray-100 rounded-xl overflow-hidden h-full flex flex-col">
+            <div className={`p-4 border-b border-gray-100 flex items-center justify-between ${headerBg}`}>
                 <h2
-                    className="font-semibold text-base flex items-center gap-2 text-gray-800 cursor-pointer hover:underline decoration-dashed underline-offset-4"
+                    className="font-semibold text-sm flex items-center gap-2 text-gray-800 cursor-pointer hover:underline decoration-dashed underline-offset-4"
                     onClick={handleHeaderClick}
                     title="Lihat selengkapnya"
                 >
-                    <TitleIcon size={18} className={titleColor} />
+                    <TitleIcon size={16} className={titleColor} />
                     {title}
                 </h2>
-                <button
-                    onClick={handleHeaderClick}
-                    className="btn btn-xs btn-ghost btn-circle opacity-0 group-hover/header:opacity-100 transition-opacity"
-                >
-                    <ArrowRight size={14} />
-                </button>
+                <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${badgeClass}`}>
+                    {totalElements}
+                </span>
             </div>
 
             <div className="flex-1 overflow-hidden">

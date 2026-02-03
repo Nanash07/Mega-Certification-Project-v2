@@ -2,7 +2,7 @@ package com.bankmega.certification.service;
 
 import com.bankmega.certification.dto.LoginRequest;
 import com.bankmega.certification.dto.LoginResponse;
-import com.bankmega.certification.dto.FirstLoginChangePasswordRequest;
+
 import com.bankmega.certification.dto.ForgotPasswordRequest;
 import com.bankmega.certification.dto.ResetPasswordRequest;
 import com.bankmega.certification.entity.Role;

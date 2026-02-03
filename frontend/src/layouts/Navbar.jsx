@@ -138,6 +138,13 @@ export default function Navbar({ onMenuClick, hideMenuButton = false }) {
                 </button>
             )}
 
+            {/* Brand for Employee (No Sidebar) */}
+            {isEmployee && (
+                <div className="flex items-center ml-0">
+                    <span className="font-bold text-xl">Mega Certification</span>
+                </div>
+            )}
+
             <div className="flex items-center gap-3 ml-auto">
                 {/* 🔔 Notification Button (Pegawai Only) */}
                 {isEmployee && (

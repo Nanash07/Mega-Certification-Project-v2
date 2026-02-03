@@ -21,6 +21,9 @@ import java.util.Optional;
 public interface BatchRepository extends JpaRepository<Batch, Long>, JpaSpecificationExecutor<Batch> {
         Optional<Batch> findByIdAndDeletedAtIsNull(Long id);
 
+        // Count batches with name starting with prefix (for auto-sequence naming)
+        long countByBatchNameStartingWithAndDeletedAtIsNull(String prefix);
+
         @Override
         @EntityGraph(attributePaths = {
                         "certificationRule",
