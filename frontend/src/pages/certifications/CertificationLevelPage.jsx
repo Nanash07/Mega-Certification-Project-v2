@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
-import { Pencil, Trash2, Plus, Layers } from "lucide-react";
+import { Pencil, Trash2, Plus, Layers, Filter, Eraser } from "lucide-react";
+import Select from "react-select";
 import { fetchCertificationLevels, deleteCertificationLevel } from "../../services/certificationLevelService";
 import CreateCertificationLevelModal from "../../components/certification-levels/CreateCertificationLevelModal";
 import EditCertificationLevelModal from "../../components/certification-levels/EditCertificationLevelModal";
@@ -12,15 +13,15 @@ export default function CertificationLevelPage() {
     const [editItem, setEditItem] = useState(null);
     const [confirm, setConfirm] = useState({ open: false, id: undefined, name: "" });
 
+    const [filter, setFilter] = useState(null);
+
     async function load() {
         setLoading(true);
         try {
-            const levelList = await fetchCertificationLevels();
-            levelList.sort((a, b) => (a.level ?? 0) - (b.level ?? 0));
-            setRows(levelList);
-        } catch (e) {
-            console.error(e);
-            toast.error(e?.response?.data?.message || "Gagal memuat data jenjang");
+            const list = await fetchCertificationLevels();
+            setRows(list);
+        } catch {
+            toast.error("Gagal memuat data jenjang");
         } finally {
             setLoading(false);
         }
@@ -40,6 +41,60 @@ export default function CertificationLevelPage() {
         }
     }
 
+     // ================== SEARCH HELPER ==================
+    const options = useMemo(() => {
+        return rows.map((r) => ({
+            value: r.id,
+            label: r.name,
+        }));
+    }, [rows]);
+
+    const filteredRows = useMemo(() => {
+        if (!filter) return rows;
+        return rows.filter((r) => r.id === filter.value);
+    }, [rows, filter]);
+
+    // ================== STYLES ==================
+    const selectStyles = {
+        control: (base) => ({
+            ...base,
+            minHeight: '32px',
+            height: '32px',
+            fontSize: '12px',
+        }),
+        valueContainer: (base) => ({
+            ...base,
+            height: '32px',
+            padding: '0 8px',
+        }),
+        input: (base) => ({
+            ...base,
+            margin: '0px',
+            padding: '0px',
+        }),
+        indicatorsContainer: (base) => ({
+            ...base,
+            height: '32px',
+        }),
+        dropdownIndicator: (base) => ({
+            ...base,
+            padding: '4px',
+        }),
+        clearIndicator: (base) => ({
+            ...base,
+            padding: '4px',
+        }),
+        option: (base) => ({
+            ...base,
+            fontSize: '12px',
+            padding: '6px 10px',
+        }),
+        menu: (base) => ({
+            ...base,
+            fontSize: '12px',
+        }),
+    };
+
     return (
         <div className="space-y-4 w-full">
             {/* Header */}
@@ -55,6 +110,37 @@ export default function CertificationLevelPage() {
                     <Plus size={14} />
                     Tambah Jenjang
                 </button>
+            </div>
+
+            {/* Filter */}
+            <div className="card bg-base-100 shadow-sm border border-gray-100 p-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+                    <div className="flex flex-col gap-1 lg:col-span-3">
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <Filter size={12} /> Filter Jenjang
+                        </label>
+                        <Select
+                            options={options}
+                            value={filter}
+                            onChange={setFilter}
+                            placeholder="Cari jenjang..."
+                            isClearable
+                            className="text-xs"
+                            classNamePrefix="react-select"
+                            styles={selectStyles}
+                        />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                         <label className="font-medium text-gray-600 invisible">.</label>
+                         <button
+                            className="btn btn-sm btn-accent btn-soft w-full flex gap-2 rounded-lg"
+                            onClick={() => setFilter(null)}
+                        >
+                            <Eraser size={14} />
+                            Clear Filter
+                        </button>
+                    </div>
+                </div>
             </div>
 
             {/* Table Card */}
@@ -76,7 +162,7 @@ export default function CertificationLevelPage() {
                                         <span className="loading loading-dots loading-lg text-primary" />
                                     </td>
                                 </tr>
-                            ) : rows.length === 0 ? (
+                            ) : filteredRows.length === 0 ? (
                                 <tr>
                                     <td colSpan={4} className="text-center py-16">
                                         <div className="flex flex-col items-center text-gray-400">
@@ -86,7 +172,7 @@ export default function CertificationLevelPage() {
                                     </td>
                                 </tr>
                             ) : (
-                                rows.map((row, idx) => (
+                                filteredRows.map((row, idx) => (
                                     <tr key={row.id} className="hover">
                                         <td>{idx + 1}</td>
                                         <td>

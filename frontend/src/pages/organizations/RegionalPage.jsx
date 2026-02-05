@@ -1,120 +1,160 @@
 import { useEffect, useState, useMemo } from "react";
 import toast from "react-hot-toast";
+import { Trash2, MapPin, Filter, Eraser } from "lucide-react";
+import Select from "react-select";
 import { fetchRegionals, toggleRegional } from "../../services/regionalService";
 import Pagination from "../../components/common/Pagination";
-import { ChevronDown, Search, Eraser, MapPin } from "lucide-react";
 
 export default function RegionalPage() {
+    // Table State
     const [rows, setRows] = useState([]);
     const [loading, setLoading] = useState(false);
-
-    const [q, setQ] = useState("");
     const [page, setPage] = useState(1);
-    const [rowsPerPage, setRowsPerPage] = useState(10);
-
-    const [totalPages, setTotalPages] = useState(0);
+    const [totalPages, setTotalPages] = useState(1);
     const [totalElements, setTotalElements] = useState(0);
+    const pageSize = 10;
 
-    const [statusMenu, setStatusMenu] = useState(null);
+    // Filter State
+    const [filter, setFilter] = useState(null);
 
-    const apiParams = useMemo(
-        () => ({ q: q?.trim() || undefined, page: page - 1, size: rowsPerPage }),
-        [q, page, rowsPerPage]
-    );
+    // Options for Select
+    const [options, setOptions] = useState([]);
+    const [isOptionsLoading, setIsOptionsLoading] = useState(false);
+
+    // Confirm dialog
+    const [confirm, setConfirm] = useState({ open: false, id: undefined, name: "" });
+
+    // Fetch Options (Pre-load for Select)
+    useEffect(() => {
+        setIsOptionsLoading(true);
+        fetchRegionals({ page: 0, size: 20 })
+            .then((res) => {
+                const list = res.content || [];
+                setOptions(list.map((r) => ({ value: r.id, label: r.name })));
+            })
+            .catch((err) => console.error(err))
+            .finally(() => setIsOptionsLoading(false));
+    }, []);
+
+    // API Params for Table
+    const apiParams = useMemo(() => {
+        return {
+            page: page - 1,
+            size: pageSize,
+            q: filter?.label || "", // Search by name (label)
+        };
+    }, [page, filter]);
+
+    // Load Table Data
+    useEffect(() => {
+        load();
+    }, [apiParams]);
 
     async function load() {
         setLoading(true);
         try {
-            const data = await fetchRegionals(apiParams);
-            setRows(data.content || []);
-            setTotalPages(Math.max(data.totalPages || 1, 1));
-            setTotalElements(data.totalElements ?? data.content?.length ?? 0);
+            const res = await fetchRegionals(apiParams);
+            setRows(res.content);
+            setTotalPages(res.totalPages);
+            setTotalElements(res.totalElements);
         } catch {
-            toast.error("Gagal memuat regional");
+            toast.error("Gagal memuat data regional");
         } finally {
             setLoading(false);
         }
     }
 
-    useEffect(() => {
-        load();
-    }, [apiParams]);
-
-    function getStatusStyle(isActive) {
-        if (isActive) {
-            return { label: "Active", badgeCls: "badge-success", btnCls: "btn-success" };
-        }
-        return { label: "Nonactive", badgeCls: "badge-warning", btnCls: "btn-warning" };
-    }
-
-    function renderStatusBadge(row) {
-        const { label, badgeCls } = getStatusStyle(row.isActive);
-        return (
-            <button
-                type="button"
-                className={`badge badge-sm whitespace-nowrap cursor-pointer flex items-center gap-1 ${badgeCls} text-white`}
-                onClick={(e) => {
-                    const rect = e.currentTarget.getBoundingClientRect();
-                    setStatusMenu({ row, x: rect.left, y: rect.bottom + 4 });
-                }}
-            >
-                <span>{label}</span>
-                <ChevronDown className="w-3 h-3" />
-            </button>
-        );
-    }
-
-    async function handleChangeStatus(row, newIsActive) {
-        if (row.isActive === newIsActive) return;
+    async function onToggle(id) {
         try {
-            await toggleRegional(row.id);
-            toast.success(`Regional berhasil di${newIsActive ? "aktifkan" : "nonaktifkan"}`);
+            await toggleRegional(id);
+            toast.success("Status regional diupdate");
             load();
-        } catch (err) {
-            toast.error(err?.response?.data?.message || "Gagal update status regional");
+        } catch {
+            toast.error("Gagal update status");
         }
     }
 
-    const clearFilter = () => {
-        setQ("");
-        setPage(1);
-        toast.success("Filter dibersihkan");
+    // ================== STYLES ==================
+    const selectStyles = {
+        control: (base) => ({
+            ...base,
+            minHeight: '32px',
+            height: '32px',
+            fontSize: '12px',
+        }),
+        valueContainer: (base) => ({
+            ...base,
+            height: '32px',
+            padding: '0 8px',
+        }),
+        input: (base) => ({
+            ...base,
+            margin: '0px',
+            padding: '0px',
+        }),
+        indicatorsContainer: (base) => ({
+            ...base,
+            height: '32px',
+        }),
+        dropdownIndicator: (base) => ({
+            ...base,
+            padding: '4px',
+        }),
+        clearIndicator: (base) => ({
+            ...base,
+            padding: '4px',
+        }),
+        option: (base) => ({
+            ...base,
+            fontSize: '12px',
+            padding: '6px 10px',
+        }),
+        menu: (base) => ({
+            ...base,
+            fontSize: '12px',
+        }),
     };
-
-    const startIdx = totalElements === 0 ? 0 : (page - 1) * rowsPerPage + 1;
 
     return (
         <div className="space-y-4 w-full">
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div>
-                    <h1 className="text-lg sm:text-xl font-bold">Kelola Regional</h1>
-                    <p className="text-xs text-gray-500">{totalElements} regional terdaftar</p>
+                    <h1 className="text-lg sm:text-xl font-bold">Regional</h1>
+                    <p className="text-xs text-gray-500">{totalElements} regional ditemukan</p>
                 </div>
             </div>
 
-            {/* Filter Card */}
+            {/* Filter */}
             <div className="card bg-base-100 shadow-sm border border-gray-100 p-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
                     <div className="flex flex-col gap-1 lg:col-span-3">
                         <label className="font-medium text-gray-600 flex items-center gap-1">
-                            <Search size={12} /> Cari Regional
+                            <Filter size={12} /> Filter Regional
                         </label>
-                        <input
-                            className="input input-sm input-bordered w-full rounded-lg"
-                            value={q}
-                            onChange={(e) => {
+                        <Select
+                            styles={selectStyles}
+                            options={options}
+                            isLoading={isOptionsLoading}
+                            value={filter}
+                            onChange={(val) => {
                                 setPage(1);
-                                setQ(e.target.value);
+                                setFilter(val);
                             }}
-                            placeholder="Ketik nama regional..."
+                            placeholder="Cari regional..."
+                            isClearable
+                            className="text-xs"
+                            classNamePrefix="react-select"
                         />
                     </div>
                     <div className="flex flex-col gap-1">
-                        <label className="font-medium text-gray-600 invisible">.</label>
-                        <button
+                         <label className="font-medium text-gray-600 invisible">.</label>
+                         <button
                             className="btn btn-sm btn-accent btn-soft w-full flex gap-2 rounded-lg"
-                            onClick={clearFilter}
+                            onClick={() => {
+                                setPage(1);
+                                setFilter(null);
+                            }}
                         >
                             <Eraser size={14} />
                             Clear Filter
@@ -130,9 +170,9 @@ export default function RegionalPage() {
                         <thead className="bg-base-200 text-xs">
                             <tr>
                                 <th className="w-12">No</th>
+                                <th className="w-24">Aksi</th>
                                 <th>Nama Regional</th>
-                                <th className="w-28">Status</th>
-                                <th className="w-32">Updated At</th>
+                                <th>Status</th>
                             </tr>
                         </thead>
                         <tbody className="text-xs">
@@ -154,17 +194,38 @@ export default function RegionalPage() {
                             ) : (
                                 rows.map((r, idx) => (
                                     <tr key={r.id} className="hover">
-                                        <td>{startIdx + idx}</td>
+                                        <td>{(page - 1) * pageSize + idx + 1}</td>
+                                        <td>
+                                            <div className="flex gap-1">
+                                                <div className="tooltip" data-tip={r.isActive ? "Nonaktifkan" : "Aktifkan"}>
+                                                    <button
+                                                        className={`btn btn-xs btn-soft rounded-lg border ${
+                                                            r.isActive
+                                                                ? "btn-error border-error"
+                                                                : "btn-success border-success"
+                                                        }`}
+                                                        onClick={() =>
+                                                            setConfirm({
+                                                                open: true,
+                                                                id: r.id,
+                                                                name: r.name,
+                                                            })
+                                                        }
+                                                    >
+                                                        <Trash2 size={12} />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </td>
                                         <td className="font-medium">{r.name}</td>
-                                        <td>{renderStatusBadge(r)}</td>
-                                        <td className="text-gray-500">
-                                            {r.createdAt
-                                                ? new Date(r.createdAt).toLocaleDateString("id-ID", {
-                                                      day: "2-digit",
-                                                      month: "short",
-                                                      year: "numeric",
-                                                  })
-                                                : "-"}
+                                        <td>
+                                            <span
+                                                className={`badge badge-sm ${
+                                                    r.isActive ? "badge-success text-white" : "badge-error text-white"
+                                                }`}
+                                            >
+                                                {r.isActive ? "Active" : "Inactive"}
+                                            </span>
                                         </td>
                                     </tr>
                                 ))
@@ -173,17 +234,18 @@ export default function RegionalPage() {
                     </table>
                 </div>
 
-                {/* Pagination inside card */}
+                {/* Pagination */}
                 {rows.length > 0 && (
                     <div className="border-t border-gray-100 p-3">
                         <Pagination
                             page={page}
                             totalPages={totalPages}
                             totalElements={totalElements}
-                            rowsPerPage={rowsPerPage}
+                            rowsPerPage={pageSize}
                             onPageChange={setPage}
                             onRowsPerPageChange={(val) => {
-                                setRowsPerPage(val);
+                                // This component doesn't allow changing rowsPerPage, but keeping the prop for consistency
+                                // setRowsPerPage(val);
                                 setPage(1);
                             }}
                         />
@@ -191,34 +253,40 @@ export default function RegionalPage() {
                 )}
             </div>
 
-            {/* Floating status menu */}
-            {statusMenu && (
-                <div className="fixed inset-0 z-[999]" onClick={() => setStatusMenu(null)}>
-                    <div
-                        className="absolute"
-                        style={{ top: statusMenu.y, left: statusMenu.x }}
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <div className="bg-base-100 shadow-xl rounded-xl border border-gray-200 p-2 text-xs flex flex-col gap-1.5">
-                            {[true, false].map((val) => {
-                                const { label, btnCls } = getStatusStyle(val);
-                                return (
-                                    <button
-                                        key={String(val)}
-                                        className={`btn btn-xs ${btnCls} text-white rounded-lg w-full justify-center`}
-                                        onClick={async () => {
-                                            await handleChangeStatus(statusMenu.row, val);
-                                            setStatusMenu(null);
-                                        }}
-                                    >
-                                        {label}
-                                    </button>
-                                );
-                            })}
-                        </div>
+
+
+            {/* Confirm Actions */}
+            <dialog className="modal" open={confirm.open}>
+                <div className="modal-box">
+                    <h3 className="font-bold text-lg">Konfirmasi Aksi</h3>
+                    {confirm.name && (
+                        <p className="py-3">
+                            Ubah status regional <b>{confirm.name}</b>?
+                        </p>
+                    )}
+                    <div className="modal-action">
+                        <button className="btn" onClick={() => setConfirm({ open: false, id: undefined, name: "" })}>
+                            Batal
+                        </button>
+                        <button
+                            className="btn btn-warning"
+                            onClick={() => {
+                                onToggle(confirm.id);
+                                setConfirm({ open: false, id: undefined, name: "" });
+                            }}
+                        >
+                            Ya, Ubah
+                        </button>
                     </div>
                 </div>
-            )}
+                <form
+                    method="dialog"
+                    className="modal-backdrop"
+                    onSubmit={() => setConfirm({ open: false, id: undefined, name: "" })}
+                >
+                    <button>close</button>
+                </form>
+            </dialog>
         </div>
     );
 }

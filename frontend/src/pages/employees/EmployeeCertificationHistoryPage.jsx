@@ -3,11 +3,30 @@ import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import Select from "react-select";
 import Pagination from "../../components/common/Pagination";
+
+import { getCurrentRole } from "../../utils/helpers";
 import api from "../../services/api";
 import { ArrowLeft, Filter, Eraser, History as HistoryIcon } from "lucide-react";
 
 export default function EmployeeCertificationHistoryPage() {
+
     const navigate = useNavigate();
+
+    const [role, setRole] = useState(null);
+    const isRoleLoaded = role !== null;
+    const isEmployee = role === "EMPLOYEE" || role === "PEGAWAI";
+
+    useEffect(() => {
+        setRole(getCurrentRole());
+    }, []);
+
+    useEffect(() => {
+        if (!isRoleLoaded) return;
+        if (isEmployee) {
+            toast.error("Anda tidak berwenang mengakses halaman ini");
+            navigate("/", { replace: true });
+        }
+    }, [isRoleLoaded, isEmployee]);
 
     const [rows, setRows] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -20,6 +39,8 @@ export default function EmployeeCertificationHistoryPage() {
     const [filterAction, setFilterAction] = useState(null);
 
     async function load() {
+        if (!isRoleLoaded || isEmployee) return;
+
         setLoading(true);
         try {
             const params = {
@@ -70,6 +91,51 @@ export default function EmployeeCertificationHistoryPage() {
         toast.success("Filter dibersihkan");
     }
 
+    // Custom styles matching Dashboard
+    const selectStyles = {
+        control: (base) => ({
+            ...base,
+            minHeight: '32px',
+            height: '32px',
+            fontSize: '12px',
+        }),
+        valueContainer: (base) => ({
+            ...base,
+            height: '32px',
+            padding: '0 8px',
+        }),
+        input: (base) => ({
+            ...base,
+            margin: '0px',
+            padding: '0px',
+        }),
+        indicatorsContainer: (base) => ({
+            ...base,
+            height: '32px',
+        }),
+        dropdownIndicator: (base) => ({
+            ...base,
+            padding: '4px',
+        }),
+        clearIndicator: (base) => ({
+            ...base,
+            padding: '4px',
+        }),
+        option: (base) => ({
+            ...base,
+            fontSize: '12px',
+            padding: '6px 10px',
+        }),
+        menu: (base) => ({
+            ...base,
+            fontSize: '12px',
+        }),
+    };
+
+
+
+    if (!isRoleLoaded || isEmployee) return null;
+
     return (
         <div className="space-y-4 w-full">
             {/* Header */}
@@ -107,6 +173,7 @@ export default function EmployeeCertificationHistoryPage() {
                             isClearable
                             className="text-xs"
                             classNamePrefix="react-select"
+                            styles={selectStyles}
                         />
                     </div>
                     <div className="flex flex-col gap-1 lg:col-span-4">

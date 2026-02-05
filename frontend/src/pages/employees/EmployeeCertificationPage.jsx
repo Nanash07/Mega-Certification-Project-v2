@@ -69,6 +69,47 @@ export default function EmployeeCertificationPage() {
         []
     );
 
+    // Custom styles matching Dashboard
+    const selectStyles = {
+        control: (base) => ({
+            ...base,
+            minHeight: '32px',
+            height: '32px',
+            fontSize: '12px',
+        }),
+        valueContainer: (base) => ({
+            ...base,
+            height: '32px',
+            padding: '0 8px',
+        }),
+        input: (base) => ({
+            ...base,
+            margin: '0px',
+            padding: '0px',
+        }),
+        indicatorsContainer: (base) => ({
+            ...base,
+            height: '32px',
+        }),
+        dropdownIndicator: (base) => ({
+            ...base,
+            padding: '4px',
+        }),
+        clearIndicator: (base) => ({
+            ...base,
+            padding: '4px',
+        }),
+        option: (base) => ({
+            ...base,
+            fontSize: '12px',
+            padding: '6px 10px',
+        }),
+        menu: (base) => ({
+            ...base,
+            fontSize: '12px',
+        }),
+    };
+
     function formatStatusLabel(status) {
         if (!status) return "-";
         switch (status) {
@@ -284,6 +325,7 @@ export default function EmployeeCertificationPage() {
                             isClearable
                             className="text-xs"
                             classNamePrefix="react-select"
+                            styles={selectStyles}
                         />
                     </div>
                     <div className="flex flex-col gap-1">
@@ -298,6 +340,7 @@ export default function EmployeeCertificationPage() {
                             placeholder="Filter Cert Code"
                             className="text-xs"
                             classNamePrefix="react-select"
+                            styles={selectStyles}
                         />
                     </div>
                     <div className="flex flex-col gap-1">
@@ -312,6 +355,7 @@ export default function EmployeeCertificationPage() {
                             placeholder="Filter Jenjang"
                             className="text-xs"
                             classNamePrefix="react-select"
+                            styles={selectStyles}
                         />
                     </div>
                     <div className="flex flex-col gap-1">
@@ -326,6 +370,7 @@ export default function EmployeeCertificationPage() {
                             placeholder="Filter Sub Field"
                             className="text-xs"
                             classNamePrefix="react-select"
+                            styles={selectStyles}
                         />
                     </div>
                     <div className="flex flex-col gap-1">
@@ -340,6 +385,7 @@ export default function EmployeeCertificationPage() {
                             placeholder="Filter Lembaga"
                             className="text-xs"
                             classNamePrefix="react-select"
+                            styles={selectStyles}
                         />
                     </div>
                     <div className="flex flex-col gap-1">
@@ -361,6 +407,7 @@ export default function EmployeeCertificationPage() {
                             placeholder="Filter Status"
                             className="text-xs"
                             classNamePrefix="react-select"
+                            styles={selectStyles}
                         />
                     </div>
                 </div>

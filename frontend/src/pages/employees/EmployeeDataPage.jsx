@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Download, Upload, History, Eraser, Filter, Users } from "lucide-react";
 import toast from "react-hot-toast";
 import Select from "react-select";
@@ -19,6 +19,7 @@ import {
 import ImportEmployeeModal from "../../components/employees/ImportEmployeeModal";
 
 export default function EmployeePage() {
+    const navigate = useNavigate();
     const [rows, setRows] = useState([]);
     const [loading, setLoading] = useState(false);
 
@@ -50,6 +51,47 @@ export default function EmployeePage() {
     );
 
     const [openImport, setOpenImport] = useState(false);
+
+    // Custom styles matching Dashboard
+    const selectStyles = {
+        control: (base) => ({
+            ...base,
+            minHeight: '32px',
+            height: '32px',
+            fontSize: '12px',
+        }),
+        valueContainer: (base) => ({
+            ...base,
+            height: '32px',
+            padding: '0 8px',
+        }),
+        input: (base) => ({
+            ...base,
+            margin: '0px',
+            padding: '0px',
+        }),
+        indicatorsContainer: (base) => ({
+            ...base,
+            height: '32px',
+        }),
+        dropdownIndicator: (base) => ({
+            ...base,
+            padding: '4px',
+        }),
+        clearIndicator: (base) => ({
+            ...base,
+            padding: '4px',
+        }),
+        option: (base) => ({
+            ...base,
+            fontSize: '12px',
+            padding: '6px 10px',
+        }),
+        menu: (base) => ({
+            ...base,
+            fontSize: '12px',
+        }),
+    };
 
     function formatStatusLabel(status) {
         if (!status) return "-";
@@ -184,6 +226,7 @@ export default function EmployeePage() {
                             isClearable
                             className="text-xs"
                             classNamePrefix="react-select"
+                            styles={selectStyles}
                         />
                     </div>
                     <div className="flex flex-col gap-1">
@@ -198,6 +241,7 @@ export default function EmployeePage() {
                             placeholder="Filter Regional"
                             className="text-xs"
                             classNamePrefix="react-select"
+                            styles={selectStyles}
                         />
                     </div>
                     <div className="flex flex-col gap-1">
@@ -212,6 +256,7 @@ export default function EmployeePage() {
                             placeholder="Filter Division"
                             className="text-xs"
                             classNamePrefix="react-select"
+                            styles={selectStyles}
                         />
                     </div>
                     <div className="flex flex-col gap-1">
@@ -226,6 +271,7 @@ export default function EmployeePage() {
                             placeholder="Filter Unit"
                             className="text-xs"
                             classNamePrefix="react-select"
+                            styles={selectStyles}
                         />
                     </div>
                     <div className="flex flex-col gap-1">
@@ -240,6 +286,7 @@ export default function EmployeePage() {
                             placeholder="Filter Jabatan"
                             className="text-xs"
                             classNamePrefix="react-select"
+                            styles={selectStyles}
                         />
                     </div>
                     <div className="flex flex-col gap-1">
@@ -254,6 +301,7 @@ export default function EmployeePage() {
                             placeholder="Filter Status"
                             className="text-xs"
                             classNamePrefix="react-select"
+                            styles={selectStyles}
                         />
                     </div>
                 </div>

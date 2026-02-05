@@ -719,7 +719,7 @@ export default function PicDashboard() {
                                     <BarChart data={monthly}>
                                         <CartesianGrid strokeDasharray="3 3" vertical={false} />
                                         <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-                                        <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                                        <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#9ca3af' }} tickFormatter={(value) => Math.floor(value)} allowDecimals={false} />
                                         <ReTooltip />
                                         <Bar dataKey="count" fill="#10b981" radius={[4, 4, 0, 0]} name="Jumlah Batch" />
                                     </BarChart>

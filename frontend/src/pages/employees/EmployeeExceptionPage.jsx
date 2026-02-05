@@ -70,6 +70,47 @@ export default function EmployeeExceptionPage() {
 
     const [statusMenu, setStatusMenu] = useState(null);
 
+    // Custom styles matching Dashboard
+    const selectStyles = {
+        control: (base) => ({
+            ...base,
+            minHeight: '32px',
+            height: '32px',
+            fontSize: '12px',
+        }),
+        valueContainer: (base) => ({
+            ...base,
+            height: '32px',
+            padding: '0 8px',
+        }),
+        input: (base) => ({
+            ...base,
+            margin: '0px',
+            padding: '0px',
+        }),
+        indicatorsContainer: (base) => ({
+            ...base,
+            height: '32px',
+        }),
+        dropdownIndicator: (base) => ({
+            ...base,
+            padding: '4px',
+        }),
+        clearIndicator: (base) => ({
+            ...base,
+            padding: '4px',
+        }),
+        option: (base) => ({
+            ...base,
+            fontSize: '12px',
+            padding: '6px 10px',
+        }),
+        menu: (base) => ({
+            ...base,
+            fontSize: '12px',
+        }),
+    };
+
     async function loadFilters() {
         if (!isRoleLoaded || isEmployee) return;
 
@@ -343,6 +384,7 @@ export default function EmployeeExceptionPage() {
                             isClearable
                             className="text-xs"
                             classNamePrefix="react-select"
+                            styles={selectStyles}
                         />
                     </div>
 
@@ -358,6 +400,7 @@ export default function EmployeeExceptionPage() {
                             placeholder="Semua Jabatan"
                             className="text-xs"
                             classNamePrefix="react-select"
+                            styles={selectStyles}
                         />
                     </div>
 
@@ -373,6 +416,7 @@ export default function EmployeeExceptionPage() {
                             placeholder="Semua Sertifikasi"
                             className="text-xs"
                             classNamePrefix="react-select"
+                            styles={selectStyles}
                         />
                     </div>
 
@@ -388,6 +432,7 @@ export default function EmployeeExceptionPage() {
                             placeholder="Semua Level"
                             className="text-xs"
                             classNamePrefix="react-select"
+                            styles={selectStyles}
                         />
                     </div>
 
@@ -403,6 +448,7 @@ export default function EmployeeExceptionPage() {
                             placeholder="Semua Sub Bidang"
                             className="text-xs"
                             classNamePrefix="react-select"
+                            styles={selectStyles}
                         />
                     </div>
 
@@ -421,6 +467,7 @@ export default function EmployeeExceptionPage() {
                             placeholder="Semua Status"
                             className="text-xs"
                             classNamePrefix="react-select"
+                            styles={selectStyles}
                         />
                     </div>
                 </div>

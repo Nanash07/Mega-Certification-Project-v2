@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
 import toast from "react-hot-toast";
+import Select from "react-select";
 import { fetchUnits, toggleUnit } from "../../services/unitService";
 import Pagination from "../../components/common/Pagination";
 import { ChevronDown, Search, Eraser, Boxes } from "lucide-react";
@@ -8,7 +9,7 @@ export default function UnitPage() {
     const [rows, setRows] = useState([]);
     const [loading, setLoading] = useState(false);
 
-    const [q, setQ] = useState("");
+    const [filter, setFilter] = useState(null);
     const [page, setPage] = useState(1);
     const [rowsPerPage, setRowsPerPage] = useState(10);
 
@@ -17,9 +18,13 @@ export default function UnitPage() {
 
     const [statusMenu, setStatusMenu] = useState(null);
 
+    // Options for Select
+    const [options, setOptions] = useState([]);
+    const [isOptionsLoading, setIsOptionsLoading] = useState(false);
+
     const apiParams = useMemo(
-        () => ({ q: q?.trim() || undefined, page: page - 1, size: rowsPerPage }),
-        [q, page, rowsPerPage]
+        () => ({ q: filter?.label || undefined, page: page - 1, size: rowsPerPage }),
+        [filter, page, rowsPerPage]
     );
 
     async function load() {
@@ -39,6 +44,59 @@ export default function UnitPage() {
     useEffect(() => {
         load();
     }, [apiParams]);
+
+    // Fetch options on mount (Pre-load for Select)
+    useEffect(() => {
+        setIsOptionsLoading(true);
+        fetchUnits({ q: undefined, page: 0, size: 20 })
+            .then((data) => {
+                const list = data.content || [];
+                setOptions(list.map((u) => ({ value: u.id, label: u.name })));
+            })
+            .catch((err) => console.error(err))
+            .finally(() => setIsOptionsLoading(false));
+    }, []);
+
+    // ================== STYLES ==================
+    const selectStyles = {
+        control: (base) => ({
+            ...base,
+            minHeight: '32px',
+            height: '32px',
+            fontSize: '12px',
+        }),
+        valueContainer: (base) => ({
+            ...base,
+            height: '32px',
+            padding: '0 8px',
+        }),
+        input: (base) => ({
+            ...base,
+            margin: '0px',
+            padding: '0px',
+        }),
+        indicatorsContainer: (base) => ({
+            ...base,
+            height: '32px',
+        }),
+        dropdownIndicator: (base) => ({
+            ...base,
+            padding: '4px',
+        }),
+        clearIndicator: (base) => ({
+            ...base,
+            padding: '4px',
+        }),
+        option: (base) => ({
+            ...base,
+            fontSize: '12px',
+            padding: '6px 10px',
+        }),
+        menu: (base) => ({
+            ...base,
+            fontSize: '12px',
+        }),
+    };
 
     function getStatusStyle(isActive) {
         if (isActive) {
@@ -76,7 +134,7 @@ export default function UnitPage() {
     }
 
     const clearFilter = () => {
-        setQ("");
+        setFilter(null);
         setPage(1);
         toast.success("Filter dibersihkan");
     };
@@ -100,14 +158,19 @@ export default function UnitPage() {
                         <label className="font-medium text-gray-600 flex items-center gap-1">
                             <Search size={12} /> Cari Unit
                         </label>
-                        <input
-                            className="input input-sm input-bordered w-full rounded-lg"
-                            value={q}
-                            onChange={(e) => {
+                        <Select
+                            options={options}
+                            isLoading={isOptionsLoading}
+                            value={filter}
+                            onChange={(val) => {
                                 setPage(1);
-                                setQ(e.target.value);
+                                setFilter(val);
                             }}
                             placeholder="Ketik nama unit..."
+                            isClearable
+                            className="text-xs"
+                            classNamePrefix="react-select"
+                            styles={selectStyles}
                         />
                     </div>
                     <div className="flex flex-col gap-1">

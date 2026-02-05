@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
-import { Pencil, Trash2, Plus, Award } from "lucide-react";
+import { Pencil, Trash2, Plus, Award, Filter, Eraser } from "lucide-react";
+import Select from "react-select";
 import { fetchCertifications, deleteCertification } from "../../services/certificationService";
 import CreateCertificationModal from "../../components/certifications/CreateCertificationModal";
 import EditCertificationModal from "../../components/certifications/EditCertificationModal";
@@ -12,15 +13,15 @@ export default function CertificationPage() {
     const [editItem, setEditItem] = useState(null);
     const [confirm, setConfirm] = useState({ open: false, id: undefined, name: "" });
 
+    const [filter, setFilter] = useState(null);
+
     async function load() {
         setLoading(true);
         try {
             const list = await fetchCertifications();
-            list.sort((a, b) => a.name.localeCompare(b.name));
             setRows(list);
-        } catch (e) {
-            console.error(e);
-            toast.error(e?.response?.data?.message || "Gagal memuat data sertifikasi");
+        } catch {
+            toast.error("Gagal memuat data sertifikasi");
         } finally {
             setLoading(false);
         }
@@ -33,12 +34,66 @@ export default function CertificationPage() {
     async function onDelete(id) {
         try {
             await deleteCertification(id);
-            toast.success("Jenis sertifikasi dihapus");
+            toast.success("Sertifikasi dihapus");
             load();
         } catch (e) {
-            toast.error(e?.response?.data?.message || "Gagal menghapus");
+            toast.error(e?.response?.data?.message || "Gagal menghapus sertifikasi");
         }
     }
+
+    // ================== SEARCH HELPER ==================
+    const options = useMemo(() => {
+        return rows.map((r) => ({
+            value: r.id,
+            label: r.name,
+        }));
+    }, [rows]);
+
+    const filteredRows = useMemo(() => {
+        if (!filter) return rows;
+        return rows.filter((r) => r.id === filter.value);
+    }, [rows, filter]);
+
+    // ================== STYLES ==================
+    const selectStyles = {
+        control: (base) => ({
+            ...base,
+            minHeight: '32px',
+            height: '32px',
+            fontSize: '12px',
+        }),
+        valueContainer: (base) => ({
+            ...base,
+            height: '32px',
+            padding: '0 8px',
+        }),
+        input: (base) => ({
+            ...base,
+            margin: '0px',
+            padding: '0px',
+        }),
+        indicatorsContainer: (base) => ({
+            ...base,
+            height: '32px',
+        }),
+        dropdownIndicator: (base) => ({
+            ...base,
+            padding: '4px',
+        }),
+        clearIndicator: (base) => ({
+            ...base,
+            padding: '4px',
+        }),
+        option: (base) => ({
+            ...base,
+            fontSize: '12px',
+            padding: '6px 10px',
+        }),
+        menu: (base) => ({
+            ...base,
+            fontSize: '12px',
+        }),
+    };
 
     return (
         <div className="space-y-4 w-full">
@@ -57,6 +112,37 @@ export default function CertificationPage() {
                 </button>
             </div>
 
+            {/* Filter */}
+            <div className="card bg-base-100 shadow-sm border border-gray-100 p-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+                    <div className="flex flex-col gap-1 lg:col-span-3">
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <Filter size={12} /> Filter Sertifikasi
+                        </label>
+                        <Select
+                            options={options}
+                            value={filter}
+                            onChange={setFilter}
+                            placeholder="Cari sertifikasi..."
+                            isClearable
+                            className="text-xs"
+                            classNamePrefix="react-select"
+                            styles={selectStyles}
+                        />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                         <label className="font-medium text-gray-600 invisible">.</label>
+                         <button
+                            className="btn btn-sm btn-accent btn-soft w-full flex gap-2 rounded-lg"
+                            onClick={() => setFilter(null)}
+                        >
+                            <Eraser size={14} />
+                            Clear Filter
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             {/* Table Card */}
             <div className="card bg-base-100 shadow-sm border border-gray-100 overflow-hidden">
                 <div className="overflow-x-auto">
@@ -67,18 +153,19 @@ export default function CertificationPage() {
                                 <th className="w-24">Aksi</th>
                                 <th>Nama</th>
                                 <th>Kode</th>
+                                <th>Deskripsi</th>
                             </tr>
                         </thead>
                         <tbody className="text-xs">
                             {loading ? (
                                 <tr>
-                                    <td colSpan={4} className="text-center py-16">
+                                    <td colSpan={5} className="text-center py-16">
                                         <span className="loading loading-dots loading-lg text-primary" />
                                     </td>
                                 </tr>
-                            ) : rows.length === 0 ? (
+                            ) : filteredRows.length === 0 ? (
                                 <tr>
-                                    <td colSpan={4} className="text-center py-16">
+                                    <td colSpan={5} className="text-center py-16">
                                         <div className="flex flex-col items-center text-gray-400">
                                             <Award size={48} className="mb-3 opacity-30" />
                                             <p className="text-sm">Tidak ada data sertifikasi</p>
@@ -86,15 +173,15 @@ export default function CertificationPage() {
                                     </td>
                                 </tr>
                             ) : (
-                                rows.map((c, idx) => (
-                                    <tr key={c.id} className="hover">
+                                filteredRows.map((r, idx) => (
+                                    <tr key={r.id} className="hover">
                                         <td>{idx + 1}</td>
                                         <td>
                                             <div className="flex gap-1">
                                                 <div className="tooltip" data-tip="Edit sertifikasi">
                                                     <button
                                                         className="btn btn-xs btn-soft btn-warning border border-warning rounded-lg"
-                                                        onClick={() => setEditItem(c)}
+                                                        onClick={() => setEditItem(r)}
                                                     >
                                                         <Pencil size={12} />
                                                     </button>
@@ -105,8 +192,8 @@ export default function CertificationPage() {
                                                         onClick={() =>
                                                             setConfirm({
                                                                 open: true,
-                                                                id: c.id,
-                                                                name: c.name,
+                                                                id: r.id,
+                                                                name: r.name,
                                                             })
                                                         }
                                                     >
@@ -115,8 +202,9 @@ export default function CertificationPage() {
                                                 </div>
                                             </div>
                                         </td>
-                                        <td className="font-medium">{c.name}</td>
-                                        <td>{c.code}</td>
+                                        <td className="font-medium">{r.name}</td>
+                                        <td>{r.code}</td>
+                                        <td>{r.description || "-"}</td>
                                     </tr>
                                 ))
                             )}

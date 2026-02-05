@@ -36,6 +36,47 @@ export default function EmployeeResignedPage() {
     const [unitOptions, setUnitOptions] = useState([]);
     const [jobOptions, setJobOptions] = useState([]);
 
+    // Custom styles matching Dashboard
+    const selectStyles = {
+        control: (base) => ({
+            ...base,
+            minHeight: '32px',
+            height: '32px',
+            fontSize: '12px',
+        }),
+        valueContainer: (base) => ({
+            ...base,
+            height: '32px',
+            padding: '0 8px',
+        }),
+        input: (base) => ({
+            ...base,
+            margin: '0px',
+            padding: '0px',
+        }),
+        indicatorsContainer: (base) => ({
+            ...base,
+            height: '32px',
+        }),
+        dropdownIndicator: (base) => ({
+            ...base,
+            padding: '4px',
+        }),
+        clearIndicator: (base) => ({
+            ...base,
+            padding: '4px',
+        }),
+        option: (base) => ({
+            ...base,
+            fontSize: '12px',
+            padding: '6px 10px',
+        }),
+        menu: (base) => ({
+            ...base,
+            fontSize: '12px',
+        }),
+    };
+
     function formatStatusLabel(status) {
         if (!status) return "-";
         const s = status.toString().toLowerCase();
@@ -133,6 +174,7 @@ export default function EmployeeResignedPage() {
                             isClearable
                             className="text-xs"
                             classNamePrefix="react-select"
+                            styles={selectStyles}
                         />
                     </div>
                     <div className="flex flex-col gap-1">
@@ -147,6 +189,7 @@ export default function EmployeeResignedPage() {
                             placeholder="Filter Regional"
                             className="text-xs"
                             classNamePrefix="react-select"
+                            styles={selectStyles}
                         />
                     </div>
                     <div className="flex flex-col gap-1">
@@ -161,6 +204,7 @@ export default function EmployeeResignedPage() {
                             placeholder="Filter Division"
                             className="text-xs"
                             classNamePrefix="react-select"
+                            styles={selectStyles}
                         />
                     </div>
                     <div className="flex flex-col gap-1">
@@ -175,6 +219,7 @@ export default function EmployeeResignedPage() {
                             placeholder="Filter Unit"
                             className="text-xs"
                             classNamePrefix="react-select"
+                            styles={selectStyles}
                         />
                     </div>
                     <div className="flex flex-col gap-1">
@@ -189,6 +234,7 @@ export default function EmployeeResignedPage() {
                             placeholder="Filter Jabatan"
                             className="text-xs"
                             classNamePrefix="react-select"
+                            styles={selectStyles}
                         />
                     </div>
                     <div className="flex flex-col gap-1">

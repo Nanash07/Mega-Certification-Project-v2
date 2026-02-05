@@ -4,6 +4,7 @@ import toast from "react-hot-toast";
 import Select from "react-select";
 import AsyncSelect from "react-select/async";
 import Pagination from "../../components/common/Pagination";
+import { getCurrentRole } from "../../utils/helpers";
 import {
     fetchEmployeeHistories,
     exportEmployeeHistoriesExcel,
@@ -44,6 +45,22 @@ const badgeClass = (actionType) => {
 export default function EmployeeHistoryPage() {
     const navigate = useNavigate();
 
+    const [role, setRole] = useState(null);
+    const isRoleLoaded = role !== null;
+    const isEmployee = role === "EMPLOYEE" || role === "PEGAWAI";
+
+    useEffect(() => {
+        setRole(getCurrentRole());
+    }, []);
+
+    useEffect(() => {
+        if (!isRoleLoaded) return;
+        if (isEmployee) {
+            toast.error("Anda tidak berwenang mengakses halaman ini");
+            navigate("/", { replace: true });
+        }
+    }, [isRoleLoaded, isEmployee]);
+
     const [rows, setRows] = useState([]);
     const [loading, setLoading] = useState(false);
     const [exporting, setExporting] = useState(false);
@@ -80,6 +97,8 @@ export default function EmployeeHistoryPage() {
     }, [filterEmployee, filterAction, startDate, endDate]);
 
     const load = useCallback(async () => {
+        if (!isRoleLoaded || isEmployee) return;
+
         setLoading(true);
         try {
             if (startDate && endDate && startDate > endDate) {
@@ -144,6 +163,47 @@ export default function EmployeeHistoryPage() {
         }
     };
 
+    // Custom styles matching Dashboard
+    const selectStyles = {
+        control: (base) => ({
+            ...base,
+            minHeight: '32px',
+            height: '32px',
+            fontSize: '12px',
+        }),
+        valueContainer: (base) => ({
+            ...base,
+            height: '32px',
+            padding: '0 8px',
+        }),
+        input: (base) => ({
+            ...base,
+            margin: '0px',
+            padding: '0px',
+        }),
+        indicatorsContainer: (base) => ({
+            ...base,
+            height: '32px',
+        }),
+        dropdownIndicator: (base) => ({
+            ...base,
+            padding: '4px',
+        }),
+        clearIndicator: (base) => ({
+            ...base,
+            padding: '4px',
+        }),
+        option: (base) => ({
+            ...base,
+            fontSize: '12px',
+            padding: '6px 10px',
+        }),
+        menu: (base) => ({
+            ...base,
+            fontSize: '12px',
+        }),
+    };
+
     const loadEmployeeOptions = useCallback(async (inputValue) => {
         try {
             const q = (inputValue ?? "").trim();
@@ -161,6 +221,8 @@ export default function EmployeeHistoryPage() {
             return [];
         }
     }, []);
+
+    if (!isRoleLoaded || isEmployee) return null;
 
     return (
         <div className="space-y-4 w-full">
@@ -224,6 +286,7 @@ export default function EmployeeHistoryPage() {
                                 return "Tidak ditemukan";
                             }}
                             loadingMessage={() => "Mencari..."}
+                            styles={selectStyles}
                         />
                     </div>
                     <div className="flex flex-col gap-1">
@@ -237,6 +300,7 @@ export default function EmployeeHistoryPage() {
                             placeholder="Filter Aksi"
                             className="text-xs"
                             classNamePrefix="react-select"
+                            styles={selectStyles}
                         />
                     </div>
                     <div className="flex flex-col gap-1">
