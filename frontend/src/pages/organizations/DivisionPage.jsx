@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
 import toast from "react-hot-toast";
-import { Trash2, Building2, Filter, Eraser } from "lucide-react";
+import { Trash2, Building2, Filter, Eraser, Search } from "lucide-react";
 import Select from "react-select";
 import { fetchDivisions, toggleDivision } from "../../services/divisionService";
 import Pagination from "../../components/common/Pagination";
@@ -131,7 +131,7 @@ export default function DivisionPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
                     <div className="flex flex-col gap-1 lg:col-span-3">
                         <label className="font-medium text-gray-600 flex items-center gap-1">
-                            <Filter size={12} /> Filter Division
+                            <Search size={12} /> Cari Divisi
                         </label>
                         <Select
                             styles={selectStyles}
@@ -142,7 +142,7 @@ export default function DivisionPage() {
                                 setPage(1);
                                 setFilter(val);
                             }}
-                            placeholder="Cari division..."
+                            placeholder="Semua Divisi"
                             isClearable
                             className="text-xs"
                             classNamePrefix="react-select"

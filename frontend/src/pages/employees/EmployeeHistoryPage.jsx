@@ -11,7 +11,7 @@ import {
     searchEmployeeOptionsFromHistories,
     fetchDefaultEmployeeOptionsFromHistories,
 } from "../../services/employeeHistoryService";
-import { ArrowLeft, Download, Filter, Eraser, History as HistoryIcon } from "lucide-react";
+import { ArrowLeft, Download, Filter, Eraser, History as HistoryIcon, Search } from "lucide-react";
 
 const ACTION_OPTIONS = [
     { value: "all", label: "Semua Aksi" },
@@ -266,7 +266,7 @@ export default function EmployeeHistoryPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 text-xs">
                     <div className="flex flex-col gap-1">
                         <label className="font-medium text-gray-600 flex items-center gap-1">
-                            <Filter size={12} /> Pegawai
+                            <Search size={12} /> Cari Pegawai
                         </label>
                         <AsyncSelect
                             cacheOptions
@@ -274,7 +274,7 @@ export default function EmployeeHistoryPage() {
                             loadOptions={loadEmployeeOptions}
                             value={filterEmployee}
                             onChange={setFilterEmployee}
-                            placeholder="Cari Pegawai"
+                            placeholder="Ketik NIP/nama..."
                             isClearable
                             isSearchable
                             className="text-xs"
@@ -297,14 +297,16 @@ export default function EmployeeHistoryPage() {
                             options={ACTION_OPTIONS}
                             value={filterAction}
                             onChange={setFilterAction}
-                            placeholder="Filter Aksi"
+                            placeholder="Semua Aksi"
                             className="text-xs"
                             classNamePrefix="react-select"
                             styles={selectStyles}
                         />
                     </div>
                     <div className="flex flex-col gap-1">
-                        <label className="font-medium text-gray-600">Tanggal Mulai</label>
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <Filter size={12} /> Tanggal Mulai
+                        </label>
                         <input
                             type="date"
                             className="input input-bordered input-sm w-full rounded-lg"
@@ -313,7 +315,9 @@ export default function EmployeeHistoryPage() {
                         />
                     </div>
                     <div className="flex flex-col gap-1">
-                        <label className="font-medium text-gray-600">Tanggal Akhir</label>
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <Filter size={12} /> Tanggal Akhir
+                        </label>
                         <input
                             type="date"
                             className="input input-bordered input-sm w-full rounded-lg"

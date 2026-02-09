@@ -13,6 +13,7 @@ public class EmployeeEligibilityExceptionResponse {
     private Long employeeId;
     private String employeeName;
     private String nip;
+    private Long jobPositionId;
     private String jobPositionTitle;
 
     private Long certificationRuleId;

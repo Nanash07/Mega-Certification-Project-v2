@@ -390,7 +390,7 @@ export default function EmployeeExceptionPage() {
 
                     <div className="flex flex-col gap-1">
                         <label className="font-medium text-gray-600 flex items-center gap-1">
-                            <Briefcase size={12} /> Jabatan
+                            <Filter size={12} /> Jabatan
                         </label>
                         <Select
                             options={jobOptions}
@@ -406,7 +406,7 @@ export default function EmployeeExceptionPage() {
 
                     <div className="flex flex-col gap-1">
                         <label className="font-medium text-gray-600 flex items-center gap-1">
-                            <Award size={12} /> Sertifikasi
+                            <Filter size={12} /> Sertifikasi
                         </label>
                         <Select
                             options={certOptions}
@@ -422,7 +422,7 @@ export default function EmployeeExceptionPage() {
 
                     <div className="flex flex-col gap-1">
                         <label className="font-medium text-gray-600 flex items-center gap-1">
-                            <Layers size={12} /> Level
+                            <Filter size={12} /> Level
                         </label>
                         <Select
                             options={levelOptions}
@@ -438,7 +438,7 @@ export default function EmployeeExceptionPage() {
 
                     <div className="flex flex-col gap-1">
                         <label className="font-medium text-gray-600 flex items-center gap-1">
-                            <Grid3X3 size={12} /> Sub Bidang
+                            <Filter size={12} /> Sub Bidang
                         </label>
                         <Select
                             options={subOptions}

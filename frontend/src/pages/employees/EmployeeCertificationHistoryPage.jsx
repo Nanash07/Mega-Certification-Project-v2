@@ -169,7 +169,7 @@ export default function EmployeeCertificationHistoryPage() {
                             ]}
                             value={filterAction}
                             onChange={setFilterAction}
-                            placeholder="Filter Aksi"
+                            placeholder="Semua Aksi"
                             isClearable
                             className="text-xs"
                             classNamePrefix="react-select"

@@ -166,7 +166,8 @@ public class EmployeeEligibilityExceptionController {
     public ResponseEntity<EmployeeEligibilityExceptionResponse> create(
             @RequestBody EmployeeEligibilityExceptionRequest req) {
         return ResponseEntity.ok(
-                exceptionService.create(req.getEmployeeId(), req.getCertificationRuleId(), req.getNotes()));
+                exceptionService.create(req.getEmployeeId(), req.getCertificationRuleId(), req.getJobPositionId(),
+                        req.getNotes()));
     }
 
     @PutMapping("/{id}/notes")

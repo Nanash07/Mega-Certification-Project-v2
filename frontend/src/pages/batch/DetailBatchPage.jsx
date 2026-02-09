@@ -14,7 +14,7 @@ import EditBatchModal from "../../components/batches/EditBatchModal";
 import Pagination from "../../components/common/Pagination";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
 import { getCurrentRole } from "../../utils/helpers";
-import { ArrowLeft, Plus, Send, RotateCcw, Pencil, Users, Eraser, Filter, Download } from "lucide-react";
+import { ArrowLeft, Plus, Send, RotateCcw, Pencil, Users, Eraser, Filter, Download, Search } from "lucide-react";
 import Select from "react-select";
 
 function getStoredUser() {
@@ -418,13 +418,13 @@ export default function DetailBatchPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 text-xs">
                     <div className="flex flex-col gap-1">
                         <label className="font-medium text-gray-600 flex items-center gap-1">
-                            <Filter size={12} /> Nama/NIP
+                            <Search size={12} /> Cari Pegawai
                         </label>
                         <Select
                             options={employeeOptions}
                             value={filterEmployee}
                             onChange={(opt) => { setFilterEmployee(opt); setPage(1); }}
-                            placeholder="Filter Nama/NIP"
+                            placeholder="Ketik NIP/nama..."
                             isClearable
                             className="text-xs"
                             classNamePrefix="react-select"
@@ -439,7 +439,7 @@ export default function DetailBatchPage() {
                             options={statusOptions}
                             value={filterStatus}
                             onChange={(opt) => { setFilterStatus(opt); setPage(1); }}
-                            placeholder="Filter Status"
+                            placeholder="Semua Status"
                             isClearable
                             className="text-xs"
                             classNamePrefix="react-select"
@@ -454,7 +454,7 @@ export default function DetailBatchPage() {
                             options={regionalOptions}
                             value={filterRegional}
                             onChange={(opt) => { setFilterRegional(opt); setPage(1); }}
-                            placeholder="Filter Regional"
+                            placeholder="Semua Regional"
                             isClearable
                             className="text-xs"
                             classNamePrefix="react-select"
@@ -463,13 +463,13 @@ export default function DetailBatchPage() {
                     </div>
                     <div className="flex flex-col gap-1">
                         <label className="font-medium text-gray-600 flex items-center gap-1">
-                            <Filter size={12} /> Division
+                            <Filter size={12} /> Divisi
                         </label>
                         <Select
                             options={divisionOptions}
                             value={filterDivision}
                             onChange={(opt) => { setFilterDivision(opt); setPage(1); }}
-                            placeholder="Filter Division"
+                            placeholder="Semua Divisi"
                             isClearable
                             className="text-xs"
                             classNamePrefix="react-select"
@@ -484,7 +484,7 @@ export default function DetailBatchPage() {
                             options={unitOptions}
                             value={filterUnit}
                             onChange={(opt) => { setFilterUnit(opt); setPage(1); }}
-                            placeholder="Filter Unit"
+                            placeholder="Semua Unit"
                             isClearable
                             className="text-xs"
                             classNamePrefix="react-select"
@@ -499,7 +499,7 @@ export default function DetailBatchPage() {
                             options={jobOptions}
                             value={filterJob}
                             onChange={(opt) => { setFilterJob(opt); setPage(1); }}
-                            placeholder="Filter Jabatan"
+                            placeholder="Semua Jabatan"
                             isClearable
                             className="text-xs"
                             classNamePrefix="react-select"

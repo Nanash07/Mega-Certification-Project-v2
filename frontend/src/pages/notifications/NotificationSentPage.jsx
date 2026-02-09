@@ -20,6 +20,46 @@ const STATUS_OPTIONS = [
     { value: "READ", label: "Sudah Dibaca" },
 ];
 
+const selectStyles = {
+    control: (base) => ({
+        ...base,
+        minHeight: '32px',
+        height: '32px',
+        fontSize: '12px',
+    }),
+    valueContainer: (base) => ({
+        ...base,
+        height: '32px',
+        padding: '0 8px',
+    }),
+    input: (base) => ({
+        ...base,
+        margin: '0px',
+        padding: '0px',
+    }),
+    indicatorsContainer: (base) => ({
+        ...base,
+        height: '32px',
+    }),
+    dropdownIndicator: (base) => ({
+        ...base,
+        padding: '4px',
+    }),
+    clearIndicator: (base) => ({
+        ...base,
+        padding: '4px',
+    }),
+    option: (base) => ({
+        ...base,
+        fontSize: '12px',
+        padding: '6px 10px',
+    }),
+    menu: (base) => ({
+        ...base,
+        fontSize: '12px',
+    }),
+};
+
 export default function NotificationSentPage() {
 
     const location = useLocation();
@@ -182,6 +222,7 @@ export default function NotificationSentPage() {
                             onChange={setStatus} 
                             className="text-xs"
                             classNamePrefix="react-select"
+                            styles={selectStyles}
                         />
                     </div>
 

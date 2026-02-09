@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
 import toast from "react-hot-toast";
-import { Pencil, Trash2, Plus, Building, Filter, Eraser } from "lucide-react";
+import { Pencil, Trash2, Plus, Building, Filter, Eraser, Search } from "lucide-react";
 import Select from "react-select";
 import { fetchInstitutions, deleteInstitution } from "../../services/institutionService";
 import CreateInstitutionModal from "../../components/institutions/CreateInstitutionModal";
@@ -117,13 +117,13 @@ export default function InstitutionPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
                     <div className="flex flex-col gap-1 lg:col-span-3">
                         <label className="font-medium text-gray-600 flex items-center gap-1">
-                            <Filter size={12} /> Filter Lembaga
+                            <Search size={12} /> Cari Lembaga
                         </label>
                         <Select
                             options={options}
                             value={filter}
                             onChange={setFilter}
-                            placeholder="Cari lembaga..."
+                            placeholder="Semua Lembaga"
                             isClearable
                             className="text-xs"
                             classNamePrefix="react-select"

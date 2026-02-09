@@ -479,88 +479,117 @@ export default function PicDashboard() {
             {/* Filter Card */}
             <div className="card bg-base-100 shadow-sm border border-gray-100 p-4">
                 <div className="flex items-center gap-2 mb-3">
-                    <Filter size={16} className="text-gray-500" />
                     <span className="font-medium text-sm">Filter Data</span>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 text-xs">
-                    <Select
-                        className="w-full"
-                        classNamePrefix="react-select"
-                        styles={selectStyles}
-                        menuPortalTarget={menuPortalTarget}
-                        menuPosition="fixed"
-                        options={regionalOptions}
-                        value={regionalSel}
-                        onChange={setRegionalSel}
-                        placeholder="Regional"
-                        isClearable
-                        isSearchable
-                    />
-                    <Select
-                        className="w-full"
-                        classNamePrefix="react-select"
-                        styles={selectStyles}
-                        menuPortalTarget={menuPortalTarget}
-                        menuPosition="fixed"
-                        options={divisionOptions}
-                        value={divisionSel}
-                        onChange={setDivisionSel}
-                        placeholder="Divisi"
-                        isClearable
-                        isSearchable
-                    />
-                    <Select
-                        className="w-full"
-                        classNamePrefix="react-select"
-                        styles={selectStyles}
-                        menuPortalTarget={menuPortalTarget}
-                        menuPosition="fixed"
-                        options={unitOptions}
-                        value={unitSel}
-                        onChange={setUnitSel}
-                        placeholder="Unit"
-                        isClearable
-                        isSearchable
-                    />
-                    <Select
-                        className="w-full"
-                        classNamePrefix="react-select"
-                        styles={selectStyles}
-                        menuPortalTarget={menuPortalTarget}
-                        menuPosition="fixed"
-                        options={certOptions}
-                        value={certSel}
-                        onChange={setCertSel}
-                        placeholder="Sertifikasi (scope PIC)"
-                        isClearable
-                        isSearchable
-                    />
-                    <Select
-                        className="w-full"
-                        classNamePrefix="react-select"
-                        styles={selectStyles}
-                        menuPortalTarget={menuPortalTarget}
-                        menuPosition="fixed"
-                        options={levelOptions}
-                        value={levelSel}
-                        onChange={setLevelSel}
-                        placeholder="Jenjang"
-                        isClearable
-                        isSearchable
-                    />
-                    <Select
-                        className="w-full"
-                        classNamePrefix="react-select"
-                        styles={selectStyles}
-                        menuPortalTarget={menuPortalTarget}
-                        menuPosition="fixed"
-                        options={subFieldOptions}
-                        value={subSel}
-                        onChange={setSubSel}
-                        placeholder="Sub Bidang"
-                        isClearable
-                        isSearchable
-                    />
+                    <div className="flex flex-col gap-1">
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <Filter size={12} /> Regional
+                        </label>
+                        <Select
+                            className="w-full"
+                            classNamePrefix="react-select"
+                            styles={selectStyles}
+                            menuPortalTarget={menuPortalTarget}
+                            menuPosition="fixed"
+                            options={regionalOptions}
+                            value={regionalSel}
+                            onChange={setRegionalSel}
+                            placeholder="Semua Regional"
+                            isClearable
+                            isSearchable
+                        />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <Filter size={12} /> Divisi
+                        </label>
+                        <Select
+                            className="w-full"
+                            classNamePrefix="react-select"
+                            styles={selectStyles}
+                            menuPortalTarget={menuPortalTarget}
+                            menuPosition="fixed"
+                            options={divisionOptions}
+                            value={divisionSel}
+                            onChange={setDivisionSel}
+                            placeholder="Semua Divisi"
+                            isClearable
+                            isSearchable
+                        />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <Filter size={12} /> Unit
+                        </label>
+                        <Select
+                            className="w-full"
+                            classNamePrefix="react-select"
+                            styles={selectStyles}
+                            menuPortalTarget={menuPortalTarget}
+                            menuPosition="fixed"
+                            options={unitOptions}
+                            value={unitSel}
+                            onChange={setUnitSel}
+                            placeholder="Semua Unit"
+                            isClearable
+                            isSearchable
+                        />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <Filter size={12} /> Sertifikasi
+                        </label>
+                        <Select
+                            className="w-full"
+                            classNamePrefix="react-select"
+                            styles={selectStyles}
+                            menuPortalTarget={menuPortalTarget}
+                            menuPosition="fixed"
+                            options={certOptions}
+                            value={certSel}
+                            onChange={setCertSel}
+                            placeholder="Semua Sertifikasi"
+                            isClearable
+                            isSearchable
+                        />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <Filter size={12} /> Jenjang
+                        </label>
+                        <Select
+                            className="w-full"
+                            classNamePrefix="react-select"
+                            styles={selectStyles}
+                            menuPortalTarget={menuPortalTarget}
+                            menuPosition="fixed"
+                            options={levelOptions}
+                            value={levelSel}
+                            onChange={setLevelSel}
+                            placeholder="Semua Jenjang"
+                            isClearable
+                            isSearchable
+                        />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <Filter size={12} /> Sub Bidang
+                        </label>
+                        <Select
+                            className="w-full"
+                            classNamePrefix="react-select"
+                            styles={selectStyles}
+                            menuPortalTarget={menuPortalTarget}
+                            menuPosition="fixed"
+                            options={subFieldOptions}
+                            value={subSel}
+                            onChange={setSubSel}
+                            placeholder="Semua Sub Bidang"
+                            isClearable
+                            isSearchable
+                        />
+                    </div>
                 </div>
 
                 {/* Date filters */}

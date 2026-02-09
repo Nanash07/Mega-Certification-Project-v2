@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Download, Upload, History, Eraser, Filter, Users } from "lucide-react";
+import { Download, Upload, History, Eraser, Filter, Users, Search } from "lucide-react";
 import toast from "react-hot-toast";
 import Select from "react-select";
 import AsyncSelect from "react-select/async";
@@ -214,7 +214,7 @@ export default function EmployeePage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 text-xs">
                     <div className="flex flex-col gap-1">
                         <label className="font-medium text-gray-600 flex items-center gap-1">
-                            <Filter size={12} /> Pegawai
+                            <Search size={12} /> Cari Pegawai
                         </label>
                         <AsyncSelect
                             cacheOptions
@@ -222,7 +222,7 @@ export default function EmployeePage() {
                             loadOptions={loadEmployees}
                             value={filterEmployee}
                             onChange={setFilterEmployee}
-                            placeholder="Filter Pegawai"
+                            placeholder="Semua Pegawai"
                             isClearable
                             className="text-xs"
                             classNamePrefix="react-select"
@@ -238,7 +238,7 @@ export default function EmployeePage() {
                             value={regionalIds}
                             onChange={setRegionalIds}
                             isClearable
-                            placeholder="Filter Regional"
+                            placeholder="Semua Regional"
                             className="text-xs"
                             classNamePrefix="react-select"
                             styles={selectStyles}
@@ -253,7 +253,7 @@ export default function EmployeePage() {
                             value={divisionIds}
                             onChange={setDivisionIds}
                             isClearable
-                            placeholder="Filter Division"
+                            placeholder="Semua Division"
                             className="text-xs"
                             classNamePrefix="react-select"
                             styles={selectStyles}
@@ -268,7 +268,7 @@ export default function EmployeePage() {
                             value={unitIds}
                             onChange={setUnitIds}
                             isClearable
-                            placeholder="Filter Unit"
+                            placeholder="Semua Unit"
                             className="text-xs"
                             classNamePrefix="react-select"
                             styles={selectStyles}
@@ -283,7 +283,7 @@ export default function EmployeePage() {
                             value={jobPositionIds}
                             onChange={setJobPositionIds}
                             isClearable
-                            placeholder="Filter Jabatan"
+                            placeholder="Semua Jabatan"
                             className="text-xs"
                             classNamePrefix="react-select"
                             styles={selectStyles}
@@ -298,7 +298,7 @@ export default function EmployeePage() {
                             value={statuses}
                             onChange={setStatuses}
                             isClearable
-                            placeholder="Filter Status"
+                            placeholder="Semua Status"
                             className="text-xs"
                             classNamePrefix="react-select"
                             styles={selectStyles}

@@ -7,7 +7,7 @@ import AsyncSelect from "react-select/async";
 import Pagination from "../../components/common/Pagination";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
 import { getCurrentRole, formatDate } from "../../utils/helpers";
-import { Plus, Pencil, Trash2, Menu, ChevronDown, Eraser, Download, Package } from "lucide-react";
+import { Plus, Pencil, Trash2, Menu, ChevronDown, Eraser, Download, Package, Search, Filter } from "lucide-react";
 
 import { fetchBatches, deleteBatch, searchBatches, updateBatch, exportBatchesExcel } from "../../services/batchService";
 import { fetchCertificationRules } from "../../services/certificationRuleService";
@@ -400,7 +400,9 @@ export default function BatchPage() {
             <div className="card bg-base-100 shadow-sm border border-gray-100 p-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 text-xs">
                     <div className="flex flex-col gap-1">
-                        <label className="font-medium text-gray-600">Search Batch</label>
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <Search size={12} /> Cari Batch
+                        </label>
                         <AsyncSelect
                             cacheOptions
                             defaultOptions
@@ -410,7 +412,7 @@ export default function BatchPage() {
                                 setFilterBatch(v);
                                 setPage(1);
                             }}
-                            placeholder="Cari batch"
+                            placeholder="Ketik nama batch..."
                             isClearable
                             className="text-xs"
                             classNamePrefix="react-select"
@@ -418,7 +420,9 @@ export default function BatchPage() {
                         />
                     </div>
                     <div className="flex flex-col gap-1">
-                        <label className="font-medium text-gray-600">Status</label>
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <Filter size={12} /> Status
+                        </label>
                         <Select
                             options={statusOptions}
                             value={status}
@@ -426,7 +430,7 @@ export default function BatchPage() {
                                 setStatus(v);
                                 setPage(1);
                             }}
-                            placeholder="Pilih status"
+                            placeholder="Semua Status"
                             isClearable
                             className="text-xs"
                             classNamePrefix="react-select"
@@ -434,7 +438,9 @@ export default function BatchPage() {
                         />
                     </div>
                     <div className="flex flex-col gap-1">
-                        <label className="font-medium text-gray-600">Jenis</label>
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <Filter size={12} /> Jenis
+                        </label>
                         <Select
                             options={typeOptions}
                             value={type}
@@ -442,7 +448,7 @@ export default function BatchPage() {
                                 setType(v);
                                 setPage(1);
                             }}
-                            placeholder="Pilih jenis"
+                            placeholder="Semua Jenis"
                             isClearable
                             className="text-xs"
                             classNamePrefix="react-select"
@@ -450,7 +456,9 @@ export default function BatchPage() {
                         />
                     </div>
                     <div className="flex flex-col gap-1">
-                        <label className="font-medium text-gray-600">Rule Sertifikasi</label>
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <Filter size={12} /> Rule Sertifikasi
+                        </label>
                         <Select
                             options={ruleOptions}
                             value={certRule}
@@ -458,7 +466,7 @@ export default function BatchPage() {
                                 setCertRule(v);
                                 setPage(1);
                             }}
-                            placeholder="Pilih rule"
+                            placeholder="Semua Rule"
                             isClearable
                             className="text-xs"
                             classNamePrefix="react-select"
@@ -466,7 +474,9 @@ export default function BatchPage() {
                         />
                     </div>
                     <div className="flex flex-col gap-1">
-                        <label className="font-medium text-gray-600">Tanggal Mulai</label>
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <Filter size={12} /> Tanggal Mulai
+                        </label>
                         <input
                             type="date"
                             className="input input-sm input-bordered w-full rounded-lg"
@@ -478,7 +488,9 @@ export default function BatchPage() {
                         />
                     </div>
                     <div className="flex flex-col gap-1">
-                        <label className="font-medium text-gray-600">Tanggal Selesai</label>
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <Filter size={12} /> Tanggal Selesai
+                        </label>
                         <input
                             type="date"
                             className="input input-sm input-bordered w-full rounded-lg"

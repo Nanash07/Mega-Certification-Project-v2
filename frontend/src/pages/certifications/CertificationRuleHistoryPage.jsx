@@ -217,7 +217,7 @@ export default function CertificationRuleHistoryPage() {
                             value={filterRule}
                             onChange={setFilterRule}
                             isClearable
-                            placeholder="Filter Aturan Sertifikasi"
+                            placeholder="Semua Aturan"
                             className="text-xs"
                             classNamePrefix="react-select"
                             styles={selectStyles}
@@ -231,7 +231,7 @@ export default function CertificationRuleHistoryPage() {
                             options={actionOptions}
                             value={filterAction}
                             onChange={setFilterAction}
-                            placeholder="Filter Aksi"
+                            placeholder="Semua Aksi"
                             className="text-xs"
                             classNamePrefix="react-select"
                             styles={selectStyles}

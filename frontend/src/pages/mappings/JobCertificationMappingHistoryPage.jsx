@@ -208,7 +208,7 @@ export default function JobCertificationMappingHistoryPage() {
                             ]}
                             value={filterAction}
                             onChange={(opt) => setFilterAction(opt || { value: "all", label: "Semua Aksi" })}
-                            placeholder="Filter Aksi"
+                            placeholder="Semua Aksi"
                             isClearable
                             className="text-xs"
                             classNamePrefix="react-select"
@@ -216,7 +216,9 @@ export default function JobCertificationMappingHistoryPage() {
                         />
                     </div>
                     <div className="flex flex-col gap-1">
-                        <label className="font-medium text-gray-600">Dari Tanggal</label>
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <Filter size={12} /> Dari Tanggal
+                        </label>
                         <DatePicker
                             selected={startDate}
                             onChange={(date) => setStartDate(date)}
@@ -229,7 +231,9 @@ export default function JobCertificationMappingHistoryPage() {
                         />
                     </div>
                     <div className="flex flex-col gap-1">
-                        <label className="font-medium text-gray-600">Sampai Tanggal</label>
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <Filter size={12} /> Sampai Tanggal
+                        </label>
                         <DatePicker
                             selected={endDate}
                             onChange={(date) => setEndDate(date)}

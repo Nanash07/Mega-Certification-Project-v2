@@ -4,14 +4,16 @@ import Select from "react-select";
 import toast from "react-hot-toast";
 import { createException } from "../../services/employeeExceptionService";
 import { fetchCertificationRules } from "../../services/certificationRuleService";
-import { fetchEmployees } from "../../services/employeeService";
+import { fetchEmployees, getEmployeeDetail } from "../../services/employeeService";
 
 export default function CreateExceptionModal({ open, onClose, onSaved, picCertCodes }) {
     const [rules, setRules] = useState([]);
     const [defaultEmployees, setDefaultEmployees] = useState([]);
+    const [jobPositions, setJobPositions] = useState([]); // available positions for selected employee
     const [form, setForm] = useState({
         employeeId: null,
         employeeLabel: "",
+        jobPositionId: null,
         certificationRuleId: null,
         notes: "",
     });
@@ -37,11 +39,11 @@ export default function CreateExceptionModal({ open, onClose, onSaved, picCertCo
             .catch(() => toast.error("Gagal memuat aturan sertifikasi"));
 
         // load default employees
-        fetchEmployees({ page: 0, size: 10 })
+        fetchEmployees({ page: 0, size: 20 })
             .then((res) => {
                 const opts = (res.content || []).map((e) => ({
                     value: e.id,
-                    label: `${e.nip} - ${e.name} (${e.jobName || "-"})`,
+                    label: `${e.nip} - ${e.name}`,
                 }));
                 setDefaultEmployees(opts);
             })
@@ -51,8 +53,37 @@ export default function CreateExceptionModal({ open, onClose, onSaved, picCertCo
             });
 
         // reset form tiap kali modal kebuka
-        setForm({ employeeId: null, employeeLabel: "", certificationRuleId: null, notes: "" });
+        setForm({ employeeId: null, employeeLabel: "", jobPositionId: null, certificationRuleId: null, notes: "" });
+        setJobPositions([]);
     }, [open, picCertCodes]);
+
+    // Load job positions when employee is selected
+    async function loadJobPositions(employeeId) {
+        if (!employeeId) {
+            setJobPositions([]);
+            return;
+        }
+        try {
+            const emp = await getEmployeeDetail(employeeId);
+            console.log("Employee detail:", emp); // Debug
+            const positions = [];
+            if (emp.jobPositionId && emp.jobName) {
+                positions.push({ value: emp.jobPositionId, label: `${emp.jobName} (Utama)` });
+            }
+            if (emp.jobPositionId2 && emp.jobName2) {
+                positions.push({ value: emp.jobPositionId2, label: `${emp.jobName2} (Rangkap)` });
+            }
+            console.log("Loaded positions:", positions); // Debug
+            setJobPositions(positions);
+            // Auto-select if only one position
+            if (positions.length === 1) {
+                setForm((prev) => ({ ...prev, jobPositionId: positions[0].value }));
+            }
+        } catch (err) {
+            console.error("Load job positions error:", err); // Debug
+            setJobPositions([]);
+        }
+    }
 
     async function onSubmit() {
         if (!form.employeeId || !form.certificationRuleId) {
@@ -74,6 +105,7 @@ export default function CreateExceptionModal({ open, onClose, onSaved, picCertCo
             await createException({
                 employeeId: form.employeeId,
                 certificationRuleId: form.certificationRuleId,
+                jobPositionId: form.jobPositionId,
                 notes: form.notes,
             });
             toast.success("Exception ditambahkan");
@@ -92,7 +124,7 @@ export default function CreateExceptionModal({ open, onClose, onSaved, picCertCo
             const res = await fetchEmployees({ search: inputValue, page: 0, size: 20 });
             return (res.content || []).map((e) => ({
                 value: e.id,
-                label: `${e.nip} - ${e.name} (${e.jobName || "-"})`,
+                label: `${e.nip} - ${e.name}`,
             }));
         } catch {
             return [];
@@ -169,7 +201,7 @@ export default function CreateExceptionModal({ open, onClose, onSaved, picCertCo
             <div className="modal-box max-w-2xl p-5 text-xs">
                 <h3 className="font-semibold text-sm mb-4">Tambah Exception</h3>
 
-                <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-4">
                     {/* Pegawai */}
                     <div>
                         <label className="block mb-1 font-medium text-gray-600">Pegawai</label>
@@ -178,13 +210,15 @@ export default function CreateExceptionModal({ open, onClose, onSaved, picCertCo
                             defaultOptions={defaultEmployees}
                             loadOptions={loadEmployeeOptions}
                             value={form.employeeId ? { value: form.employeeId, label: form.employeeLabel } : null}
-                            onChange={(opt) =>
+                            onChange={(opt) => {
                                 setForm({
                                     ...form,
                                     employeeId: opt?.value || null,
                                     employeeLabel: opt?.label || "",
-                                })
-                            }
+                                    jobPositionId: null, // reset job position when employee changes
+                                });
+                                loadJobPositions(opt?.value);
+                            }}
                             placeholder="Cari atau pilih pegawai..."
                             className="text-xs"
                             classNamePrefix="rs"
@@ -194,7 +228,26 @@ export default function CreateExceptionModal({ open, onClose, onSaved, picCertCo
                             menuShouldScrollIntoView={false}
                             isClearable
                         />
-                        <p className="text-[10px] text-gray-400 mt-1">Ketik minimal 2 huruf untuk mencari pegawai.</p>
+                        <p className="text-[10px] text-gray-400 mt-1">Ketik minimal 2 huruf.</p>
+                    </div>
+
+                    {/* Jabatan Pegawai */}
+                    <div>
+                        <label className="block mb-1 font-medium text-gray-600">Jabatan</label>
+                        <Select
+                            isDisabled={!form.employeeId}
+                            options={jobPositions}
+                            value={jobPositions.find((opt) => opt.value === form.jobPositionId) || null}
+                            onChange={(opt) => setForm({ ...form, jobPositionId: opt?.value || null })}
+                            placeholder={!form.employeeId ? "Pilih pegawai dulu" : "Pilih jabatan"}
+                            className="text-xs"
+                            classNamePrefix="rs"
+                            menuPortalTarget={document.body}
+                            menuPosition="fixed"
+                            styles={smallSelectStyles}
+                            menuShouldScrollIntoView={false}
+                            isClearable
+                        />
                     </div>
 
                     {/* Aturan Sertifikasi */}
@@ -215,7 +268,7 @@ export default function CreateExceptionModal({ open, onClose, onSaved, picCertCo
                         />
                         {picCertCodes && (
                             <p className="text-[10px] text-gray-400 mt-1">
-                                *PIC hanya dapat memilih sertifikasi dalam scope yang diberikan.
+                                *PIC scope aktif.
                             </p>
                         )}
                     </div>

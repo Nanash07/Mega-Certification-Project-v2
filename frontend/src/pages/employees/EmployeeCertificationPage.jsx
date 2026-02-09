@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import Select from "react-select";
 import AsyncSelect from "react-select/async";
-import { Plus, History as HistoryIcon, Eraser, Pencil, Trash2, Upload, Eye, Download, Filter, Award } from "lucide-react";
+import { Plus, History as HistoryIcon, Eraser, Pencil, Trash2, Upload, Eye, Download, Filter, Award, Search } from "lucide-react";
 
 import Pagination from "../../components/common/Pagination";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
@@ -313,7 +313,7 @@ export default function EmployeeCertificationPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 text-xs">
                     <div className="flex flex-col gap-1">
                         <label className="font-medium text-gray-600 flex items-center gap-1">
-                            <Filter size={12} /> Pegawai
+                            <Search size={12} /> Cari Pegawai
                         </label>
                         <AsyncSelect
                             cacheOptions
@@ -321,7 +321,7 @@ export default function EmployeeCertificationPage() {
                             loadOptions={loadEmployees}
                             value={filterEmployee}
                             onChange={setFilterEmployee}
-                            placeholder="Filter Pegawai"
+                            placeholder="Ketik NIP/nama..."
                             isClearable
                             className="text-xs"
                             classNamePrefix="react-select"
@@ -330,14 +330,14 @@ export default function EmployeeCertificationPage() {
                     </div>
                     <div className="flex flex-col gap-1">
                         <label className="font-medium text-gray-600 flex items-center gap-1">
-                            <Filter size={12} /> Cert Code
+                            <Filter size={12} /> Sertifikasi
                         </label>
                         <Select
                             options={certCodeOptions}
                             value={filterCertCode}
                             onChange={setFilterCertCode}
                             isClearable
-                            placeholder="Filter Cert Code"
+                            placeholder="Semua Sertifikasi"
                             className="text-xs"
                             classNamePrefix="react-select"
                             styles={selectStyles}
@@ -352,7 +352,7 @@ export default function EmployeeCertificationPage() {
                             value={filterLevel}
                             onChange={setFilterLevel}
                             isClearable
-                            placeholder="Filter Jenjang"
+                            placeholder="Semua Jenjang"
                             className="text-xs"
                             classNamePrefix="react-select"
                             styles={selectStyles}
@@ -360,14 +360,14 @@ export default function EmployeeCertificationPage() {
                     </div>
                     <div className="flex flex-col gap-1">
                         <label className="font-medium text-gray-600 flex items-center gap-1">
-                            <Filter size={12} /> Sub Field
+                            <Filter size={12} /> Sub Bidang
                         </label>
                         <Select
                             options={subFieldOptions}
                             value={filterSubField}
                             onChange={setFilterSubField}
                             isClearable
-                            placeholder="Filter Sub Field"
+                            placeholder="Semua Sub Bidang"
                             className="text-xs"
                             classNamePrefix="react-select"
                             styles={selectStyles}
@@ -382,7 +382,7 @@ export default function EmployeeCertificationPage() {
                             value={filterInstitution}
                             onChange={setFilterInstitution}
                             isClearable
-                            placeholder="Filter Lembaga"
+                            placeholder="Semua Lembaga"
                             className="text-xs"
                             classNamePrefix="react-select"
                             styles={selectStyles}
@@ -404,7 +404,7 @@ export default function EmployeeCertificationPage() {
                             value={filterStatus}
                             onChange={setFilterStatus}
                             isClearable
-                            placeholder="Filter Status"
+                            placeholder="Semua Status"
                             className="text-xs"
                             classNamePrefix="react-select"
                             styles={selectStyles}

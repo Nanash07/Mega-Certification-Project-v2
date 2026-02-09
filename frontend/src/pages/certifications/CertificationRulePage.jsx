@@ -278,7 +278,7 @@ export default function CertificationRulePage() {
                             value={filterCert}
                             onChange={setFilterCert}
                             isClearable
-                            placeholder="Filter Sertifikasi"
+                            placeholder="Semua Sertifikasi"
                             className="text-xs"
                             classNamePrefix="react-select"
                             styles={selectStyles}
@@ -293,7 +293,7 @@ export default function CertificationRulePage() {
                             value={filterLevel}
                             onChange={setFilterLevel}
                             isClearable
-                            placeholder="Filter Level"
+                            placeholder="Semua Level"
                             className="text-xs"
                             classNamePrefix="react-select"
                             styles={selectStyles}
@@ -308,7 +308,7 @@ export default function CertificationRulePage() {
                             value={filterSub}
                             onChange={setFilterSub}
                             isClearable
-                            placeholder="Filter Sub Bidang"
+                            placeholder="Semua Sub Bidang"
                             className="text-xs"
                             classNamePrefix="react-select"
                             styles={selectStyles}
@@ -326,7 +326,7 @@ export default function CertificationRulePage() {
                             ]}
                             value={filterStatus}
                             onChange={setFilterStatus}
-                            placeholder="Status"
+                            placeholder="Semua Status"
                             className="text-xs"
                             classNamePrefix="react-select"
                             styles={selectStyles}

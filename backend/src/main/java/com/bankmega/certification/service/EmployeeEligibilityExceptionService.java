@@ -3,9 +3,11 @@ package com.bankmega.certification.service;
 import com.bankmega.certification.dto.EmployeeEligibilityExceptionResponse;
 import com.bankmega.certification.entity.EmployeeEligibilityException;
 import com.bankmega.certification.entity.EmployeePosition;
+import com.bankmega.certification.entity.JobPosition;
 import com.bankmega.certification.repository.CertificationRuleRepository;
 import com.bankmega.certification.repository.EmployeeEligibilityExceptionRepository;
 import com.bankmega.certification.repository.EmployeeRepository;
+import com.bankmega.certification.repository.JobPositionRepository;
 import com.bankmega.certification.specification.EmployeeEligibilityExceptionSpecification;
 import jakarta.persistence.criteria.JoinType;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +36,7 @@ public class EmployeeEligibilityExceptionService {
         private final EmployeeEligibilityExceptionRepository exceptionRepo;
         private final EmployeeRepository employeeRepo;
         private final CertificationRuleRepository ruleRepo;
+        private final JobPositionRepository jobPositionRepo;
         private final EmployeeEligibilityService eligibilityService;
         private final EmployeeCertificationRepository employeeCertificationRepo;
 
@@ -48,10 +51,18 @@ public class EmployeeEligibilityExceptionService {
 
                 var emp = e.getEmployee();
                 var rule = e.getCertificationRule();
+
+                // Use exception's job position if set, otherwise fall back to primary position
+                JobPosition exceptionJob = e.getJobPosition();
                 EmployeePosition primary = emp != null ? emp.getPrimaryPosition() : null;
-                String jobTitle = primary != null && primary.getJobPosition() != null
-                                ? primary.getJobPosition().getName()
-                                : null;
+                Long jobPositionId = exceptionJob != null ? exceptionJob.getId()
+                                : (primary != null && primary.getJobPosition() != null
+                                                ? primary.getJobPosition().getId()
+                                                : null);
+                String jobTitle = exceptionJob != null ? exceptionJob.getName()
+                                : (primary != null && primary.getJobPosition() != null
+                                                ? primary.getJobPosition().getName()
+                                                : null);
 
                 LocalDate targetMemiliki = null;
                 LocalDate expiredDate = null;
@@ -93,6 +104,7 @@ public class EmployeeEligibilityExceptionService {
                                 .employeeId(emp != null ? emp.getId() : null)
                                 .employeeName(emp != null ? emp.getName() : null)
                                 .nip(emp != null ? emp.getNip() : null)
+                                .jobPositionId(jobPositionId)
                                 .jobPositionTitle(jobTitle)
                                 .certificationRuleId(rule != null ? rule.getId() : null)
                                 .certificationCode(rule != null ? rule.getCertification().getCode() : null)
@@ -317,7 +329,8 @@ public class EmployeeEligibilityExceptionService {
         }
 
         @Transactional
-        public EmployeeEligibilityExceptionResponse create(Long employeeId, Long certificationRuleId, String notes) {
+        public EmployeeEligibilityExceptionResponse create(Long employeeId, Long certificationRuleId,
+                        Long jobPositionId, String notes) {
                 var employee = employeeRepo.findById(Objects.requireNonNull(employeeId))
                                 .orElseThrow(() -> new RuntimeException("Employee not found"));
                 if (isResigned(employee))
@@ -325,6 +338,13 @@ public class EmployeeEligibilityExceptionService {
 
                 var rule = ruleRepo.findById(Objects.requireNonNull(certificationRuleId))
                                 .orElseThrow(() -> new RuntimeException("Certification rule not found"));
+
+                // Load job position if provided
+                JobPosition jobPosition = null;
+                if (jobPositionId != null) {
+                        jobPosition = jobPositionRepo.findById(jobPositionId)
+                                        .orElseThrow(() -> new RuntimeException("Job position not found"));
+                }
 
                 exceptionRepo.findFirstByEmployeeIdAndCertificationRuleIdAndDeletedAtIsNull(employeeId,
                                 certificationRuleId)
@@ -341,12 +361,14 @@ public class EmployeeEligibilityExceptionService {
                         softDeleted.setDeletedAt(null);
                         softDeleted.setIsActive(true);
                         softDeleted.setNotes(notes);
+                        softDeleted.setJobPosition(jobPosition);
                         softDeleted.setUpdatedAt(Instant.now());
                         saved = exceptionRepo.save(softDeleted);
                 } else {
                         EmployeeEligibilityException exception = EmployeeEligibilityException.builder()
                                         .employee(employee)
                                         .certificationRule(rule)
+                                        .jobPosition(jobPosition)
                                         .isActive(true)
                                         .notes(notes)
                                         .createdAt(Instant.now())

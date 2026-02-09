@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
 import toast from "react-hot-toast";
-import { Trash2, MapPin, Filter, Eraser } from "lucide-react";
+import { Trash2, MapPin, Filter, Eraser, Search } from "lucide-react";
 import Select from "react-select";
 import { fetchRegionals, toggleRegional } from "../../services/regionalService";
 import Pagination from "../../components/common/Pagination";
@@ -130,7 +130,7 @@ export default function RegionalPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
                     <div className="flex flex-col gap-1 lg:col-span-3">
                         <label className="font-medium text-gray-600 flex items-center gap-1">
-                            <Filter size={12} /> Filter Regional
+                            <Search size={12} /> Cari Regional
                         </label>
                         <Select
                             styles={selectStyles}
@@ -141,7 +141,7 @@ export default function RegionalPage() {
                                 setPage(1);
                                 setFilter(val);
                             }}
-                            placeholder="Cari regional..."
+                            placeholder="Semua Regional"
                             isClearable
                             className="text-xs"
                             classNamePrefix="react-select"

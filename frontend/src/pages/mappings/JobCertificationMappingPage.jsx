@@ -280,7 +280,7 @@ export default function JobCertificationMappingPage() {
                             options={jobOptions}
                             value={filterJob}
                             onChange={setFilterJob}
-                            placeholder="Filter Jabatan"
+                            placeholder="Semua Jabatan"
                             className="text-xs"
                             classNamePrefix="react-select"
                             isClearable
@@ -295,7 +295,7 @@ export default function JobCertificationMappingPage() {
                             options={certOptions}
                             value={filterCert}
                             onChange={setFilterCert}
-                            placeholder="Filter Sertifikasi"
+                            placeholder="Semua Sertifikasi"
                             className="text-xs"
                             classNamePrefix="react-select"
                             isClearable
@@ -310,7 +310,7 @@ export default function JobCertificationMappingPage() {
                             options={levelOptions}
                             value={filterLevel}
                             onChange={setFilterLevel}
-                            placeholder="Filter Level"
+                            placeholder="Semua Level"
                             className="text-xs"
                             classNamePrefix="react-select"
                             isClearable
@@ -325,7 +325,7 @@ export default function JobCertificationMappingPage() {
                             options={subOptions}
                             value={filterSub}
                             onChange={setFilterSub}
-                            placeholder="Filter Sub Bidang"
+                            placeholder="Semua Sub Bidang"
                             className="text-xs"
                             classNamePrefix="react-select"
                             isClearable
@@ -344,7 +344,7 @@ export default function JobCertificationMappingPage() {
                             ]}
                             value={filterStatus}
                             onChange={setFilterStatus}
-                            placeholder="Status"
+                            placeholder="Semua Status"
                             className="text-xs"
                             classNamePrefix="react-select"
                             styles={selectStyles}

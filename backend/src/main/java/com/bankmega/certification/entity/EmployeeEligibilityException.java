@@ -9,10 +9,9 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 import java.time.Instant;
 
 @Entity
-@Table(name = "employee_eligibility_exceptions",
-       uniqueConstraints = {
-           @UniqueConstraint(columnNames = {"employee_id", "certification_rule_id"})
-       })
+@Table(name = "employee_eligibility_exceptions", uniqueConstraints = {
+        @UniqueConstraint(columnNames = { "employee_id", "certification_rule_id" })
+})
 @Getter
 @Setter
 @NoArgsConstructor
@@ -39,6 +38,10 @@ public class EmployeeEligibilityException {
 
     @Column(name = "notes")
     private String notes; // catatan PIC, opsional
+
+    @ManyToOne
+    @JoinColumn(name = "job_position_id")
+    private JobPosition jobPosition; // optional: specific job position for this exception
 
     @CreatedDate
     @Column(name = "created_at", updatable = false)

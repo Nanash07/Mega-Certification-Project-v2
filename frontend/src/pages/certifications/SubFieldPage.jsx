@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
 import toast from "react-hot-toast";
-import { Pencil, Trash2, Plus, Grid3X3, Filter, Eraser } from "lucide-react";
+import { Pencil, Trash2, Plus, Grid3X3, Filter, Eraser, Search } from "lucide-react";
 import Select from "react-select";
 import { fetchSubFields, deleteSubField } from "../../services/subFieldService";
 import CreateSubFieldModal from "../../components/subfields/CreateSubFieldModal";
@@ -118,13 +118,13 @@ export default function SubFieldPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
                     <div className="flex flex-col gap-1 lg:col-span-3">
                         <label className="font-medium text-gray-600 flex items-center gap-1">
-                            <Filter size={12} /> Filter Sub Bidang
+                            <Search size={12} /> Cari Sub Bidang
                         </label>
                         <Select
                             options={options}
                             value={filter}
                             onChange={setFilter}
-                            placeholder="Cari sub bidang..."
+                            placeholder="Semua Sub Bidang"
                             isClearable
                             className="text-xs"
                             classNamePrefix="react-select"

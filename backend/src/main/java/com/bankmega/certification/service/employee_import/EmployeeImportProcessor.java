@@ -4,6 +4,7 @@ import com.bankmega.certification.dto.EmployeeImportResponse;
 import com.bankmega.certification.entity.*;
 import com.bankmega.certification.repository.*;
 import com.bankmega.certification.service.EmployeeCertificationService;
+import com.bankmega.certification.service.EmployeeEligibilityService;
 import com.bankmega.certification.service.EmployeeHistoryService;
 import com.bankmega.certification.service.UserService;
 import jakarta.annotation.PostConstruct;
@@ -41,6 +42,7 @@ public class EmployeeImportProcessor {
     private final EmployeeImportLogRepository logRepo;
 
     private final EmployeeHistoryService historyService;
+    private final EmployeeEligibilityService eligibilityService;
     private final EmployeeCertificationService certificationService;
     private final UserService userService;
     private final RoleRepository roleRepo;
@@ -118,6 +120,29 @@ public class EmployeeImportProcessor {
                         .toList();
                 safe(() -> certificationService.markInvalidToPendingForEmployeeIds(rehiredIds));
                 safe(() -> certificationService.recomputeStatusesForEmployeeIds(rehiredIds));
+            }
+
+            // Auto-refresh eligibility for all affected employees
+            Set<Long> employeeIdsToRefresh = new java.util.HashSet<>();
+            plan.newEmployees.stream().map(Employee::getId).filter(Objects::nonNull).forEach(employeeIdsToRefresh::add);
+            plan.mutatedEmployees.stream().map(Employee::getId).filter(Objects::nonNull)
+                    .forEach(employeeIdsToRefresh::add);
+            plan.rehiredEmployees.stream().map(Employee::getId).filter(Objects::nonNull)
+                    .forEach(employeeIdsToRefresh::add);
+            plan.resignedEmployees.stream().map(Employee::getId).filter(Objects::nonNull)
+                    .forEach(employeeIdsToRefresh::add);
+
+            if (!employeeIdsToRefresh.isEmpty()) {
+                log.info("Scheduling async eligibility refresh for {} employees after import",
+                        employeeIdsToRefresh.size());
+                // Run eligibility refresh async to avoid blocking import response
+                java.util.concurrent.CompletableFuture.runAsync(() -> {
+                    log.info("Starting async eligibility refresh for {} employees", employeeIdsToRefresh.size());
+                    for (Long empId : employeeIdsToRefresh) {
+                        safe(() -> eligibilityService.refreshEligibilityForEmployee(empId));
+                    }
+                    log.info("Completed async eligibility refresh for {} employees", employeeIdsToRefresh.size());
+                });
             }
         });
 

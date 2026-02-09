@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
-import { Pencil, Trash2, Plus, Layers, Filter, Eraser } from "lucide-react";
+import { Pencil, Trash2, Plus, Layers, Filter, Eraser, Search } from "lucide-react";
 import Select from "react-select";
 import { fetchCertificationLevels, deleteCertificationLevel } from "../../services/certificationLevelService";
 import CreateCertificationLevelModal from "../../components/certification-levels/CreateCertificationLevelModal";
@@ -117,13 +117,13 @@ export default function CertificationLevelPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
                     <div className="flex flex-col gap-1 lg:col-span-3">
                         <label className="font-medium text-gray-600 flex items-center gap-1">
-                            <Filter size={12} /> Filter Jenjang
+                            <Search size={12} /> Cari Jenjang
                         </label>
                         <Select
                             options={options}
                             value={filter}
                             onChange={setFilter}
-                            placeholder="Cari jenjang..."
+                            placeholder="Semua Jenjang"
                             isClearable
                             className="text-xs"
                             classNamePrefix="react-select"
