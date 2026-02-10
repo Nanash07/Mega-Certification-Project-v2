@@ -128,12 +128,12 @@ export default function EmployeePage() {
             const params = {
                 page: page - 1,
                 size: rowsPerPage,
-                employeeIds: filterEmployee ? [filterEmployee.value] : [],
-                regionalIds: regionalIds ? [regionalIds.value] : [],
-                divisionIds: divisionIds ? [divisionIds.value] : [],
-                unitIds: unitIds ? [unitIds.value] : [],
-                jobPositionIds: jobPositionIds ? [jobPositionIds.value] : [],
-                statuses: statuses ? [statuses.value] : [],
+                employeeIds: filterEmployee ? filterEmployee.value : undefined,
+                regionalIds: regionalIds ? regionalIds.value : undefined,
+                divisionIds: divisionIds ? divisionIds.value : undefined,
+                unitIds: unitIds ? unitIds.value : undefined,
+                jobPositionIds: jobPositionIds ? jobPositionIds.value : undefined,
+                statuses: statuses ? statuses.value : undefined,
             };
 
             const res = await fetchEmployees(params);

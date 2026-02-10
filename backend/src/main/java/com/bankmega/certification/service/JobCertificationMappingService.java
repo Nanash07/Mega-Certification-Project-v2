@@ -1,7 +1,11 @@
 package com.bankmega.certification.service;
 
+import com.bankmega.certification.dto.CertificationLevelResponse;
+import com.bankmega.certification.dto.CertificationResponse;
 import com.bankmega.certification.dto.JobCertificationMappingRequest;
 import com.bankmega.certification.dto.JobCertificationMappingResponse;
+import com.bankmega.certification.dto.JobPositionResponse;
+import com.bankmega.certification.dto.SubFieldResponse;
 import com.bankmega.certification.entity.CertificationRule;
 import com.bankmega.certification.entity.JobCertificationMapping;
 import com.bankmega.certification.entity.JobPosition;
@@ -215,5 +219,66 @@ public class JobCertificationMappingService {
                                                 .and(JobCertificationMappingSpecification
                                                                 .byJobIds(List.of(jobPositionId)))
                                                 .and(JobCertificationMappingSpecification.byStatus("active")));
+        }
+
+        // ================== FILTER OPTIONS (Distinct values from mappings)
+        // ==================
+
+        @Transactional(readOnly = true)
+        public Page<JobPositionResponse> getDistinctJobPositions(String search, int page, int size) {
+                Pageable pageable = PageRequest.of(page, size);
+                return mappingRepo.findDistinctJobPositions(search, pageable)
+                                .map(jp -> JobPositionResponse.builder()
+                                                .id(jp.getId())
+                                                .name(jp.getName())
+                                                .isActive(jp.getIsActive())
+                                                .createdAt(jp.getCreatedAt())
+                                                .updatedAt(jp.getUpdatedAt())
+                                                .build());
+        }
+
+        @Transactional(readOnly = true)
+        public Page<CertificationResponse> getDistinctCertifications(String search, int page, int size) {
+                Pageable pageable = PageRequest.of(page, size);
+                return mappingRepo.findDistinctCertifications(search, pageable)
+                                .map(c -> CertificationResponse.builder()
+                                                .id(c.getId())
+                                                .code(c.getCode())
+                                                .name(c.getName())
+                                                .createdAt(c.getCreatedAt())
+                                                .updatedAt(c.getUpdatedAt())
+                                                .deletedAt(c.getDeletedAt())
+                                                .build());
+        }
+
+        @Transactional(readOnly = true)
+        public Page<CertificationLevelResponse> getDistinctLevels(String search, int page, int size) {
+                Pageable pageable = PageRequest.of(page, size);
+                return mappingRepo.findDistinctCertificationLevels(search, pageable)
+                                .map(l -> CertificationLevelResponse.builder()
+                                                .id(l.getId())
+                                                .level(l.getLevel())
+                                                .name(l.getName())
+                                                .createdAt(l.getCreatedAt())
+                                                .updatedAt(l.getUpdatedAt())
+                                                .deletedAt(l.getDeletedAt())
+                                                .build());
+        }
+
+        @Transactional(readOnly = true)
+        public Page<SubFieldResponse> getDistinctSubFields(String search, int page, int size) {
+                Pageable pageable = PageRequest.of(page, size);
+                return mappingRepo.findDistinctSubFields(search, pageable)
+                                .map(s -> SubFieldResponse.builder()
+                                                .id(s.getId())
+                                                .code(s.getCode())
+                                                .name(s.getName())
+                                                .certificationId(s.getCertification().getId())
+                                                .certificationName(s.getCertification().getName())
+                                                .certificationCode(s.getCertification().getCode())
+                                                .createdAt(s.getCreatedAt())
+                                                .updatedAt(s.getUpdatedAt())
+                                                .deletedAt(s.getDeletedAt())
+                                                .build());
         }
 }

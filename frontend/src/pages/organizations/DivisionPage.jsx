@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from "react";
 import toast from "react-hot-toast";
 import { Trash2, Building2, Filter, Eraser, Search } from "lucide-react";
-import Select from "react-select";
+import AsyncSelect from "react-select/async";
 import { fetchDivisions, toggleDivision } from "../../services/divisionService";
 import Pagination from "../../components/common/Pagination";
 
@@ -116,50 +116,75 @@ export default function DivisionPage() {
         }),
     };
 
+    const resetFilter = () => {
+        setFilter(null);
+        setPage(1);
+        toast.success("Filter dibersihkan");
+    };
+
+    // Load options for AsyncSelect
+    const loadOptions = (inputValue, callback) => {
+        fetchDivisions({ page: 0, size: 20, q: inputValue })
+            .then((res) => {
+                const list = res.content || [];
+                const options = list.map((r) => ({ value: r.id, label: r.name }));
+                callback(options);
+            })
+            .catch(() => callback([]));
+    };
+
     return (
         <div className="space-y-4 w-full">
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                <div>
-                    <h1 className="text-lg sm:text-xl font-bold">Division</h1>
-                    <p className="text-xs text-gray-500">{totalElements} division ditemukan</p>
+                <div className="flex items-center gap-2">
+                    <Building2 size={20} className="text-secondary" />
+                    <h1 className="text-lg sm:text-xl font-bold">Data Divisi</h1>
                 </div>
+                <button
+                    className="btn btn-sm btn-primary rounded-lg"
+                    onClick={() => { /* setIsAddModalOpen(true) */ }} // Placeholder for actual modal open logic
+                >
+                    <Plus size={16} />
+                    Tambah Divisi
+                </button>
             </div>
 
-            {/* Filter */}
+            {/* Filter Card */}
             <div className="card bg-base-100 shadow-sm border border-gray-100 p-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
-                    <div className="flex flex-col gap-1 lg:col-span-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs w-full">
+                    <div className="flex flex-col gap-1 w-full">
                         <label className="font-medium text-gray-600 flex items-center gap-1">
                             <Search size={12} /> Cari Divisi
                         </label>
-                        <Select
-                            styles={selectStyles}
-                            options={options}
-                            isLoading={isOptionsLoading}
+                        <AsyncSelect
+                            cacheOptions
+                            loadOptions={loadOptions}
+                            defaultOptions
                             value={filter}
                             onChange={(val) => {
                                 setPage(1);
                                 setFilter(val);
                             }}
-                            placeholder="Semua Divisi"
+                            placeholder="Ketik nama divisi..."
                             isClearable
                             className="text-xs"
-                            classNamePrefix="react-select"
+                            styles={selectStyles}
+                            noOptionsMessage={() => "Tidak ditemukan"}
+                            loadingMessage={() => "Mencari..."}
                         />
                     </div>
-                    <div className="flex flex-col gap-1">
-                         <label className="font-medium text-gray-600 invisible">.</label>
-                         <button
-                            className="btn btn-sm btn-accent btn-soft w-full flex gap-2 rounded-lg"
-                            onClick={() => {
-                                setPage(1);
-                                setFilter(null);
-                            }}
-                        >
-                            <Eraser size={14} />
-                            Clear Filter
-                        </button>
+                    <div className="flex flex-col gap-1 sm:col-span-2">
+                        <label className="font-medium text-gray-600 invisible">.</label>
+                        <div className="flex gap-2">
+                            <button
+                                className="btn btn-sm btn-accent btn-soft rounded-lg flex gap-2"
+                                onClick={resetFilter}
+                            >
+                                <Eraser size={14} />
+                                Clear Filter
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>

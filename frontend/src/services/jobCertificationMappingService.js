@@ -67,3 +67,41 @@ export async function deleteJobCertificationMapping(id) {
         throw err;
     }
 }
+
+// ================== FILTER OPTIONS (Distinct) ==================
+
+export async function fetchDistinctJobs(params = {}) {
+    try {
+        const { data } = await api.get(`${BASE_URL}/options/jobs`, { params });
+        return data; // returns { content: [...], totalPages: ... }
+    } catch (err) {
+        return { content: [] };
+    }
+}
+
+export async function fetchDistinctCertifications(params = {}) {
+    try {
+        const { data } = await api.get(`${BASE_URL}/options/certifications`, { params });
+        return data;
+    } catch (err) {
+        return { content: [] };
+    }
+}
+
+export async function fetchDistinctLevels(params = {}) {
+    try {
+        const { data } = await api.get(`${BASE_URL}/options/levels`, { params });
+        return data;
+    } catch (err) {
+        return { content: [] };
+    }
+}
+
+export async function fetchDistinctSubFields(params = {}) {
+    try {
+        const { data } = await api.get(`${BASE_URL}/options/sub-fields`, { params });
+        return data;
+    } catch (err) {
+        return { content: [] };
+    }
+}

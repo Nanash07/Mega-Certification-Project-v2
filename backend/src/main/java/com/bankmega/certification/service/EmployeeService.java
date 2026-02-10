@@ -46,6 +46,7 @@ public class EmployeeService {
                         List<Long> divisionIds,
                         List<Long> unitIds,
                         List<Long> jobPositionIds,
+                        List<String> statuses,
                         String search,
                         Pageable pageable) {
 
@@ -55,6 +56,7 @@ public class EmployeeService {
                                 .and(EmployeeSpecification.byDivisionIds(divisionIds))
                                 .and(EmployeeSpecification.byUnitIds(unitIds))
                                 .and(EmployeeSpecification.byJobPositionIds(jobPositionIds))
+                                .and(EmployeeSpecification.byStatuses(statuses))
                                 .and(EmployeeSpecification.bySearch(search));
 
                 if (pageable.getSort().isUnsorted()) {

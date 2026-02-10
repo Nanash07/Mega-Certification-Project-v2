@@ -36,6 +36,15 @@ public class EmployeeSpecification {
         };
     }
 
+    public static Specification<Employee> byStatuses(List<String> statuses) {
+        return (root, query, cb) -> {
+            if (statuses == null || statuses.isEmpty())
+                return cb.conjunction();
+            var upperStatuses = statuses.stream().map(String::toUpperCase).toList();
+            return cb.upper(root.get("status")).in(upperStatuses);
+        };
+    }
+
     public static Specification<Employee> activePageOnly() {
         return notDeleted().and(statusNot("RESIGN"));
     }

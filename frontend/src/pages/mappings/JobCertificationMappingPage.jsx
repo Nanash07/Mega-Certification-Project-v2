@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
-import Select from "react-select";
+import AsyncSelect from "react-select/async"; // Changed import
 import { Download, Upload, History as HistoryIcon, Pencil, Trash2, Eraser, ChevronDown, Filter, Link2 } from "lucide-react";
 
 import Pagination from "../../components/common/Pagination";
@@ -11,11 +11,11 @@ import {
     fetchJobCertificationMappingsPaged,
     deleteJobCertificationMapping,
     toggleJobCertificationMapping,
+    fetchDistinctJobs,
+    fetchDistinctCertifications,
+    fetchDistinctLevels,
+    fetchDistinctSubFields,
 } from "../../services/jobCertificationMappingService";
-import { fetchCertifications } from "../../services/certificationService";
-import { fetchCertificationLevels } from "../../services/certificationLevelService";
-import { fetchSubFields } from "../../services/subFieldService";
-import { fetchAllJobPositions } from "../../services/jobPositionService";
 import { fetchMyPicScope } from "../../services/picScopeService";
 import EditJobCertificationMappingModal from "../../components/job-certification-mapping/EditJobCertificationMappingModal";
 import { downloadJobCertTemplate } from "../../services/jobCertificationImportService";
@@ -39,10 +39,7 @@ export default function JobCertificationMappingPage() {
     const [totalPages, setTotalPages] = useState(0);
     const [totalElements, setTotalElements] = useState(0);
 
-    const [jobOptions, setJobOptions] = useState([]);
-    const [certOptions, setCertOptions] = useState([]);
-    const [levelOptions, setLevelOptions] = useState([]);
-    const [subOptions, setSubOptions] = useState([]);
+    // Removed static options state
 
     const [filterJob, setFilterJob] = useState(null);
     const [filterCert, setFilterCert] = useState(null);
@@ -81,6 +78,17 @@ export default function JobCertificationMappingPage() {
         );
     }
 
+    useEffect(() => {
+        if (isEmployee) {
+            toast.error("Anda tidak berwenang mengakses halaman ini");
+            navigate("/", { replace: true });
+        }
+    }, [isEmployee]);
+
+    useEffect(() => {
+        load();
+    }, [page, rowsPerPage, filterJob, filterCert, filterLevel, filterSub, filterStatus, allowedCertificationIds]);
+
     async function load() {
         if (isEmployee) return;
         setLoading(true);
@@ -88,15 +96,29 @@ export default function JobCertificationMappingPage() {
             const params = {
                 page: page - 1,
                 size: rowsPerPage,
-                jobIds: filterJob ? [filterJob.value] : [],
-                certCodes: filterCert ? [filterCert.value] : [],
-                levels: filterLevel ? [filterLevel.value] : [],
-                subCodes: filterSub ? [filterSub.value] : [],
+                jobIds: filterJob ? filterJob.value : undefined,
+                certCodes: filterCert ? filterCert.value : undefined,
+                levels: filterLevel ? filterLevel.value : undefined,
+                subCodes: filterSub ? filterSub.value : undefined,
                 status: filterStatus?.value || "all",
             };
 
-            if (isPic && Array.isArray(allowedCertificationIds) && allowedCertificationIds.length > 0) {
-                params.allowedCertificationIds = allowedCertificationIds;
+            if (isPic) {
+                // Determine scope if not already set (though for AsyncSelect we handle differently)
+                // For main table load, we might need scope to enforce filter.
+                // Current logic for load() uses allowedCertificationIds if set.
+                // We should ensure allowedCertificationIds is fetched once.
+                if (!allowedCertificationIds) {
+                    const scope = await fetchMyPicScope();
+                    const ids = (scope?.certifications || []).map(s => s.certificationId).filter(id => id != null);
+                    if (ids.length > 0) {
+                        setAllowedCertificationIds(ids);
+                        // Re-trigger load will happen via useEffect dependency
+                        return; 
+                    }
+                } else if (allowedCertificationIds.length > 0) {
+                     params.allowedCertificationIds = allowedCertificationIds.join(",");
+                }
             }
 
             const res = await fetchJobCertificationMappingsPaged(params);
@@ -111,64 +133,15 @@ export default function JobCertificationMappingPage() {
         }
     }
 
-    async function loadFilters() {
-        if (isEmployee) return;
-        try {
-            if (isPic) {
-                const [jobs, certs, levels, subs, scope] = await Promise.all([
-                    fetchAllJobPositions(),
-                    fetchCertifications(),
-                    fetchCertificationLevels(),
-                    fetchSubFields(),
-                    fetchMyPicScope(),
-                ]);
-
-                const scopeCerts = scope?.certifications || [];
-                const codesSet = new Set(
-                    scopeCerts.map((s) => s.certificationCode).filter((c) => c && String(c).trim() !== "")
-                );
-                const ids = scopeCerts.map((s) => s.certificationId).filter((id) => id != null);
+    // Load filter scope for PIC once
+    useEffect(() => {
+        if (isPic && !allowedCertificationIds) {
+             fetchMyPicScope().then(scope => {
+                const ids = (scope?.certifications || []).map(s => s.certificationId).filter(id => id != null);
                 setAllowedCertificationIds(ids);
-
-                const filteredCerts = (certs || []).filter((c) => codesSet.has(c.code));
-
-                setJobOptions((jobs || []).map((j) => ({ value: j.id, label: j.name })));
-                setCertOptions(filteredCerts.map((c) => ({ value: c.code, label: c.code })));
-                setLevelOptions((levels || []).map((l) => ({ value: l.level, label: l.name })));
-                setSubOptions((subs || []).map((s) => ({ value: s.code, label: s.code })));
-            } else {
-                const [jobs, certs, levels, subs] = await Promise.all([
-                    fetchAllJobPositions(),
-                    fetchCertifications(),
-                    fetchCertificationLevels(),
-                    fetchSubFields(),
-                ]);
-
-                setJobOptions((jobs || []).map((j) => ({ value: j.id, label: j.name })));
-                setCertOptions((certs || []).map((c) => ({ value: c.code, label: c.code })));
-                setLevelOptions((levels || []).map((l) => ({ value: l.level, label: l.name })));
-                setSubOptions((subs || []).map((s) => ({ value: s.code, label: s.code })));
-            }
-        } catch (err) {
-            console.error("loadFilters error:", err);
-            toast.error("Gagal memuat filter");
+             }).catch(() => {});
         }
-    }
-
-    useEffect(() => {
-        if (isEmployee) {
-            toast.error("Anda tidak berwenang mengakses halaman ini");
-            navigate("/", { replace: true });
-        }
-    }, [isEmployee]);
-
-    useEffect(() => {
-        load();
-    }, [page, rowsPerPage, filterJob, filterCert, filterLevel, filterSub, filterStatus, allowedCertificationIds]);
-
-    useEffect(() => {
-        loadFilters();
-    }, []);
+    }, [isPic]);
 
     function resetFilter() {
         setFilterJob(null);
@@ -219,6 +192,50 @@ export default function JobCertificationMappingPage() {
             ...base,
             fontSize: '12px',
         }),
+    };
+
+    const loadJobOptions = (inputValue, callback) => {
+        fetchDistinctJobs({ page: 0, size: 20, search: inputValue }) // param name 'search' matches backend
+            .then((res) => {
+                const list = res.content || [];
+                const options = list.map((r) => ({ value: r.id, label: r.name }));
+                callback(options);
+            })
+            .catch(() => callback([]));
+    };
+
+    const loadCertOptions = (inputValue, callback) => {
+        fetchDistinctCertifications({ page: 0, size: 20, search: inputValue })
+            .then((res) => {
+                const list = res.content || [];
+                // If PIC, filter based on allowed ids if needed, but backend distinct query doesn't know scope.
+                // Ideally backend should filter distincts by PIC scope.
+                // For now, we trust the backend distinct list.
+                // If strict PIC scoping is needed for dropdown logic, backend endpoint needs allowedCertificationIds.
+                const options = list.map((r) => ({ value: r.code, label: r.code }));
+                callback(options);
+            })
+            .catch(() => callback([]));
+    };
+
+    const loadLevelOptions = (inputValue, callback) => {
+        fetchDistinctLevels({ page: 0, size: 20, search: inputValue })
+            .then((res) => {
+                const list = res.content || [];
+                const options = list.map((r) => ({ value: r.level, label: r.name }));
+                callback(options);
+            })
+            .catch(() => callback([]));
+    };
+
+    const loadSubOptions = (inputValue, callback) => {
+        fetchDistinctSubFields({ page: 0, size: 20, search: inputValue })
+            .then((res) => {
+                const list = res.content || [];
+                const options = list.map((r) => ({ value: r.code, label: r.code }));
+                callback(options);
+            })
+            .catch(() => callback([]));
     };
 
     async function handleChangeStatus(row, desiredActive) {
@@ -276,60 +293,84 @@ export default function JobCertificationMappingPage() {
                         <label className="font-medium text-gray-600 flex items-center gap-1">
                             <Filter size={12} /> Jabatan
                         </label>
-                        <Select
-                            options={jobOptions}
+                        <AsyncSelect
+                            cacheOptions
+                            loadOptions={loadJobOptions}
+                            defaultOptions
                             value={filterJob}
-                            onChange={setFilterJob}
-                            placeholder="Semua Jabatan"
-                            className="text-xs"
-                            classNamePrefix="react-select"
+                            onChange={(val) => {
+                                setPage(1);
+                                setFilterJob(val);
+                            }}
+                            placeholder="Ketik jabatan..."
                             isClearable
+                            className="text-xs"
                             styles={selectStyles}
+                            noOptionsMessage={() => "Tidak ditemukan"}
+                            loadingMessage={() => "Mencari..."}
                         />
                     </div>
                     <div className="flex flex-col gap-1">
                         <label className="font-medium text-gray-600 flex items-center gap-1">
                             <Filter size={12} /> Sertifikasi
                         </label>
-                        <Select
-                            options={certOptions}
+                        <AsyncSelect
+                            cacheOptions
+                            loadOptions={loadCertOptions}
+                            defaultOptions
                             value={filterCert}
-                            onChange={setFilterCert}
-                            placeholder="Semua Sertifikasi"
-                            className="text-xs"
-                            classNamePrefix="react-select"
+                            onChange={(val) => {
+                                setPage(1);
+                                setFilterCert(val);
+                            }}
+                            placeholder="Ketik sertifikasi..."
                             isClearable
+                            className="text-xs"
                             styles={selectStyles}
+                            noOptionsMessage={() => "Tidak ditemukan"}
+                            loadingMessage={() => "Mencari..."}
                         />
                     </div>
                     <div className="flex flex-col gap-1">
                         <label className="font-medium text-gray-600 flex items-center gap-1">
                             <Filter size={12} /> Level
                         </label>
-                        <Select
-                            options={levelOptions}
+                        <AsyncSelect
+                            cacheOptions
+                            loadOptions={loadLevelOptions}
+                            defaultOptions
                             value={filterLevel}
-                            onChange={setFilterLevel}
-                            placeholder="Semua Level"
-                            className="text-xs"
-                            classNamePrefix="react-select"
+                            onChange={(val) => {
+                                setPage(1);
+                                setFilterLevel(val);
+                            }}
+                            placeholder="Ketik level..."
                             isClearable
+                            className="text-xs"
                             styles={selectStyles}
+                            noOptionsMessage={() => "Tidak ditemukan"}
+                            loadingMessage={() => "Mencari..."}
                         />
                     </div>
                     <div className="flex flex-col gap-1">
                         <label className="font-medium text-gray-600 flex items-center gap-1">
                             <Filter size={12} /> Sub Bidang
                         </label>
-                        <Select
-                            options={subOptions}
+                        <AsyncSelect
+                            cacheOptions
+                            loadOptions={loadSubOptions}
+                            defaultOptions
                             value={filterSub}
-                            onChange={setFilterSub}
-                            placeholder="Semua Sub Bidang"
-                            className="text-xs"
-                            classNamePrefix="react-select"
+                            onChange={(val) => {
+                                setPage(1);
+                                setFilterSub(val);
+                            }}
+                            placeholder="Ketik sub bidang..."
                             isClearable
+                            className="text-xs"
                             styles={selectStyles}
+                            noOptionsMessage={() => "Tidak ditemukan"}
+                            loadingMessage={() => "Mencari..."}
                         />
                     </div>
                     <div className="flex flex-col gap-1">

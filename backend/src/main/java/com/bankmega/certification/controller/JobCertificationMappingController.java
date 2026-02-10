@@ -65,4 +65,38 @@ public class JobCertificationMappingController {
         service.delete(id);
         return ResponseEntity.noContent().build();
     }
+
+    // ================== FILTER OPTIONS ==================
+
+    @GetMapping("/options/jobs")
+    public ResponseEntity<Page<com.bankmega.certification.dto.JobPositionResponse>> getDistinctJobs(
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ResponseEntity.ok(service.getDistinctJobPositions(search, page, size));
+    }
+
+    @GetMapping("/options/certifications")
+    public ResponseEntity<Page<com.bankmega.certification.dto.CertificationResponse>> getDistinctCertifications(
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ResponseEntity.ok(service.getDistinctCertifications(search, page, size));
+    }
+
+    @GetMapping("/options/levels")
+    public ResponseEntity<Page<com.bankmega.certification.dto.CertificationLevelResponse>> getDistinctLevels(
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ResponseEntity.ok(service.getDistinctLevels(search, page, size));
+    }
+
+    @GetMapping("/options/sub-fields")
+    public ResponseEntity<Page<com.bankmega.certification.dto.SubFieldResponse>> getDistinctSubFields(
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ResponseEntity.ok(service.getDistinctSubFields(search, page, size));
+    }
 }
