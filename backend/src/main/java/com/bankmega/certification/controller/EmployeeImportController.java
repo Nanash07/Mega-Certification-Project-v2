@@ -4,6 +4,7 @@ import com.bankmega.certification.dto.EmployeeImportLogResponse;
 import com.bankmega.certification.dto.EmployeeImportResponse;
 import com.bankmega.certification.entity.User;
 import com.bankmega.certification.service.EmployeeImportService;
+import com.bankmega.certification.exception.NotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -41,10 +42,10 @@ public class EmployeeImportController {
     private User resolveUser(Principal principal) {
         if (principal == null) {
             // Should be handled by Security filter, but just in case
-            throw new com.bankmega.certification.exception.NotFoundException("User not authenticated");
+            throw new NotFoundException("User not authenticated");
         }
         return userRepo.findByUsername(principal.getName())
-                .orElseThrow(() -> new com.bankmega.certification.exception.NotFoundException(
+                .orElseThrow(() -> new NotFoundException(
                         "User not found: " + principal.getName()));
     }
 

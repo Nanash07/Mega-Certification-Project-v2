@@ -14,13 +14,9 @@ import {
 import { ArrowLeft, Download, Filter, Eraser, History as HistoryIcon, Search } from "lucide-react";
 
 const ACTION_OPTIONS = [
-    { value: "all", label: "Semua Aksi" },
     { value: "CREATED", label: "CREATED" },
     { value: "UPDATED", label: "UPDATED" },
-    { value: "MUTASI", label: "MUTASI" },
-    { value: "REHIRED", label: "REHIRED" },
-    { value: "RESIGN", label: "RESIGN" },
-    { value: "TERMINATED", label: "TERMINATED" },
+    { value: "DELETED", label: "DELETED" },
 ];
 
 const badgeClass = (actionType) => {
@@ -29,18 +25,52 @@ const badgeClass = (actionType) => {
             return "badge-success";
         case "UPDATED":
             return "badge-info";
-        case "MUTASI":
-            return "badge-warning";
-        case "REHIRED":
-            return "badge-primary";
-        case "RESIGN":
-            return "badge-neutral";
-        case "TERMINATED":
+        case "DELETED":
             return "badge-error";
         default:
             return "badge-ghost";
     }
 };
+
+const titleStyles = {
+    control: (base) => ({
+        ...base,
+        minHeight: '32px',
+        height: '32px',
+        fontSize: '12px',
+    }),
+    valueContainer: (base) => ({
+        ...base,
+        height: '32px',
+        padding: '0 8px',
+    }),
+    input: (base) => ({
+        ...base,
+        margin: '0px',
+        padding: '0px',
+    }),
+    indicatorsContainer: (base) => ({
+        ...base,
+        height: '32px',
+    }),
+    dropdownIndicator: (base) => ({
+        ...base,
+        padding: '4px',
+    }),
+    clearIndicator: (base) => ({
+        ...base,
+        padding: '4px',
+    }),
+    option: (base) => ({
+        ...base,
+        fontSize: '12px',
+        padding: '6px 10px',
+    }),
+    menu: (base) => ({
+        ...base,
+        fontSize: '12px',
+    }),
+}; // NEW
 
 export default function EmployeeHistoryPage() {
     const navigate = useNavigate();
@@ -71,7 +101,8 @@ export default function EmployeeHistoryPage() {
     const [totalElements, setTotalElements] = useState(0);
 
     const [filterEmployee, setFilterEmployee] = useState(null);
-    const [filterAction, setFilterAction] = useState(ACTION_OPTIONS[0]);
+    const [filterAction, setFilterAction] = useState(null);
+    const [filterPositionType, setFilterPositionType] = useState(null); // NEW
     const [startDate, setStartDate] = useState("");
     const [endDate, setEndDate] = useState("");
 
@@ -94,7 +125,7 @@ export default function EmployeeHistoryPage() {
 
     useEffect(() => {
         setPage(1);
-    }, [filterEmployee, filterAction, startDate, endDate]);
+    }, [filterEmployee, filterAction, startDate, endDate, filterPositionType]); // NEW
 
     const load = useCallback(async () => {
         if (!isRoleLoaded || isEmployee) return;
@@ -111,6 +142,7 @@ export default function EmployeeHistoryPage() {
                 size: rowsPerPage,
                 actionType: filterAction?.value || "all",
                 employeeId: filterEmployee?.value ?? null,
+                positionType: filterPositionType?.value ?? null, // NEW
                 startDate,
                 endDate,
             };
@@ -124,7 +156,7 @@ export default function EmployeeHistoryPage() {
         } finally {
             setLoading(false);
         }
-    }, [page, rowsPerPage, filterEmployee, filterAction, startDate, endDate]);
+    }, [page, rowsPerPage, filterEmployee, filterAction, startDate, endDate, isRoleLoaded, isEmployee, filterPositionType]); // NEW
 
     useEffect(() => {
         load();
@@ -132,7 +164,8 @@ export default function EmployeeHistoryPage() {
 
     const resetFilter = () => {
         setFilterEmployee(null);
-        setFilterAction(ACTION_OPTIONS[0]);
+        setFilterAction(null);
+        setFilterPositionType(null); // NEW
         setStartDate("");
         setEndDate("");
         setPage(1);
@@ -151,6 +184,7 @@ export default function EmployeeHistoryPage() {
             await exportEmployeeHistoriesExcel({
                 actionType: filterAction?.value || "all",
                 employeeId: filterEmployee?.value ?? null,
+                positionType: filterPositionType?.value ?? null, // NEW
                 startDate,
                 endDate,
             });
@@ -263,7 +297,7 @@ export default function EmployeeHistoryPage() {
 
             {/* Filter Card */}
             <div className="card bg-base-100 shadow-sm border border-gray-100 p-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-3 text-xs">
                     <div className="flex flex-col gap-1">
                         <label className="font-medium text-gray-600 flex items-center gap-1">
                             <Search size={12} /> Cari Pegawai
@@ -298,11 +332,32 @@ export default function EmployeeHistoryPage() {
                             value={filterAction}
                             onChange={setFilterAction}
                             placeholder="Semua Aksi"
+                            isClearable
                             className="text-xs"
                             classNamePrefix="react-select"
                             styles={selectStyles}
                         />
                     </div>
+
+                    <div className="flex flex-col gap-1 sm:col-span-1">
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <Filter size={12} /> Tipe
+                        </label>
+                        <Select
+                            options={[
+                                { value: "UTAMA", label: "UTAMA" },
+                                { value: "KEDUA", label: "KEDUA" },
+                            ]}
+                            value={filterPositionType}
+                            onChange={setFilterPositionType}
+                            placeholder="Semua Tipe"
+                            isClearable
+                            className="text-xs"
+                            classNamePrefix="react-select"
+                            styles={titleStyles}
+                        />
+                    </div>
+
                     <div className="flex flex-col gap-1">
                         <label className="font-medium text-gray-600 flex items-center gap-1">
                             <Filter size={12} /> Tanggal Mulai
@@ -344,6 +399,7 @@ export default function EmployeeHistoryPage() {
                             <tr>
                                 <th className="w-12">No</th>
                                 <th className="w-24">Aksi</th>
+                                <th>Tipe</th>
                                 <th>Tanggal Aksi</th>
                                 <th>NIP</th>
                                 <th>Nama Pegawai</th>
@@ -361,13 +417,13 @@ export default function EmployeeHistoryPage() {
                         <tbody>
                             {loading ? (
                                 <tr>
-                                    <td colSpan={14} className="text-center py-16">
+                                    <td colSpan={15} className="text-center py-16">
                                         <span className="loading loading-dots loading-lg text-primary" />
                                     </td>
                                 </tr>
                             ) : rows.length === 0 ? (
                                 <tr>
-                                    <td colSpan={14} className="text-center py-16">
+                                    <td colSpan={15} className="text-center py-16">
                                         <div className="flex flex-col items-center text-gray-400">
                                             <HistoryIcon size={48} className="mb-3 opacity-30" />
                                             <p className="text-sm">Tidak ada data histori</p>
@@ -382,6 +438,19 @@ export default function EmployeeHistoryPage() {
                                             <span className={`badge badge-sm text-white ${badgeClass(h.actionType)}`}>
                                                 {h.actionType || "-"}
                                             </span>
+                                        </td>
+                                        <td>
+                                            {h.positionType ? (
+                                                <span
+                                                    className={`badge badge-sm text-white ${
+                                                        h.positionType === "UTAMA" ? "badge-warning" : "badge-neutral"
+                                                    }`}
+                                                >
+                                                    {h.positionType}
+                                                </span>
+                                            ) : (
+                                                "-"
+                                            )}
                                         </td>
                                         <td>{formatDate(h.actionAt)}</td>
                                         <td>{h.employeeNip || "-"}</td>

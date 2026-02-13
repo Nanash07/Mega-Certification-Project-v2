@@ -30,11 +30,12 @@ public class EmployeeController {
             @RequestParam(required = false) List<Long> jobPositionIds,
             @RequestParam(required = false) List<String> statuses,
             @RequestParam(required = false) String search,
+            @RequestParam(required = false) String positionType,
             Pageable pageable) {
 
         return ResponseEntity.ok(
                 service.search(employeeIds, regionalIds, divisionIds, unitIds, jobPositionIds, statuses, search,
-                        pageable));
+                        positionType, pageable));
     }
 
     // Resigned - Paging + Filter
@@ -46,11 +47,12 @@ public class EmployeeController {
             @RequestParam(required = false) List<Long> unitIds,
             @RequestParam(required = false) List<Long> jobPositionIds,
             @RequestParam(required = false) String search,
+            @RequestParam(required = false) String positionType,
             Pageable pageable) {
 
         return ResponseEntity.ok(
                 service.searchResigned(employeeIds, regionalIds, divisionIds, unitIds, jobPositionIds, search,
-                        pageable));
+                        positionType, pageable));
     }
 
     // ======= DASHBOARD COUNT (ACTIVE ONLY, exclude RESIGN) =======

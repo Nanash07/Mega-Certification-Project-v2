@@ -76,4 +76,14 @@ public class EmployeeHistorySpecification {
                     cb.like(cb.lower(root.get("newRegionalName")), like));
         };
     }
+
+    // 🔹 Filter Position Type (UTAMA/KEDUA)
+    public static Specification<EmployeeHistory> byPositionType(String positionType) {
+        return (root, query, cb) -> {
+            if (positionType == null || positionType.isBlank() || "ALL".equalsIgnoreCase(positionType)) {
+                return cb.conjunction();
+            }
+            return cb.equal(root.get("positionType"), positionType);
+        };
+    }
 }

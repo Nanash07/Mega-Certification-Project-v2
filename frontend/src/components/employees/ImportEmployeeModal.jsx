@@ -93,22 +93,22 @@ export default function ImportEmployeeModal({ open, onClose, onImported }) {
                         </h4>
                         <div className="grid grid-cols-2 gap-2 text-sm mt-2">
                             <div>
-                                Processed: <b>{result.processed}</b>
+                                Diproses: <b>{result.processed}</b>
                             </div>
                             <div>
-                                Created: <b className="text-green-600">{result.created}</b>
+                                Pegawai Baru: <b className="text-green-600">{result.created}</b>
                             </div>
                             <div>
-                                Updated: <b className="text-blue-600">{result.updated}</b>
+                                Update Data Diri: <b className="text-blue-600">{result.updated}</b>
                             </div>
                             <div>
-                                Mutated: <b className="text-purple-600">{result.mutated}</b>
+                                Mutasi / Promosi: <b className="text-purple-600">{result.mutated}</b>
                             </div>
                             <div>
-                                Resigned: <b className="text-red-600">{result.resigned}</b>
+                                Pegawai Nonaktif: <b className="text-red-600">{result.resigned}</b>
                             </div>
                             <div>
-                                Errors: <b className="text-orange-600">{result.errors}</b>
+                                Error: <b className="text-orange-600">{result.errors}</b>
                             </div>
                         </div>
 

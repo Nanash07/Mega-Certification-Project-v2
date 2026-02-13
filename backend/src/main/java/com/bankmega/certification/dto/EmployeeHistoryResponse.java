@@ -30,5 +30,6 @@ public class EmployeeHistoryResponse {
 
     private LocalDate effectiveDate;
     private EmployeeHistory.EmployeeActionType actionType;
+    private String positionType;
     private Instant actionAt;
 }

@@ -37,10 +37,10 @@ export const MENU = [
         key: "data-pegawai",
     },
     {
-        label: "Pegawai Resign",
+        label: "Pegawai Nonaktif",
         icon: <UserX size={18} />,
         href: "/employee/resigned",
-        key: "pegawai-resign",
+        key: "pegawai-nonaktif",
     },
     {
         label: "Eligibility",

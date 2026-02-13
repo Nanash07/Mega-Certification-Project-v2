@@ -208,4 +208,32 @@ public class EmployeeSpecification {
                     cb.equal(positions.get("unit").get("id"), id));
         };
     }
+
+    public static Specification<Employee> byPositionType(String positionType) {
+        return (root, query, cb) -> {
+            if (positionType == null || positionType.isBlank() || "ALL".equalsIgnoreCase(positionType)) {
+                return cb.conjunction();
+            }
+
+            var positions = root.join("positions", jakarta.persistence.criteria.JoinType.LEFT);
+            if (query != null)
+                query.distinct(true);
+
+            // Map string UTAMA/KEDUA to ENUM PRIMARY/SECONDARY
+            com.bankmega.certification.entity.EmployeePosition.PositionType typeEnum;
+            if ("UTAMA".equalsIgnoreCase(positionType) || "PRIMARY".equalsIgnoreCase(positionType)) {
+                typeEnum = com.bankmega.certification.entity.EmployeePosition.PositionType.PRIMARY;
+            } else if ("KEDUA".equalsIgnoreCase(positionType) || "SECONDARY".equalsIgnoreCase(positionType)) {
+                typeEnum = com.bankmega.certification.entity.EmployeePosition.PositionType.SECONDARY;
+            } else {
+                // Return empty if invalid type
+                return cb.disjunction();
+            }
+
+            return cb.and(
+                    cb.isNull(positions.get("deletedAt")),
+                    cb.isTrue(positions.get("isActive")),
+                    cb.equal(positions.get("positionType"), typeEnum));
+        };
+    }
 }

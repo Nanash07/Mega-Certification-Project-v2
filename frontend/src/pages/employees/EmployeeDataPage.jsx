@@ -36,6 +36,7 @@ export default function EmployeePage() {
     const [unitIds, setUnitIds] = useState(null);
     const [jobPositionIds, setJobPositionIds] = useState(null);
     const [statuses, setStatuses] = useState(null);
+    const [positionType, setPositionType] = useState(null); // NEW
 
     const [regionalOptions, setRegionalOptions] = useState([]);
     const [divisionOptions, setDivisionOptions] = useState([]);
@@ -49,6 +50,11 @@ export default function EmployeePage() {
         ],
         []
     );
+
+    const positionTypeOptions = [
+        { value: "UTAMA", label: "UTAMA" },
+        { value: "KEDUA", label: "KEDUA" },
+    ];
 
     const [openImport, setOpenImport] = useState(false);
 
@@ -134,6 +140,7 @@ export default function EmployeePage() {
                 unitIds: unitIds ? unitIds.value : undefined,
                 jobPositionIds: jobPositionIds ? jobPositionIds.value : undefined,
                 statuses: statuses ? statuses.value : undefined,
+                positionType: positionType ? positionType.value : undefined, // NEW
             };
 
             const res = await fetchEmployees(params);
@@ -150,7 +157,7 @@ export default function EmployeePage() {
     useEffect(() => {
         load();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [page, rowsPerPage, filterEmployee, regionalIds, divisionIds, unitIds, jobPositionIds, statuses]);
+    }, [page, rowsPerPage, filterEmployee, regionalIds, divisionIds, unitIds, jobPositionIds, statuses, positionType]);
 
     function resetFilter() {
         setFilterEmployee(null);
@@ -159,6 +166,7 @@ export default function EmployeePage() {
         setUnitIds(null);
         setJobPositionIds(null);
         setStatuses(null);
+        setPositionType(null); // NEW
         setPage(1);
         toast.success("Filter dibersihkan");
     }
@@ -211,7 +219,7 @@ export default function EmployeePage() {
 
             {/* Filter Card */}
             <div className="card bg-base-100 shadow-sm border border-gray-100 p-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-3 text-xs">
                     <div className="flex flex-col gap-1">
                         <label className="font-medium text-gray-600 flex items-center gap-1">
                             <Search size={12} /> Cari Pegawai
@@ -299,6 +307,21 @@ export default function EmployeePage() {
                             onChange={setStatuses}
                             isClearable
                             placeholder="Semua Status"
+                            className="text-xs"
+                            classNamePrefix="react-select"
+                            styles={selectStyles}
+                        />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                        <label className="font-medium text-gray-600 flex items-center gap-1">
+                            <Filter size={12} /> Tipe
+                        </label>
+                        <Select
+                            options={positionTypeOptions}
+                            value={positionType}
+                            onChange={setPositionType}
+                            isClearable
+                            placeholder="Semua Tipe"
                             className="text-xs"
                             classNamePrefix="react-select"
                             styles={selectStyles}

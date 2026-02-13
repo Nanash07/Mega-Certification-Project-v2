@@ -75,7 +75,10 @@ public class EmployeeImportProcessor {
         preloadMasters();
         ImportPlan plan = buildPlan(file, true, true);
         EmployeeImportResponse res = plan.toResponse(file.getOriginalFilename(), true);
-        res.setMessage("Dry run selesai oleh " + user.getUsername());
+        res.setMessage(String.format(
+                "Dry run selesai. Ditemukan: %d data diproses, %d baru, %d update/mutasi, %d resign, %d error.",
+                res.getProcessed(), res.getCreated(), res.getUpdated() + res.getMutated(), res.getResigned(),
+                res.getErrors()));
         return res;
     }
 
@@ -208,6 +211,16 @@ public class EmployeeImportProcessor {
 
         for (ImportRow r : rows) {
             try {
+                // Validation: Primary fields must not be empty
+                if (r.regionalName.isEmpty() || r.divisionName.isEmpty() || r.unitName.isEmpty()
+                        || r.jobName.isEmpty()) {
+                    plan.errors++;
+                    plan.errorDetails.add(
+                            "Row " + r.rowIndex
+                                    + ": Data jabatan utama (Regional, Divisi, Unit, Job) tidak boleh kosong");
+                    continue;
+                }
+
                 Regional regional = resolveRegional(r.regionalName, !dryRun);
                 Division division = resolveDivision(r.divisionName, !dryRun);
                 Unit unit = resolveUnit(r.unitName, !dryRun);
@@ -236,8 +249,9 @@ public class EmployeeImportProcessor {
 
                     if (!dryRun) {
                         emp = empRepo.save(Objects.requireNonNull(emp));
-                        createPositions(emp, regional, division, unit, job, r.effectiveDate,
+                        EmployeePosition primary = createPositions(emp, regional, division, unit, job, r.effectiveDate,
                                 regional2, division2, unit2, job2, r.effectiveDate2);
+                        historyService.snapshotCreated(emp, primary, r.effectiveDate, "UTAMA");
                     }
 
                     plan.newEmployees.add(emp);
@@ -263,18 +277,6 @@ public class EmployeeImportProcessor {
                                 ? primary.getRegional().getName()
                                 : null;
 
-                        // Check changes against PRIMARY
-                        boolean orgChanged = false;
-                        if (primary != null) {
-                            orgChanged = !sameEntity(primary.getRegional(), regional)
-                                    || !sameEntity(primary.getDivision(), division)
-                                    || !sameEntity(primary.getUnit(), unit)
-                                    || !sameEntity(primary.getJobPosition(), job);
-                        } else {
-                            // If no primary (weird for legacy data?), assume changed if new values present
-                            orgChanged = (regional != null || division != null || unit != null || job != null);
-                        }
-
                         existing.setStatus("ACTIVE");
                         existing.setName(r.name);
                         existing.setEmail(r.email);
@@ -286,9 +288,7 @@ public class EmployeeImportProcessor {
                         updatePositions(existing, regional, division, unit, job, r.effectiveDate,
                                 regional2, division2, unit2, job2, r.effectiveDate2);
 
-                        EmployeeHistory.EmployeeActionType type = orgChanged
-                                ? EmployeeHistory.EmployeeActionType.MUTASI
-                                : EmployeeHistory.EmployeeActionType.REHIRED;
+                        EmployeeHistory.EmployeeActionType type = EmployeeHistory.EmployeeActionType.UPDATED;
 
                         historyService.snapshotWithOldValues(
                                 existing,
@@ -297,7 +297,8 @@ public class EmployeeImportProcessor {
                                 oldDivisionName,
                                 oldRegionalName,
                                 type,
-                                r.effectiveDate);
+                                r.effectiveDate,
+                                "UTAMA");
                     }
 
                     plan.rehiredEmployees.add(existing);
@@ -313,6 +314,7 @@ public class EmployeeImportProcessor {
 
                 if (mutasi) {
                     if (!dryRun) {
+                        // Capture old PRIMARY values
                         EmployeePosition primary = existing.getPrimaryPosition();
                         String oldJobTitle = primary != null && primary.getJobPosition() != null
                                 ? primary.getJobPosition().getName()
@@ -326,6 +328,21 @@ public class EmployeeImportProcessor {
                                 ? primary.getRegional().getName()
                                 : null;
 
+                        // Capture old SECONDARY values
+                        EmployeePosition secondary = existing.getSecondaryPosition();
+                        String oldJobTitle2 = secondary != null && secondary.getJobPosition() != null
+                                ? secondary.getJobPosition().getName()
+                                : null;
+                        String oldUnitName2 = secondary != null && secondary.getUnit() != null
+                                ? secondary.getUnit().getName()
+                                : null;
+                        String oldDivisionName2 = secondary != null && secondary.getDivision() != null
+                                ? secondary.getDivision().getName()
+                                : null;
+                        String oldRegionalName2 = secondary != null && secondary.getRegional() != null
+                                ? secondary.getRegional().getName()
+                                : null;
+
                         // Do not set legacy fields
 
                         existing.setUpdatedAt(Instant.now());
@@ -333,17 +350,31 @@ public class EmployeeImportProcessor {
                         updatePositions(existing, regional, division, unit, job, r.effectiveDate,
                                 regional2, division2, unit2, job2, r.effectiveDate2);
 
-                        // We need effective date for history... use request effective date or primary's
-                        LocalDate effDate = r.effectiveDate;
+                        // Snapshot Primary
+                        if (primaryChanged) {
+                            historyService.snapshotWithOldValues(
+                                    existing,
+                                    oldJobTitle,
+                                    oldUnitName,
+                                    oldDivisionName,
+                                    oldRegionalName,
+                                    EmployeeHistory.EmployeeActionType.UPDATED,
+                                    r.effectiveDate,
+                                    "UTAMA");
+                        }
 
-                        historyService.snapshotWithOldValues(
-                                existing,
-                                oldJobTitle,
-                                oldUnitName,
-                                oldDivisionName,
-                                oldRegionalName,
-                                EmployeeHistory.EmployeeActionType.MUTASI,
-                                effDate);
+                        // Snapshot Secondary
+                        if (secondaryChanged) {
+                            historyService.snapshotWithOldValues(
+                                    existing,
+                                    oldJobTitle2,
+                                    oldUnitName2,
+                                    oldDivisionName2,
+                                    oldRegionalName2,
+                                    EmployeeHistory.EmployeeActionType.UPDATED,
+                                    r.effectiveDate2 != null ? r.effectiveDate2 : r.effectiveDate,
+                                    "KEDUA");
+                        }
                     }
                     plan.mutatedEmployees.add(existing);
                     plan.mutated++;
@@ -399,7 +430,8 @@ public class EmployeeImportProcessor {
                                 oldDivisionName,
                                 oldRegionalName,
                                 type,
-                                r.effectiveDate);
+                                r.effectiveDate,
+                                "UTAMA");
                     }
                     plan.updatedEmployees.add(existing);
                     plan.updated++;
@@ -443,7 +475,7 @@ public class EmployeeImportProcessor {
                     allPositionsToSave.add(p);
                 }
 
-                historyService.snapshot(e, EmployeeHistory.EmployeeActionType.RESIGN, LocalDate.now());
+                historyService.snapshot(e, EmployeeHistory.EmployeeActionType.DELETED, LocalDate.now(), "UTAMA");
                 plan.resignedEmployees.add(e);
                 plan.resigned++;
             }
@@ -493,6 +525,22 @@ public class EmployeeImportProcessor {
                 String email = safe(fmt.formatCellValue(row.getCell(7)));
                 LocalDate effDate = parseDateSafe(row.getCell(8), safe(fmt.formatCellValue(row.getCell(8))));
 
+                // Validate primary fields
+                if (regionalName.isEmpty() || divisionName.isEmpty() || unitName.isEmpty() || jobName.isEmpty()) {
+                    // We can either skip or throw error. Since this is inside dry run / parse,
+                    // usually we might want to flag it?
+                    // But parseExcelInternal just returns rows.
+                    // Let's filter later in buildPlan or just handle it here?
+                    // The previous code didn't validate.
+                    // Let's let it pass here and validate in buildPlan if possible, or just skip
+                    // here?
+                    // User said "yg utama gaboleh kosong".
+                    // If we skip here, it won't be in the list.
+                    // Better to include it but validation happens in buildPlan loop.
+                    // But wait, parseExcelInternal returns ImportRow.
+                    // Let's check logic in buildPlan.
+                }
+
                 String regionalName2 = safe(fmt.formatCellValue(row.getCell(9)));
                 String divisionName2 = safe(fmt.formatCellValue(row.getCell(10)));
                 String unitName2 = safe(fmt.formatCellValue(row.getCell(11)));
@@ -508,7 +556,14 @@ public class EmployeeImportProcessor {
     }
 
     private String safe(String s) {
-        return s == null ? "" : s.trim();
+        if (s == null)
+            return "";
+        // Remove all dashes, underscores, and whitespace if that's all there is
+        String t = s.trim();
+        if (t.matches("^[-–—_\\s]+$")) {
+            return "";
+        }
+        return t;
     }
 
     private void saveImportLog(User user, MultipartFile file, ImportPlan plan) {
@@ -656,13 +711,14 @@ public class EmployeeImportProcessor {
         }
     }
 
-    private void createPositions(Employee emp, Regional reg, Division div, Unit unit, JobPosition job,
+    private EmployeePosition createPositions(Employee emp, Regional reg, Division div, Unit unit, JobPosition job,
             LocalDate effDate,
             Regional reg2, Division div2, Unit unit2, JobPosition job2, LocalDate effDate2) {
         Instant now = Instant.now();
+        EmployeePosition primary = null;
 
         if (job != null) {
-            EmployeePosition primary = EmployeePosition.builder()
+            primary = EmployeePosition.builder()
                     .employee(emp)
                     .positionType(EmployeePosition.PositionType.PRIMARY)
                     .regional(reg)
@@ -692,6 +748,7 @@ public class EmployeeImportProcessor {
                     .build();
             positionRepo.save(Objects.requireNonNull(secondary));
         }
+        return primary;
     }
 
     private void updatePositions(Employee emp, Regional reg, Division div, Unit unit, JobPosition job,

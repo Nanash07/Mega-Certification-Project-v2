@@ -48,6 +48,7 @@ public class EmployeeService {
                         List<Long> jobPositionIds,
                         List<String> statuses,
                         String search,
+                        String positionType, // NEW
                         Pageable pageable) {
 
                 Specification<Employee> spec = EmployeeSpecification.activePageOnly()
@@ -57,7 +58,8 @@ public class EmployeeService {
                                 .and(EmployeeSpecification.byUnitIds(unitIds))
                                 .and(EmployeeSpecification.byJobPositionIds(jobPositionIds))
                                 .and(EmployeeSpecification.byStatuses(statuses))
-                                .and(EmployeeSpecification.bySearch(search));
+                                .and(EmployeeSpecification.bySearch(search))
+                                .and(EmployeeSpecification.byPositionType(positionType)); // NEW
 
                 if (pageable.getSort().isUnsorted()) {
                         pageable = PageRequest.of(
@@ -77,6 +79,7 @@ public class EmployeeService {
                         List<Long> unitIds,
                         List<Long> jobPositionIds,
                         String search,
+                        String positionType, // NEW
                         Pageable pageable) {
 
                 Specification<Employee> spec = EmployeeSpecification.resignedPageOnly()
@@ -85,7 +88,8 @@ public class EmployeeService {
                                 .and(EmployeeSpecification.byDivisionIds(divisionIds))
                                 .and(EmployeeSpecification.byUnitIds(unitIds))
                                 .and(EmployeeSpecification.byJobPositionIds(jobPositionIds))
-                                .and(EmployeeSpecification.bySearch(search));
+                                .and(EmployeeSpecification.bySearch(search))
+                                .and(EmployeeSpecification.byPositionType(positionType)); // NEW
 
                 if (pageable.getSort().isUnsorted()) {
                         pageable = PageRequest.of(
@@ -133,7 +137,7 @@ public class EmployeeService {
                                 saved.getId(), EmployeePosition.PositionType.PRIMARY).orElse(null);
                 LocalDate effDate = primary != null ? primary.getEffectiveDate() : null;
 
-                historyService.snapshot(saved, EmployeeHistory.EmployeeActionType.CREATED, effDate);
+                historyService.snapshotCreated(saved, primary, effDate, "UTAMA");
 
                 return toResponse(saved);
         }
@@ -167,19 +171,6 @@ public class EmployeeService {
                                 ? oldPrimary.getRegional().getName()
                                 : null;
 
-                Long oldJobId = oldPrimary != null && oldPrimary.getJobPosition() != null
-                                ? oldPrimary.getJobPosition().getId()
-                                : null;
-                Long oldUnitId = oldPrimary != null && oldPrimary.getUnit() != null
-                                ? oldPrimary.getUnit().getId()
-                                : null;
-                Long oldDivisionId = oldPrimary != null && oldPrimary.getDivision() != null
-                                ? oldPrimary.getDivision().getId()
-                                : null;
-                Long oldRegionalId = oldPrimary != null && oldPrimary.getRegional() != null
-                                ? oldPrimary.getRegional().getId()
-                                : null;
-
                 emp = mapRequestToEntity(emp, req);
                 emp.setUpdatedAt(Instant.now());
 
@@ -191,14 +182,7 @@ public class EmployeeService {
                                 saved.getId(), EmployeePosition.PositionType.PRIMARY).orElse(null);
                 LocalDate newEffDate = newPrimary != null ? newPrimary.getEffectiveDate() : null;
 
-                boolean orgChanged = !Objects.equals(oldRegionalId, req.getRegionalId())
-                                || !Objects.equals(oldDivisionId, req.getDivisionId())
-                                || !Objects.equals(oldUnitId, req.getUnitId())
-                                || !Objects.equals(oldJobId, req.getJobPositionId());
-
-                EmployeeHistory.EmployeeActionType type = orgChanged
-                                ? EmployeeHistory.EmployeeActionType.MUTASI
-                                : EmployeeHistory.EmployeeActionType.UPDATED;
+                EmployeeHistory.EmployeeActionType type = EmployeeHistory.EmployeeActionType.UPDATED;
 
                 historyService.snapshotWithOldValues(
                                 saved,
@@ -207,7 +191,8 @@ public class EmployeeService {
                                 oldDivisionName,
                                 oldRegionalName,
                                 type,
-                                newEffDate);
+                                newEffDate,
+                                "UTAMA");
 
                 return toResponse(saved);
         }
@@ -233,7 +218,7 @@ public class EmployeeService {
                         EmployeePosition primary = emp.getPrimaryPosition();
                         LocalDate effDate = primary != null ? primary.getEffectiveDate() : null;
 
-                        historyService.snapshot(saved, EmployeeHistory.EmployeeActionType.RESIGN, effDate);
+                        historyService.snapshot(saved, EmployeeHistory.EmployeeActionType.DELETED, effDate, "UTAMA");
                         return toResponse(saved);
                 }
 
@@ -262,7 +247,7 @@ public class EmployeeService {
                 EmployeePosition primary = emp.getPrimaryPosition();
                 LocalDate effDate = primary != null ? primary.getEffectiveDate() : null;
 
-                historyService.snapshot(saved, EmployeeHistory.EmployeeActionType.TERMINATED, effDate);
+                historyService.snapshot(saved, EmployeeHistory.EmployeeActionType.DELETED, effDate, "UTAMA");
         }
 
         private Employee mapRequestToEntity(Employee emp, EmployeeRequest req) {

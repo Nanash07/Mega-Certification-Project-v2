@@ -38,23 +38,52 @@ public class EmployeeHistoryService {
                         JobPosition oldJob,
                         JobPosition newJob,
                         LocalDate effective,
-                        EmployeeHistory.EmployeeActionType actionType) {
+                        EmployeeHistory.EmployeeActionType actionType,
+                        String positionType) {
                 if (emp == null)
                         return;
 
                 EmployeePosition primary = emp.getPrimaryPosition();
+                // Use passed jobs/orgs if available, otherwise fallback to existing primary
+                // (for old logic)
+                // Actually, if we are snapshotting a SPECIFIC position (e.g. secondary), we
+                // should use the passed values.
+
+                // For safety, if newJob/oldJob are passed, we rely on them.
+                // Org units are a bit trickier because they are usually tied to position.
+                // But here we only pass JobPosition.
+                // We should probably rely on the caller to pass correct orgs if possible,
+                // or fetch from the relevant position.
+
+                // As a simplification for now, we'll assume orgs come from primary if not
+                // provided
+                // OR we should have passed them?
+                // The original code fetched form primary.
+                // If we want to support secondary, we must fetch from the CORRECT position.
+                // But here we only have Employee and JobPosition.
+                // Ideally we should pass the full snapshot data or the Position object.
+
+                // Let's modify to use the VALUES from the relevant position if available?
+                // Or stick to the original "snapshot" signatures?
+                // To properly support splitting, we need the caller to provide details.
+                // BUT, `snapshot` at line 37 is usually called for CREATED/RESIGN/TERMINATED of
+                // EMPLOYEE.
+                // In those cases, it's usually about the PRIMARY position or the whole
+                // employee.
+                // So default to "UTAMA" is fine for general employee events.
+
                 String unitName = primary != null && primary.getUnit() != null
                                 ? primary.getUnit().getName()
-                                : null; // Removed fallback
+                                : null;
                 String divisionName = primary != null && primary.getDivision() != null
                                 ? primary.getDivision().getName()
-                                : null; // Removed fallback
+                                : null;
                 String regionalName = primary != null && primary.getRegional() != null
                                 ? primary.getRegional().getName()
-                                : null; // Removed fallback
+                                : null;
                 LocalDate effDate = primary != null && primary.getEffectiveDate() != null
                                 ? primary.getEffectiveDate()
-                                : null; // Removed fallback
+                                : null;
 
                 EmployeeHistory history = EmployeeHistory.builder()
                                 .employee(emp)
@@ -72,6 +101,7 @@ public class EmployeeHistoryService {
                                 .newRegionalName(regionalName)
                                 .effectiveDate(effective != null ? effective : effDate)
                                 .actionType(actionType)
+                                .positionType(positionType != null ? positionType : "UTAMA")
                                 .actionAt(Instant.now())
                                 .build();
 
@@ -90,27 +120,31 @@ public class EmployeeHistoryService {
                         String oldDivisionName,
                         String oldRegionalName,
                         EmployeeHistory.EmployeeActionType actionType,
-                        LocalDate effective) {
+                        LocalDate effective,
+                        String positionType) {
 
                 if (newEmp == null)
                         return;
 
-                EmployeePosition primary = newEmp.getPrimaryPosition();
-                JobPosition newJob = primary != null && primary.getJobPosition() != null
-                                ? primary.getJobPosition()
-                                : null; // Removed fallback
-                String newUnitName = primary != null && primary.getUnit() != null
-                                ? primary.getUnit().getName()
-                                : null; // Removed fallback
-                String newDivisionName = primary != null && primary.getDivision() != null
-                                ? primary.getDivision().getName()
-                                : null; // Removed fallback
-                String newRegionalName = primary != null && primary.getRegional() != null
-                                ? primary.getRegional().getName()
-                                : null; // Removed fallback
-                LocalDate effDate = primary != null && primary.getEffectiveDate() != null
-                                ? primary.getEffectiveDate()
-                                : null; // Removed fallback
+                // Determine which position to read new values from
+                boolean isSecondary = "KEDUA".equalsIgnoreCase(positionType);
+                EmployeePosition targetPos = isSecondary ? newEmp.getSecondaryPosition() : newEmp.getPrimaryPosition();
+
+                JobPosition newJob = targetPos != null && targetPos.getJobPosition() != null
+                                ? targetPos.getJobPosition()
+                                : null;
+                String newUnitName = targetPos != null && targetPos.getUnit() != null
+                                ? targetPos.getUnit().getName()
+                                : null;
+                String newDivisionName = targetPos != null && targetPos.getDivision() != null
+                                ? targetPos.getDivision().getName()
+                                : null;
+                String newRegionalName = targetPos != null && targetPos.getRegional() != null
+                                ? targetPos.getRegional().getName()
+                                : null;
+                LocalDate effDate = targetPos != null && targetPos.getEffectiveDate() != null
+                                ? targetPos.getEffectiveDate()
+                                : null;
 
                 EmployeeHistory history = EmployeeHistory.builder()
                                 .employee(newEmp)
@@ -127,6 +161,7 @@ public class EmployeeHistoryService {
                                 .newRegionalName(newRegionalName)
                                 .effectiveDate(effective != null ? effective : effDate)
                                 .actionType(actionType)
+                                .positionType(positionType != null ? positionType : "UTAMA")
                                 .actionAt(Instant.now())
                                 .build();
 
@@ -150,30 +185,63 @@ public class EmployeeHistoryService {
                 }
         }
 
-        public void snapshot(Employee emp, EmployeeHistory.EmployeeActionType actionType, LocalDate effectiveDate) {
+        public void snapshot(Employee emp, EmployeeHistory.EmployeeActionType actionType, LocalDate effectiveDate,
+                        String positionType) {
                 EmployeePosition primary = emp != null ? emp.getPrimaryPosition() : null;
                 JobPosition jp = primary != null && primary.getJobPosition() != null
                                 ? primary.getJobPosition()
                                 : null;
-                snapshot(emp, jp, jp, effectiveDate, actionType);
+                snapshot(emp, jp, jp, effectiveDate, actionType, positionType);
         }
 
         public void snapshot(Employee emp, EmployeeHistory.EmployeeActionType actionType) {
-                EmployeePosition primary = emp != null ? emp.getPrimaryPosition() : null;
-                JobPosition jp = primary != null && primary.getJobPosition() != null
-                                ? primary.getJobPosition()
-                                : null;
-                LocalDate effDate = primary != null && primary.getEffectiveDate() != null
-                                ? primary.getEffectiveDate()
-                                : null;
-                snapshot(emp, jp, jp, effDate, actionType);
+                snapshot(emp, actionType, null, "UTAMA");
+        }
+
+        @Transactional
+        public void snapshotCreated(Employee emp, EmployeePosition pos, LocalDate effectiveDate, String positionType) {
+                if (emp == null || pos == null)
+                        return;
+
+                String unitName = pos.getUnit() != null ? pos.getUnit().getName() : null;
+                String divisionName = pos.getDivision() != null ? pos.getDivision().getName() : null;
+                String regionalName = pos.getRegional() != null ? pos.getRegional().getName() : null;
+                String jobName = pos.getJobPosition() != null ? pos.getJobPosition().getName() : null;
+
+                EmployeeHistory history = EmployeeHistory.builder()
+                                .employee(emp)
+                                .employeeNip(emp.getNip())
+                                .employeeName(emp.getName())
+                                .oldJobPosition(null)
+                                .oldJobTitle("-") // As requested
+                                .oldUnitName("-")
+                                .oldDivisionName("-")
+                                .oldRegionalName("-")
+                                .newJobPosition(pos.getJobPosition())
+                                .newJobTitle(jobName)
+                                .newUnitName(unitName)
+                                .newDivisionName(divisionName)
+                                .newRegionalName(regionalName)
+                                .effectiveDate(effectiveDate != null ? effectiveDate
+                                                : (pos.getEffectiveDate() != null ? pos.getEffectiveDate()
+                                                                : LocalDate.now()))
+                                .actionType(EmployeeHistory.EmployeeActionType.CREATED)
+                                .positionType(positionType != null ? positionType : "UTAMA")
+                                .actionAt(Instant.now())
+                                .build();
+
+                batchBuffer.add(history);
+
+                if (batchBuffer.size() >= BATCH_SIZE) {
+                        flushBatch();
+                }
         }
 
         @Transactional(readOnly = true)
         public Page<EmployeeHistoryResponse> getPagedHistory(
                         Long employeeId, String actionType, String search, Pageable pageable) {
 
-                return getPagedHistory(employeeId, actionType, search, null, null, pageable);
+                return getPagedHistory(employeeId, actionType, search, null, null, null, pageable);
         }
 
         @Transactional(readOnly = true)
@@ -183,12 +251,14 @@ public class EmployeeHistoryService {
                         String search,
                         LocalDate startDate,
                         LocalDate endDate,
+                        String positionType,
                         Pageable pageable) {
 
                 Specification<EmployeeHistory> spec = EmployeeHistorySpecification.byEmployeeId(employeeId)
                                 .and(EmployeeHistorySpecification.byActionType(actionType))
                                 .and(EmployeeHistorySpecification.bySearch(search))
-                                .and(EmployeeHistorySpecification.byDateRange(startDate, endDate));
+                                .and(EmployeeHistorySpecification.byDateRange(startDate, endDate))
+                                .and(EmployeeHistorySpecification.byPositionType(positionType)); // NEW
 
                 Pageable sorted = PageRequest.of(
                                 pageable.getPageNumber(),
@@ -204,12 +274,14 @@ public class EmployeeHistoryService {
                         String actionType,
                         String search,
                         LocalDate startDate,
-                        LocalDate endDate) {
+                        LocalDate endDate,
+                        String positionType) { // NEW
 
                 Specification<EmployeeHistory> spec = EmployeeHistorySpecification.byEmployeeId(employeeId)
                                 .and(EmployeeHistorySpecification.byActionType(actionType))
                                 .and(EmployeeHistorySpecification.bySearch(search))
-                                .and(EmployeeHistorySpecification.byDateRange(startDate, endDate));
+                                .and(EmployeeHistorySpecification.byDateRange(startDate, endDate))
+                                .and(EmployeeHistorySpecification.byPositionType(positionType)); // NEW
 
                 List<EmployeeHistory> rows = historyRepo.findAll(spec, Sort.by(Sort.Direction.DESC, "actionAt"));
 
@@ -241,7 +313,8 @@ public class EmployeeHistoryService {
                                         "Divisi Baru",
                                         "Regional Lama",
                                         "Regional Baru",
-                                        "Tanggal Efektif (WIB)"
+                                        "Tanggal Efektif (WIB)",
+                                        "Tipe"
                         };
 
                         Row headerRow = sheet.createRow(0);
@@ -291,6 +364,8 @@ public class EmployeeHistoryService {
                                         effCell.setCellValue("");
                                 }
 
+                                row.createCell(col++).setCellValue(nvl(h.getPositionType()));
+
                                 rowIdx++;
                         }
 
@@ -327,6 +402,7 @@ public class EmployeeHistoryService {
                                 .newRegionalName(h.getNewRegionalName())
                                 .effectiveDate(h.getEffectiveDate())
                                 .actionType(h.getActionType())
+                                .positionType(h.getPositionType())
                                 .actionAt(h.getActionAt())
                                 .build();
         }

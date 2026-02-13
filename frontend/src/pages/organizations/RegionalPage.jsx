@@ -1,68 +1,54 @@
 import { useEffect, useState, useMemo } from "react";
 import toast from "react-hot-toast";
-import { Trash2, MapPin, Filter, Eraser, Search } from "lucide-react";
-import AsyncSelect from "react-select/async";
+import { Trash2, MapPin, Eraser, Search } from "lucide-react";
+import Select from "react-select";
 import { fetchRegionals, toggleRegional } from "../../services/regionalService";
 import Pagination from "../../components/common/Pagination";
 
 export default function RegionalPage() {
-    // Table State
     const [rows, setRows] = useState([]);
     const [loading, setLoading] = useState(false);
-    const [page, setPage] = useState(1);
-    const [totalPages, setTotalPages] = useState(1);
-    const [totalElements, setTotalElements] = useState(0);
-    const pageSize = 10;
-
-    // Filter State
-    const [filter, setFilter] = useState(null);
-
-    // Options for Select
-    const [options, setOptions] = useState([]);
-    const [isOptionsLoading, setIsOptionsLoading] = useState(false);
-
-    // Confirm dialog
     const [confirm, setConfirm] = useState({ open: false, id: undefined, name: "" });
 
-    // Fetch Options (Pre-load for Select)
-    useEffect(() => {
-        setIsOptionsLoading(true);
-        fetchRegionals({ page: 0, size: 20 })
-            .then((res) => {
-                const list = res.content || [];
-                setOptions(list.map((r) => ({ value: r.id, label: r.name })));
-            })
-            .catch((err) => console.error(err))
-            .finally(() => setIsOptionsLoading(false));
-    }, []);
+    const [filter, setFilter] = useState(null);
+    const [page, setPage] = useState(1);
+    const [rowsPerPage, setRowsPerPage] = useState(10);
+    const [totalPages, setTotalPages] = useState(0);
+    const [totalElements, setTotalElements] = useState(0);
 
-    // API Params for Table
-    const apiParams = useMemo(() => {
-        return {
-            page: page - 1,
-            size: pageSize,
-            q: filter?.label || "", // Search by name (label)
-        };
-    }, [page, filter]);
+    // All data for select options
+    const [allRows, setAllRows] = useState([]);
 
-    // Load Table Data
-    useEffect(() => {
-        load();
-    }, [apiParams]);
+    const apiParams = useMemo(() => ({
+        page: page - 1,
+        size: rowsPerPage,
+        q: filter?.label || "",
+    }), [page, rowsPerPage, filter]);
 
     async function load() {
         setLoading(true);
         try {
             const res = await fetchRegionals(apiParams);
-            setRows(res.content);
-            setTotalPages(res.totalPages);
-            setTotalElements(res.totalElements);
+            setRows(res.content || []);
+            setTotalPages(res.totalPages || 1);
+            setTotalElements(res.totalElements || 0);
         } catch {
             toast.error("Gagal memuat data regional");
         } finally {
             setLoading(false);
         }
     }
+
+    // Load all data for Select options
+    useEffect(() => {
+        fetchRegionals({ page: 0, size: 9999 })
+            .then((res) => setAllRows(res.content || []))
+            .catch(() => {});
+    }, []);
+
+    useEffect(() => {
+        load();
+    }, [apiParams]);
 
     async function onToggle(id) {
         try {
@@ -73,6 +59,14 @@ export default function RegionalPage() {
             toast.error("Gagal update status");
         }
     }
+
+    // ================== SEARCH HELPER ==================
+    const options = useMemo(() => {
+        return allRows.map((r) => ({
+            value: r.id,
+            label: r.name,
+        }));
+    }, [allRows]);
 
     // ================== STYLES ==================
     const selectStyles = {
@@ -115,58 +109,48 @@ export default function RegionalPage() {
         }),
     };
 
+    const startIdx = totalElements === 0 ? 0 : (page - 1) * rowsPerPage + 1;
+
     return (
         <div className="space-y-4 w-full">
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                <div className="flex items-center gap-2">
-                    <MapPin size={20} className="text-secondary" />
+                <div>
                     <h1 className="text-lg sm:text-xl font-bold">Data Regional</h1>
+                    <p className="text-xs text-gray-500">{totalElements} regional</p>
                 </div>
-                <button
-                    className="btn btn-sm btn-primary rounded-lg"
-                    onClick={() => setIsAddModalOpen(true)}
-                >
-                    <Plus size={16} />
-                    Tambah Regional
-                </button>
             </div>
 
-            {/* Filter Card */}
+            {/* Filter */}
             <div className="card bg-base-100 shadow-sm border border-gray-100 p-4">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs w-full">
-                    <div className="flex flex-col gap-1 w-full">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+                    <div className="flex flex-col gap-1 lg:col-span-3">
                         <label className="font-medium text-gray-600 flex items-center gap-1">
                             <Search size={12} /> Cari Regional
                         </label>
-                        <AsyncSelect
-                            cacheOptions
-                            loadOptions={loadOptions}
-                            defaultOptions
+                        <Select
+                            options={options}
                             value={filter}
                             onChange={(val) => {
                                 setPage(1);
                                 setFilter(val);
                             }}
-                            placeholder="Ketik nama regional..."
+                            placeholder="Semua Regional"
                             isClearable
                             className="text-xs"
+                            classNamePrefix="react-select"
                             styles={selectStyles}
-                            noOptionsMessage={() => "Tidak ditemukan"}
-                            loadingMessage={() => "Mencari..."}
                         />
                     </div>
-                    <div className="flex flex-col gap-1 sm:col-span-2">
-                        <label className="font-medium text-gray-600 invisible">.</label>
-                        <div className="flex gap-2">
-                            <button
-                                className="btn btn-sm btn-accent btn-soft rounded-lg flex gap-2"
-                                onClick={resetFilter}
-                            >
-                                <Eraser size={14} />
-                                Clear Filter
-                            </button>
-                        </div>
+                    <div className="flex flex-col gap-1">
+                         <label className="font-medium text-gray-600 invisible">.</label>
+                         <button
+                            className="btn btn-sm btn-accent btn-soft w-full flex gap-2 rounded-lg"
+                            onClick={() => { setFilter(null); setPage(1); }}
+                        >
+                            <Eraser size={14} />
+                            Clear Filter
+                        </button>
                     </div>
                 </div>
             </div>
@@ -202,7 +186,7 @@ export default function RegionalPage() {
                             ) : (
                                 rows.map((r, idx) => (
                                     <tr key={r.id} className="hover">
-                                        <td>{(page - 1) * pageSize + idx + 1}</td>
+                                        <td>{startIdx + idx}</td>
                                         <td>
                                             <div className="flex gap-1">
                                                 <div className="tooltip" data-tip={r.isActive ? "Nonaktifkan" : "Aktifkan"}>
@@ -249,19 +233,16 @@ export default function RegionalPage() {
                             page={page}
                             totalPages={totalPages}
                             totalElements={totalElements}
-                            rowsPerPage={pageSize}
+                            rowsPerPage={rowsPerPage}
                             onPageChange={setPage}
                             onRowsPerPageChange={(val) => {
-                                // This component doesn't allow changing rowsPerPage, but keeping the prop for consistency
-                                // setRowsPerPage(val);
+                                setRowsPerPage(val);
                                 setPage(1);
                             }}
                         />
                     </div>
                 )}
             </div>
-
-
 
             {/* Confirm Actions */}
             <dialog className="modal" open={confirm.open}>

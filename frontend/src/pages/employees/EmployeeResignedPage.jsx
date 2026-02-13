@@ -124,7 +124,7 @@ export default function EmployeeResignedPage() {
             setTotalPages(res.totalPages || 1);
             setTotalElements(res.totalElements || 0);
         } catch {
-            toast.error("Gagal memuat data pegawai resign");
+            toast.error("Gagal memuat data pegawai nonaktif");
         } finally {
             setLoading(false);
         }
@@ -152,8 +152,8 @@ export default function EmployeeResignedPage() {
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div>
-                    <h1 className="text-lg sm:text-xl font-bold">Pegawai Resign</h1>
-                    <p className="text-xs text-gray-500">{totalElements} pegawai resign terdaftar</p>
+                    <h1 className="text-lg sm:text-xl font-bold">Pegawai Nonaktif</h1>
+                    <p className="text-xs text-gray-500">{totalElements} pegawai nonaktif terdaftar</p>
                 </div>
             </div>
 
@@ -279,7 +279,7 @@ export default function EmployeeResignedPage() {
                                     <td colSpan={12} className="text-center py-16">
                                         <div className="flex flex-col items-center text-gray-400">
                                             <UserX size={48} className="mb-3 opacity-30" />
-                                            <p className="text-sm">Tidak ada data pegawai resign</p>
+                                            <p className="text-sm">Tidak ada data pegawai nonaktif</p>
                                         </div>
                                     </td>
                                 </tr>

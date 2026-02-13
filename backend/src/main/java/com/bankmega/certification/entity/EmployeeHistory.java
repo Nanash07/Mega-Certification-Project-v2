@@ -60,15 +60,15 @@ public class EmployeeHistory {
     @Enumerated(EnumType.STRING)
     private EmployeeActionType actionType;
 
+    @Column(name = "position_type", length = 20)
+    private String positionType;
+
     private Instant actionAt;
 
     // 🔹 Inner Enum
     public enum EmployeeActionType {
         CREATED,
         UPDATED,
-        MUTASI,
-        RESIGN,
-        TERMINATED,
-        REHIRED
+        DELETED
     }
 }
